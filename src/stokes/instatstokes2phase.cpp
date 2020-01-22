@@ -248,7 +248,7 @@ void System2Accumulator_P2P1XCL::visit (const TetraCL& tet)
 {
     base_::visit( tet);
     evaluate_on_vertexes( lset_.GetSolution(), tet, lat, Addr( ls_loc_));
-    if (equal_signs( ls_loc_)) return; // extended basis functions have only support on tetra intersecting Gamma.
+    if (equalSigns(ls_loc_)) return; // extended basis functions have only support on tetra intersecting Gamma.
 
     partition_.make_partition<SortedVertexPolicyCL, MergeCutPolicyCL>( lat, ls_loc_);
     make_CompositeQuad2Domain( q2dom_, partition_);
@@ -2266,7 +2266,7 @@ void InstatStokes2PhaseP2P1CL::SetupPrStiff( MLMatDescCL* A_pr, const LevelsetP2
 }
 
 
-void InstatStokes2PhaseP2P1CL::InitVel(VelVecDescCL* vec, instat_vector_fun_ptr LsgVel, double t0) const
+void InstatStokes2PhaseP2P1CL::InitVel(VelVecDescCL* vec, InstatVectorFunction LsgVel, double t0) const
 {
     VectorCL& lsgvel= vec->Data;
     vec->t = t0;
@@ -2449,7 +2449,7 @@ class SlipBndSystem1TwoPhaseP2CL
 
     const VecDescCL&    Phi_;
     const BndDataCL<>& lsetBndData_;
-    instat_vector_fun_ptr BndOutNormal_;
+    InstatVectorFunction BndOutNormal_;
     const double mu1_, mu2_;                                //dynamic viscosities
     const double beta1_, beta2_;                            //beta1_=beta2_=0 for symmetric Bnd;
     const double betaL_; 
@@ -2458,8 +2458,8 @@ class SlipBndSystem1TwoPhaseP2CL
     std::valarray<double> ls_loc;
 
   public:
-    SlipBndSystem1TwoPhaseP2CL(const StokesBndDataCL& BndData, const VecDescCL& Phi, const BndDataCL<>& lsetBndData, 
-    instat_vector_fun_ptr BndOutNormal, double mu1, double mu2, const double beta1=0, const double beta2=0, const double betaL=0, const double alpha=0)
+    SlipBndSystem1TwoPhaseP2CL(const StokesBndDataCL& BndData, const VecDescCL& Phi, const BndDataCL<>& lsetBndData,
+                               InstatVectorFunction BndOutNormal, double mu1, double mu2, const double beta1=0, const double beta2=0, const double betaL=0, const double alpha=0)
     : lat( PrincipalLatticeCL::instance(2)), BndData_(BndData), Phi_(Phi), lsetBndData_(lsetBndData), 
     BndOutNormal_(BndOutNormal), mu1_(mu1), mu2_(mu2), beta1_(beta1), beta2_(beta2), betaL_(betaL), alpha_(alpha), ls_loc( lat.vertex_size())
     { P2DiscCL::GetGradientsOnRef( GradRef); }
@@ -2615,7 +2615,6 @@ void SlipBndSystem1TwoPhaseP2CL::setupCL_dissipation(const TetraCL& tet, LocalSy
     InterfaceLineCL line;
     line.Init( tet, Phi_,lsetBndData_); 
     line.SetBndCondT(tet, BndData_.Vel);
-    line.SetBndOutNormal(BndOutNormal_);
     LocalP2CL<double> phi[10]; 
     for(Uint i=0; i<10; ++i)
     {
@@ -2633,7 +2632,7 @@ void SlipBndSystem1TwoPhaseP2CL::setupCL_dissipation(const TetraCL& tet, LocalSy
             BaryCoordCL Barys[2]; //Barycentric coordinates of two end points
             Point3DCL Pt[2];      //Cartesian coordinates of two end points
             double length = line.GetInfoMCL(cl, Barys[0], Barys[1], Pt[0], Pt[1]);
-            Quad9_1DCL<Point3DCL> normal_MCL = line.GetImprovedMCLNormalOnSlipBnd(tet, cl);     //outer normal of moving contact lines on the slip surface
+            Quad9_1DCL<Point3DCL> normal_MCL = line.GetImprovedMCLNormalOnSlipBnd(tet, cl, BndOutNormal_);     //outer normal of moving contact lines on the slip surface
             for (Uint i=0; i<10; ++i)
             {
                 Quad9_1DCL<double> phiquadi(phi[i], Barys);
@@ -2663,7 +2662,7 @@ class LocalSystem1TwoPhase_P2CL
 
     const double mu_p, mu_n;
     const double rho_p, rho_n;
-    instat_vector_fun_ptr rhs_func;
+    InstatVectorFunction rhs_func;
 
     LocalP1CL<Point3DCL> GradRefLP1[10], GradLP1[10];
     LocalP2CL<> p2;
@@ -2677,7 +2676,7 @@ class LocalSystem1TwoPhase_P2CL
     GridFunctionCL<Point3DCL> rhs;
 
   public:
-    LocalSystem1TwoPhase_P2CL (double mup, double mun, double rhop, double rhon, instat_vector_fun_ptr rhsFunc)
+    LocalSystem1TwoPhase_P2CL (double mup, double mun, double rhop, double rhon, InstatVectorFunction rhsFunc)
         : lat( PrincipalLatticeCL::instance( 2)), mu_p( mup), mu_n( mun), rho_p( rhop), rho_n( rhon), rhs_func(rhsFunc), ls_loc( lat.vertex_size())
     { P2DiscCL::GetGradientsOnRef( GradRefLP1); }
 
@@ -2985,7 +2984,7 @@ void System1Accumulator_P2CL::local_setup (const TetraCL& tet)
     n.assign( tet, RowIdx, BndData.Vel);
 
     ls_loc.assign( tet, lset_Phi, lset_Bnd);
-    const bool noCut= equal_signs( ls_loc);
+    const bool noCut= equalSigns(ls_loc);
     
     speBnd = false;
     for(int i =0; i< 4; ++i) {
@@ -3174,7 +3173,7 @@ void CplMAccumulator_P2CL::local_setup (const TetraCL& tet)
     absdet= std::fabs( det);
 
     ls_loc.assign( tet, lset_Phi, lset_Bnd);
-    const bool noCut= equal_signs( ls_loc);
+    const bool noCut= equalSigns(ls_loc);
     if (noCut) {
         local_onephase.rho( local_twophase.rho( sign( ls_loc[0])) );
         local_onephase.setup( absdet, loc);
@@ -3284,7 +3283,7 @@ void AdotUAccumulator_P2CL::local_setup (const TetraCL& tet)
     n.assign( tet, RowIdx, BndData.Vel);
 
     ls_loc.assign( tet, lset_Phi, lset_Bnd);
-    const bool noCut= equal_signs( ls_loc);
+    const bool noCut= equalSigns(ls_loc);
     if (noCut) {
         local_onephase.mu(  local_twophase.mu(  sign( ls_loc[0] ) ) );
         local_onephase.setup( T, absdet, loc);
@@ -3386,7 +3385,7 @@ void System1Accumulator_P2XCL::local_setup (const TetraCL& tet)
 {
     base::local_setup( tet);
     // ls_loc already set in base::local_setup(...)
-    if (!equal_signs( ls_loc))
+    if (!equalSigns(ls_loc))
         localX_twophase.setup( ls_loc, locInt, locX);
     for (int sgn=0; sgn<2; ++sgn) // loop over neg/pos part
         add_transpose_kronecker_id( locX[sgn].Ak, locX[sgn].A);
@@ -4113,11 +4112,11 @@ class LocalLBTwoPhase_P2CL
 
     double surfTension_;
     double t_;
-    DROPS::instat_scalar_fun_ptr var_tau_fncs_;
+    DROPS::InstatScalarFunction var_tau_fncs_;
     void Get_Normals(const LocalP2CL<>& ls, LocalP1CL<Point3DCL>&);
 
   public:
-    LocalLBTwoPhase_P2CL (double surfTension, DROPS::instat_scalar_fun_ptr var_tau_fncs = NULL, double t=0)
+    LocalLBTwoPhase_P2CL (double surfTension, DROPS::InstatScalarFunction var_tau_fncs = NULL, double t=0)
         : lat( PrincipalLatticeCL::instance( 2)), ls_loc( lat.vertex_size()), surfTension_( surfTension), t_(t), var_tau_fncs_(var_tau_fncs)
     { P2DiscCL::GetGradientsOnRef( GradRefLP1); }
 
@@ -4244,7 +4243,7 @@ void LBAccumulator_P2CL::visit (const TetraCL& tet)
 {
     ls_loc.assign( tet, lset, lset_bnd);
 
-    if (!equal_signs( ls_loc))
+    if (!equalSigns(ls_loc))
     {
         local_setup( tet);
         update_global_system();
@@ -4428,14 +4427,14 @@ class ImprovedYoungForceAccumulatorCL : public  TetraAccumulatorCL
     InterfaceLineCL line;
 
     const double sigma_;
-    instat_scalar_fun_ptr angle_;    //Young's equilibrium contact angle
-    instat_vector_fun_ptr BndOutNormal_;//outer normal of the (slip) boundary
+    InstatScalarFunction angle_;    //Young's equilibrium contact angle
+    InstatVectorFunction BndOutNormal_;//outer normal of the (slip) boundary
     IdxT Numb[10];
 
   public:
-    ImprovedYoungForceAccumulatorCL( const LevelsetP2CL& ls, const BndDataCL<Point3DCL>& VelBndData, VecDescCL& f_Gamma, double sigma, instat_scalar_fun_ptr CtAngle, instat_vector_fun_ptr outnormal)
+    ImprovedYoungForceAccumulatorCL(const LevelsetP2CL& ls, const BndDataCL<Point3DCL>& VelBndData, VecDescCL& f_Gamma, double sigma, InstatScalarFunction CtAngle, InstatVectorFunction outnormal)
      :  SmPhi_(ls.Phi), lsetBndData_(ls.GetBndData()), VelBndData_(VelBndData), f(f_Gamma), sigma_(sigma),angle_(CtAngle), BndOutNormal_(outnormal)
-    { ls.MaybeSmooth( SmPhi_.Data);}
+    { ls.MaybeSmooth( SmPhi_.Data); }
 
     void begin_accumulation (){}
     void finalize_accumulation(){}
@@ -4447,16 +4446,16 @@ void ImprovedYoungForceAccumulatorCL::visit ( const TetraCL& t)
 {
     bool SpeBnd = false; //has slip or symmetry bounary segments
     //check if the tetra contains one face or one edge on slip or symmetric boundary.
-    for(Uint v=0; v<4; v++)
-        if(VelBndData_.IsOnSlipBnd(*t.GetFace(v)) || VelBndData_.IsOnSymmBnd(*t.GetFace(v)) )
+    for( auto face= t.GetFacesBegin(); face!=t.GetFacesEnd(); ++face) 
+        if(VelBndData_.IsOnSlipBnd(**face) || VelBndData_.IsOnSymmBnd(**face) || VelBndData_.IsOnNatBnd(**face) )
         {
             SpeBnd=true;
             break;
         }
     if(!SpeBnd)
     {
-        for(Uint v=0; v<6; v++)
-            if(VelBndData_.IsOnSlipBnd(*t.GetEdge(v)) || VelBndData_.IsOnSymmBnd(*t.GetEdge(v)) )
+        for( auto edge= t.GetEdgesBegin(); edge!=t.GetEdgesEnd(); ++edge)
+            if(VelBndData_.IsOnSlipBnd(**edge) || VelBndData_.IsOnSymmBnd(**edge) || VelBndData_.IsOnNatBnd(**edge) )
             {
                 SpeBnd=true;
                 break;
@@ -4471,7 +4470,6 @@ void ImprovedYoungForceAccumulatorCL::visit ( const TetraCL& t)
     //Initialize one interface patch
     line.Init( t, SmPhi_, lsetBndData_); 
     line.SetBndCondT(t, VelBndData_);       // required to find moving contact line.
-    line.SetBndOutNormal(BndOutNormal_);
     for (int v=0; v<10; ++v)
     {   const UnknownHandleCL& unk= v<4 ? t.GetVertex(v)->Unknowns : t.GetEdge(v-4)->Unknowns;
         Numb[v]= unk.Exist(idx_f) ? unk(idx_f) : NoIdx;
@@ -4491,23 +4489,29 @@ void ImprovedYoungForceAccumulatorCL::visit ( const TetraCL& t)
             BaryCoordCL Barys[2]; //Barycentric coordinates of two end points
             Point3DCL Pt[2];      //Cartesian coordinates of two end points
             double length = line.GetInfoMCL(i,Barys[0],Barys[1],Pt[0], Pt[1]);
-            Quad9_1DCL<double> EquilibriumCtAngle(t, Barys, angle_);   
-            Quad9_1DCL<double> DynamicCtAngle = line.GetDynamicCtAngle(t, i);
-            Quad9_1DCL<double> costheta_e, sintheta_d;
-            //Note apply member function in GridFunctionCL requires template argument. 
-            for(int j=0; j< Quad9_1DDataCL::NumNodesC; j++){
-                costheta_e[j] = line.IsSymmType(i) ? 0 : std:: cos(EquilibriumCtAngle[j]);
-                sintheta_d[j] = line.IsSymmType(i) ? 1 : std:: sin(DynamicCtAngle[j]);
-            }
-            Quad9_1DCL<Point3DCL> normal_MCL = line.GetImprovedMCLNormalOnSlipBnd(t, i);     //outer normal of moving contact lines on the slip surface
-            Quad9_1DCL<Point3DCL> normal_SlipBnd(t, Barys, BndOutNormal_);                      //outer normal of the slip boundary
+            const Quad9_1DCL<Point3DCL> normal_Bnd(t, Barys, BndOutNormal_);             // outer normal of the boundary
+            Quad9_1DCL<Point3DCL> functional;
+            const BndCondInfoCL& bc= line.GetBC(i);
+            if (bc.IsSlip()) {
+                const Quad9_1DCL<> EquilibriumCtAngle(t, Barys, angle_),
+                    DynamicCtAngle = line.GetDynamicCtAngle(t, i, BndOutNormal_),
+                    costheta_e= Quad9_1DCL<>( std::cos(EquilibriumCtAngle)), 
+                    sintheta_d= Quad9_1DCL<>( std::sin(DynamicCtAngle));
+                const Quad9_1DCL<Point3DCL> normal_MCL = line.GetImprovedMCLNormalOnSlipBnd(t, i, BndOutNormal_); // outer normal of moving contact lines on the slip surface
+                functional= normal_MCL * costheta_e + normal_Bnd * sintheta_d; // cos (theta_e) n_cl + sin (theta_D) \dot n
+            } else if (bc.IsSymmetric())
+                functional= normal_Bnd;
+            else if (bc.IsNatural())
+                functional= line.GetImprovedMCLTangential(t, i, BndOutNormal_);
+            else 
+                throw DROPSErrCL("ImprovedYoungForceAccumulatorCL::visit: illegal boundary condition");
             for (int v=0; v<10; ++v)
             {
                 Quad9_1DCL<double> phiquadv(phi[v], Barys);
                 const IdxT Numbv= v<10 ? Numb[v] : (velXfem && Numb[v-10]!=NoIdx ? f.RowIdx->GetXidx()[Numb[v-10]] : NoIdx);
                 if (Numbv==NoIdx) continue;
-                // cos (theta_e) v \dot tau_cl + sin (theta_D) v \dot n
-                Point3DCL value = Quad9_1DCL<Point3DCL>(normal_MCL * costheta_e * phiquadv + normal_SlipBnd * sintheta_d * phiquadv ).quad(0.5*length); 
+                
+                Point3DCL value = Quad9_1DCL<Point3DCL>(functional * phiquadv ).quad(0.5*length); 
                 for (int j=0; j<3; ++j)
                     f.Data[Numbv+j] += sigma_*value[j];
             }
@@ -4590,7 +4594,7 @@ void BSAccumulator_P2CL::visit (const TetraCL& tet)
 {
     ls_loc.assign( tet, *lset.PhiC, lset.GetBndData());
 
-    if (!equal_signs( ls_loc))
+    if (!equalSigns(ls_loc))
     {
         local_setup( tet);
         update_global_system();

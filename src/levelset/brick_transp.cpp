@@ -60,7 +60,7 @@ double H= 0.5; // in the neg. part
 namespace DROPS
 {
 
-void InitVel (const MultiGridCL& MG, VecDescCL& v, instat_vector_fun_ptr vf)
+void InitVel (const MultiGridCL& MG, VecDescCL& v, InstatVectorFunction vf)
 {
     const Uint lvl= v.GetLevel(),
                idx= v.RowIdx->GetIdx();

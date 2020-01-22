@@ -306,11 +306,11 @@ class IdxDescCL: public FE_InfoCL
     Uint GetFreeIdx();
     /// \brief Number unknowns for standard FE.
     void CreateNumbStdFE( Uint level, MultiGridCL& mg);
+    /// \brief Number unknowns on the vertices in a trip surrounding an interface.
+    size_t CreateNumbOnInterface(Uint level, MultiGridCL& mg, const VecDescCL& ls, const BndDataCL<>& lsetbnd, double omit_bound= -1./*default to using all dof*/);
     /// \brief Number unknowns on the vertices surrounding an interface.
-    void CreateNumbOnInterface(Uint level, MultiGridCL& mg, const VecDescCL& ls, const BndDataCL<>& lsetbnd, double omit_bound= -1./*default to using all dof*/);
-        /// \brief Number unknowns on the vertices in a trip surrounding an interface.
-        void CreateNumbNearInterface(Uint level, MultiGridCL& mg, const VecDescCL& ls, const BndDataCL<>& lsetbnd,double width, double dist=0./*default to using dof in cut tetra*/);
-  public:
+    void CreateNumbNearInterface(Uint level, MultiGridCL& mg, const VecDescCL& ls, const BndDataCL<>& lsetbnd,double width, double dist=0./*default to using dof in cut tetra*/);
+public:
     using FE_InfoCL::IsExtended;
 
     /// \brief The constructor uses the lowest available index for the
@@ -357,7 +357,8 @@ class IdxDescCL: public FE_InfoCL
     /// \name Numbering
     /// \{
     /// \brief Used to number unknowns.
-    void CreateNumbering( Uint level, MultiGridCL& mg, const VecDescCL* lsetp= 0, const BndDataCL<>* lsetbnd =0);
+    size_t CreateNumbering( Uint level, MultiGridCL& mg, const VecDescCL* lsetp= 0, const BndDataCL<>* lsetbnd =0);
+    // void CreateNumbering(MultiGridCL&, std::vector<MultiGridCL::const_TriangTetraIteratorCL> const &);
     /// \brief Used to number unknowns and store boundary condition.
     /// \brief Used to number unknowns.
     void CreateNumbering( Uint level, MultiGridCL& mg, const VecDescCL* lsetp, const BndDataCL<>* lsetbnd ,double width);
@@ -519,10 +520,10 @@ class MLIdxDescCL : public MLDataCL<IdxDescCL>
 };
 
 /// merges two p1-VectorCL into a p1x-VectorCL
-void P1toP1X ( const IdxDescCL& xidx, VectorCL& p1x, const IdxDescCL& idx, const VectorCL& posPart, const VectorCL& negPart, const VecDescCL& lset, const MultiGridCL& mg );
+void P1toP1X ( const IdxDescCL& xidx, VectorCL& p1x, const IdxDescCL& idx, const VectorCL& posPart, const VectorCL& negPart, const VecDescCL& lset, const BndDataCL<>& lset_bnd, const MultiGridCL& mg);
 
 /// splits a p1x-VectorCL into two p1-VectorCL
-void P1XtoP1 ( const IdxDescCL& xidx, const VectorCL& p1x, const IdxDescCL& idx, VectorCL& posPart, VectorCL& negPart, const VecDescCL& lset, const MultiGridCL& mg );
+void P1XtoP1 ( const IdxDescCL& xidx, const VectorCL& p1x, const IdxDescCL& idx, VectorCL& posPart, VectorCL& negPart, const VecDescCL& lset, const BndDataCL<>& lset_bnd, const MultiGridCL& mg );
 
 /// extracts component from vector valued FE vector
 void ExtractComponent( const VectorCL& vecFE, VectorCL& scalarFE, Uint comp, Uint stride=3);
@@ -687,7 +688,6 @@ class VecDescBaseCL
     void Read(std::istream&, bool binary=false);
 };
 
-
 /// \brief A sparse matrix together with two IdxDescCL -objects,
 ///     that couple the row- and column- indices to simplices in a
 ///     multigrid.
@@ -719,6 +719,8 @@ class MatDescBaseCL
     void SetIdx( const IdxDescT*, const IdxDescT*);
     /// \brief Empty Data and set the index-pointers to 0.
     void Reset();
+    /// \brief Flag used by assembly routines to decide whether to populate the mtx or not
+    bool assemble = true;
 };
 
 typedef MatDescBaseCL<MatrixCL,IdxDescCL>     MatDescCL;
@@ -1040,7 +1042,7 @@ DeleteNumbOnSimplex( Uint idx, const Iter& begin, const Iter& end)
 }
 
 template <class SimplexContT>
-void DoPeriodicMatching(SimplexContT& s1, SimplexContT& s2, match_fun match, const Uint idx)
+void DoPeriodicMatching(SimplexContT& s1, SimplexContT& s2, MatchFunction match, const Uint idx)
 {
     // match objects in s1 and s2
     typedef typename SimplexContT::iterator psetIterT;
@@ -1092,10 +1094,10 @@ void DoPeriodicMatching(SimplexContT& s1, SimplexContT& s2, match_fun match, con
 ///       indices from its l1-counterpart.
 /// \{
 template<class SimplexT>
-void CreatePeriodicNumbOnSimplex( const Uint idx, IdxT& counter, Uint stride,
-                        const ptr_iter<SimplexT>& begin,
-                        const ptr_iter<SimplexT>& end,
-                        const BndCondCL& Bnd, const Uint level, match_fun match)
+void CreatePeriodicNumbOnSimplex(const Uint idx, IdxT& counter, Uint stride,
+                                 const ptr_iter<SimplexT>& begin,
+                                 const ptr_iter<SimplexT>& end,
+                                 const BndCondCL& Bnd, const Uint level, MatchFunction match)
 {
     if (stride == 0) return;
 

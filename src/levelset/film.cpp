@@ -130,7 +130,7 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
     adap.push_back( &ensrepair);
 
     lset.CreateNumbering(      MG.GetLastLevel(), periodic_match);
-    DROPS::instat_scalar_fun_ptr DistanceFct = DROPS::InScaMap::getInstance()[P.get("Exp.InitialLSet", std::string("WavyFilm"))];
+    DROPS::InstatScalarFunction DistanceFct = DROPS::InScaMap::getInstance()[P.get("Exp.InitialLSet", std::string("WavyFilm"))];
     lset.Init( DistanceFct);
     if ( StokesSolverFactoryHelperCL().VelMGUsed(P))
         Stokes.SetNumVelLvl ( Stokes.GetMG().GetNumLevel());
@@ -391,7 +391,7 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
 } // end of namespace DROPS
 
 
-void MarkFilm (DROPS::MultiGridCL& mg, DROPS::instat_scalar_fun_ptr distanceFct, DROPS::Uint maxLevel= ~0, double t=0.)
+void MarkFilm (DROPS::MultiGridCL& mg, DROPS::InstatScalarFunction distanceFct, DROPS::Uint maxLevel= ~0, double t=0.)
 {
     for (DROPS::MultiGridCL::TriangTetraIteratorCL It(mg.GetTriangTetraBegin(maxLevel)),
              ItEnd(mg.GetTriangTetraEnd(maxLevel)); It!=ItEnd; ++It)

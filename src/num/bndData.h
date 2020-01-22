@@ -106,11 +106,9 @@ template<class BndValT = double>
 class BndSegDataCL: public BndCondInfoCL
 {
   public:
-    typedef BndValT (*bnd_val_fun)( const Point3DCL&, double);
-
+    using bnd_val_fun = std::function<BndValT(const Point3DCL&, double)>;
   private:
     bnd_val_fun  bnd_val_;
-
   public:
     BndSegDataCL( BndCondT bc= Nat0BC, bnd_val_fun f= 0)
       :  BndCondInfoCL(bc), bnd_val_(f)
@@ -155,6 +153,8 @@ class BndCondCL
     }
     /// \brief Replace all Dirichlet by Neumann boundary conditions (yielding unknowns in all boundary DoFs)
     void StripDirichletBC();
+    /// \brief Replace all periodic by Neumann boundary conditions to prevent periodic numbering of unknowns
+    void StripPeriodicBC();
 
     /// \name boundary condition
     /// Returns superior boundary condition of sub-simplex
@@ -270,11 +270,13 @@ template <class T>
 class NoBndCondCL: public BndCondCL
 {
   public:
-         NoBndCondCL() : BndCondCL(0) {} // no bnd segments stored
+         NoBndCondCL() : BndCondCL(1) { BndCond_[0]= NoBC; } // no bnd segments stored
      // default copyctor, dtor, whatever
 
     template<class SimplexT>
     static inline BndCondT GetBC  (const SimplexT&) { return NoBC; }
+    template<class SimplexT>
+    static inline BndCondT GetBC  (const SimplexT&, BndIdxT& bidx) { bidx= 0; return NoBC; }
     template<class SimplexT>
     static inline bool IsOnDirBnd (const SimplexT&) { return false; }
     template<class SimplexT>

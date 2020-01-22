@@ -549,13 +549,13 @@ void TestAllP2MatricesWithP1Matrices(const MultiGridCL& MG, LevelsetP2CL& lset, 
     Schur_normalP1_stab.SetIdx(&ifaceP1idx, &ifaceP1idx);
 
 
-    SetupNavierStokesIF_P1P1(MG, &A_P1, &A_P1_stab, &B_P1P1, &Omega_P1P1,&C_P1,&CT_P1, &M_P1,&D_P1, &S_P1, &L_P1P1, &L_P1P1_stab, &Schur_P1, &Schur_P1_stab,&Schur_normalP1_stab, lset.Phi, lset.GetBndData(),
+    SetupNavierStokesIF_P1P1(MG, &A_P1, &A_P1_stab, &B_P1P1, &Omega_P1P1,&C_P1,&CT_P1, &M_P1,&D_P1, &S_P1, &L_P1P1, &L_P1P1_stab, &Schur_P1, &Schur_P1_stab,&Schur_normalP1_stab, lset,
     		//Y
     		lset.Phi, bb,
 			//
-			fullgrad);
+            nullptr);
 
-    DROPS::MatDescCL A_P2, A_P2_stab, B_P1P2, M_P2, S_P2, L_P1P2, L_P1P2_stab, Schur_P2, Schur_P2_stab;
+    DROPS::MatDescCL A_P2, A_P2_stab, B_P1P2, M_P2, S_P2, L_P1P2, L_P1P2_stab, Schur_P2, Schur_P2_stab, Schur_P2_normal_stab;
 
     A_P2.SetIdx( &ifaceVecP2idx, &ifaceVecP2idx);
     A_P2_stab.SetIdx( &ifaceVecP2idx, &ifaceVecP2idx);
@@ -566,8 +566,9 @@ void TestAllP2MatricesWithP1Matrices(const MultiGridCL& MG, LevelsetP2CL& lset, 
     L_P1P2_stab.SetIdx( &ifaceP1idx, &ifaceVecP2idx);
     Schur_P2.SetIdx(&ifaceP1idx, &ifaceP1idx);
     Schur_P2_stab.SetIdx(&ifaceP1idx, &ifaceP1idx);
+    Schur_P2_normal_stab.SetIdx(&ifaceP1idx, &ifaceP1idx);
 
-    SetupStokesIF_P2P1(MG, &A_P2, &A_P2_stab, &B_P1P2, &M_P2, &S_P2, &L_P1P2, &L_P1P2_stab, &Schur_P2, &Schur_P2_stab, lset.Phi, lset.GetBndData(), fullgrad);
+    SetupSurfOseen_P2P1(MG, lset, nullptr, nullptr);
 
     DROPS::VecDescCL a, b, c, a_P2, b_P2;
     a.SetIdx( &ifaceVecP1idx);

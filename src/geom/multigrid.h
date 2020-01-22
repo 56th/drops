@@ -30,6 +30,7 @@
 
 #include "geom/simplex.h"
 #include "num/bndData.h"
+#include "num/functions.hpp"
 
 namespace DROPS
 {
@@ -101,11 +102,6 @@ typedef  TriangCL<EdgeCL>   TriangEdgeCL;
 typedef  TriangCL<FaceCL>   TriangFaceCL;
 typedef  TriangCL<TetraCL>  TriangTetraCL;
 
-/// \brief Type of functions used to identify points on periodic boundaries,
-///     that share the same dof.
-typedef bool (*match_fun)(const Point3DCL&, const Point3DCL&);
-
-
 class BoundaryCL
 /// \brief stores boundary segments and information on periodic boundaries (if some exist)
 {
@@ -124,7 +120,7 @@ class BoundaryCL
   private:
     SegPtrCont          Bnd_;
     mutable BndTypeCont BndType_;
-    mutable match_fun   match_;
+    mutable MatchFunction   match_;
 
   public:
     BoundaryCL() : match_(0) {}
@@ -135,10 +131,10 @@ class BoundaryCL
     BndIdxT         GetNumBndSeg()          const { return Bnd_.size(); }
     BndType         GetBndType(BndIdxT idx) const { return !BndType_.empty() ? BndType_[idx] : OtherBnd; }
 
-    void      SetPeriodicBnd( const BndTypeCont& type, match_fun) const;
-    match_fun GetMatchFun() const { return match_; }
+    void      SetPeriodicBnd(const BndTypeCont& type, MatchFunction) const;
+    MatchFunction GetMatchFun() const { return match_; }
     bool      Matching ( const Point3DCL& p, const Point3DCL& q) const { return match_(p,q); }
-    bool      HasPeriodicBnd() const { return match_; }
+    bool      HasPeriodicBnd() const { return static_cast<bool>(match_); }
 };
 
 
@@ -310,15 +306,15 @@ class MultiGridCL
     void Refine();                                              // in parallel mode, this function uses a parallel version for refinement!
 
     void Scale( double);
-    void Transform( Point3DCL (*mapping)(const Point3DCL&));
+    void Transform(VectorFunction const &);
     void MakeConsistentNumbering();
     void SplitMultiBoundaryTetras();                            ///< Tetras adjacent to more than one boundary-segment are subdivided into four tetras using the barycenter. This method must be called prior to Refine or MakeConsistentNumbering.
     void SizeInfo(std::ostream&);                               // all procs have to call this function in parallel mode!
     void ElemInfo(std::ostream&, int Level= -1) const;          // all procs have to call this function in parallel mode
     void DebugInfo(std::ostream&, int Level=-1) const;          ///< Put all vertices, edges, faces, and tetras on the stream
+    Uint GetNumTriangTetra(int Level=-1);                       // get number of tetras of a given level
 #ifdef _PAR
     Uint GetNumDistributedObjects() const;                      // get number of distributed objects
-    Uint GetNumTriangTetra(int Level=-1);                       // get number of tetras of a given level
     Uint GetNumTriangFace(int Level=-1);                        // get number of faces of a given level
     Uint GetNumDistributedFaces(int Level=-1);                  // get number of faces on processor boundary
     SimplexFactoryCL& GetSimplexFactory() { return factory_; }
@@ -328,6 +324,8 @@ class MultiGridCL
     const ColorClassesCL& GetColorClasses (int Level, const BndCondCL& Bnd) const;
 
     bool IsSane (std::ostream&, int Level=-1) const;
+
+    // std::vector<const_TriangTetraIteratorCL> getCutTetras(LevelsetP2CL const &) const;
 };
 
 

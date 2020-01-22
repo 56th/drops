@@ -30,7 +30,7 @@
 #include "navstokes/navstokes.h"
 #include <fstream>
 
-typedef double    (*instat_scalar_fun_ptr)(const DROPS::Point3DCL&, double);
+typedef double    (*InstatScalarFunction)(const DROPS::Point3DCL&, double);
 typedef DROPS::Point3DCL (*instat_vector_fun_ptr)(const DROPS::Point3DCL&, double);
 
 static double Reaction(const DROPS::Point3DCL&, double =0)
@@ -65,7 +65,7 @@ class StokesCoeffCL
 {
   public:
     //reaction
-    static instat_scalar_fun_ptr q;
+    static InstatScalarFunction q;
     //source term
     static instat_vector_fun_ptr f;
         
@@ -79,7 +79,7 @@ class StokesCoeffCL
 
 };
 
-instat_scalar_fun_ptr StokesCoeffCL::q;
+InstatScalarFunction StokesCoeffCL::q;
 instat_vector_fun_ptr StokesCoeffCL::f;
 
 
@@ -378,9 +378,9 @@ PlotMTVSolOutCL<DiscVel>::put(std::ostream &os) const
         if ( std::fabs(tit->GetCoord()[1] -0.5 ) > 1.e-10 )
             continue;
 
-            os << tit->GetCoord()[0] << ' ' << tit->GetCoord()[2] << " 0.0\t"
-               << _discsol.val(*tit)[0] << ' ' << _discsol.val(*tit)[2] << _discsol.val(*tit)[1]
-               << '\n';
+        os << tit->GetCoord()[0] << ' ' << tit->GetCoord()[2] << " 0.0\t"
+            << _discsol.val(*tit)[0] << ' ' << _discsol.val(*tit)[2] << _discsol.val(*tit)[1]
+            << '\n';
     }
     os.flags(old_format);
     return os  << std::endl;

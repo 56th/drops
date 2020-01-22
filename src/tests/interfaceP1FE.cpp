@@ -34,7 +34,7 @@ TestSingleTetra()
 {
     TetraBuilderCL tetra( 0); // unrefined reference tetra
     MultiGridCL mg( tetra);
-    instat_scalar_fun_ptr sigma (0);
+    InstatScalarFunction sigma (0);
     SurfaceTensionCL sf( sigma, 0);
     BndCondT bc[4]= { NoBC, NoBC, NoBC, NoBC };
     LsetBndDataCL::bnd_val_fun bfun[4]= { 0,0,0,0};
@@ -103,7 +103,7 @@ TestPlaneInCube()
                                 DROPS::std_basis<3>(3),
                                 10, 1, 1);
     MultiGridCL mg( brick);
-    instat_scalar_fun_ptr sigma (0);
+    InstatScalarFunction sigma (0);
     SurfaceTensionCL sf( sigma, 0);
     BndCondT bc[6]= { NoBC, NoBC, NoBC, NoBC, NoBC, NoBC };
     LsetBndDataCL::bnd_val_fun bfun[6]= { 0,0,0,0,0,0};
@@ -246,7 +246,7 @@ int main ()
                                 DROPS::std_basis<3>(3),
                                 20, 20, 20);
     MultiGridCL mg( brick);
-    instat_scalar_fun_ptr sigma (0);
+    InstatScalarFunction sigma (0);
     SurfaceTensionCL sf( sigma, 0);
     BndCondT bc[6]= { NoBC, NoBC, NoBC, NoBC, NoBC, NoBC };
     LsetBndDataCL::bnd_val_fun bfun[6]= { 0,0,0,0,0,0};

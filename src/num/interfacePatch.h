@@ -170,34 +170,30 @@ class InterfaceTriangleCL : public InterfacePatchCL
     Point3DCL ApplyProj( const Point3DCL& grad) const { return grad[0]*B_[0] + grad[1]*B_[1] + grad[2]*B_[2]; }
 };
 
-//***********************************************************************************************************
-// InterfaceLineCL is used to handle the cases in which the interface intersects with slip/symmetry boundary.
+//*******************************************************************************************************************
+// InterfaceLineCL is used to handle the cases in which the interface intersects with slip/symmetry/natural boundary.
 // The number of contact line segments are computed and the information of the end nodes of the segments are
 // computed, too. In addition, the normal vectors at the contact line are computed.
-//***********************************************************************************************************
+//*******************************************************************************************************************
 class InterfaceLineCL : public InterfacePatchCL
 {
   private:
-    Uint     numMCL_;	                   ///< number of moving contact lines (MCL)
-    Uint     IdxMCL_[4][2];                ///< the edge index for each contact line
-    BndCondT  BC_Face_[4];                 ///< boundary condition type for all four faces
-    BndCondT  BC_Edge_[6];                 ///< boundary condition type for all six edges
-    instat_vector_fun_ptr outnormal_;      ///< the outer normal of the (slip) boundary
-    bool SymmType[4];                      ///< store if a contact line segment is symmetric
+    Uint     numMCL_;	                    ///< number of moving contact lines (MCL)
+    Uint     IdxMCL_[4][2];               ///< the edge index for each contact line
+    BndCondInfoCL BC_MCL_[4];             ///< store boundary condition of contact line segment
+    BndCondT BC_Face_[4];                 ///< boundary condition type for all four faces
+    BndCondT BC_Edge_[6];                 ///< boundary condition type for all six edges
 
   public:
     bool ComputeMCLForChild(Uint ch);                          ///< returns true, if a moving contact line exists for this child
-    Uint GetNumMCL();                                          ///< returns number of MCL segments
+    Uint GetNumMCL() const;                                    ///< returns number of MCL segments
     void SetBndCondT(const TetraCL& tet, const BndDataCL<Point3DCL>& BndData);     ///< set the boundary condition type of the tetra
-    void SetBndOutNormal(instat_vector_fun_ptr outnormal);     ///< set the outer normal of the slip boundary
-    bool IsSymmType(Uint i) {return SymmType[i];}              ///<return if a contact line segment is on symmetry boundary
-    double GetInfoMCL(Uint v, BaryCoordCL& bary0, BaryCoordCL& bary1, Point3DCL& pt0, Point3DCL& pt1); ///< return the length of the MCL
-                                                                                                       /// set the BaryCoord and Point3D of two end nodes
-    Quad9_1DCL<Point3DCL> GetImprovedNormalAtMCL(Uint v) const;  ///< Returns the improved unit normal of the interface at the moving contact line
-    Quad9_1DCL<Point3DCL> GetImprovedMCLNormalOnSlipBnd(const TetraCL& t, Uint v) const;    ///< Returns the unit outer normal at the contact line which lies on the slip boundary                                                           ///computed in an improved way using levelset function
-                                                                            /// v denotes the v-th contact line. 
-                                                                            /// It must be called after SetBndOutNormal() 
-    Quad9_1DCL<double> GetDynamicCtAngle(const TetraCL& t, Uint v) const;   ///< Returns the contact angle
+    const BndCondInfoCL& GetBC(Uint mcl) const { return BC_MCL_[mcl]; } ///< returns boundary condition of contact line segment
+    double GetInfoMCL(Uint mcl, BaryCoordCL& bary0, BaryCoordCL& bary1, Point3DCL& pt0, Point3DCL& pt1) const; ///< return the length of the MCL and set the BaryCoord and Point3D of two end nodes
+    Quad9_1DCL<Point3DCL> GetImprovedNormalAtMCL(Uint mcl) const;  ///< Returns the improved unit normal of the interface at the moving contact line
+    Quad9_1DCL<Point3DCL> GetImprovedMCLNormalOnSlipBnd(const TetraCL& t, Uint mcl, InstatVectorFunction normalBnd) const; ///< Returns the unit outer normal at the contact line which lies on the slip boundary                                                           ///computed in an improved way using levelset function
+    Quad9_1DCL<Point3DCL> GetImprovedMCLTangential     (const TetraCL& t, Uint mcl, InstatVectorFunction normalBnd) const; ///< Returns the unit outer normal at the contact line tangential to the interface
+    Quad9_1DCL<double>    GetDynamicCtAngle            (const TetraCL& t, Uint mcl, InstatVectorFunction normalBnd) const; ///< Returns the dynamic contact angle
 
 };
 

@@ -30,8 +30,8 @@ namespace DROPS
 template <class Coeff>
   void
   NavierStokesP2P1CL<Coeff>::CheckSolution(
-    const VelVecDescCL* lsgvel, MLIdxDescCL* idx, const VecDescCL* lsgpr,
-    instat_vector_fun_ptr LsgVel, instat_scalar_fun_ptr LsgPr)
+          const VelVecDescCL* lsgvel, MLIdxDescCL* idx, const VecDescCL* lsgpr,
+          InstatVectorFunction LsgVel, InstatScalarFunction LsgPr)
 {
     const double t =  lsgvel->t;
     double diff, maxdiff=0, norm2= 0;

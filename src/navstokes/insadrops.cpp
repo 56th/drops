@@ -477,7 +477,7 @@ Strategy(DROPS::NavierStokesP2P1CL<Coeff>& NS,
 //            statsolver= new FPDeCo_Schur_PCG_CL<NavStokesCL>( NS, fp_maxiter, fp_tol,
 //                           stokes_maxiter, poi_maxiter, poi_tol, deco_red);
             // If the saddlepoint-problem is solved via an Uzawa-method, the mass-matrix alone is
-            // not an appropriate preconditioner for the Schur-Complement-Matrix. M has to be scaled
+            // not an appropriate preconditioner for the M_p-Complement-Matrix. M has to be scaled
             // by 1/(theta*dt).
             static_cast<Uzawa_PCG_CL&>(statsolver->GetStokesSolver()).SetTau( theta*dt); // Betrachte den Code in num/stokessolver.h: M ist bei zeitabhaqengigen Problemen kein geeigneter Vorkonditionierer.
             time.Reset(); time.Start();

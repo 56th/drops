@@ -107,13 +107,13 @@ class LevelsetP2CL : public ProblemCL< LevelsetCoeffCL, LsetBndDataCL>
 
   public:
     MatrixCL            E, H;  ///< E: mass matrix, H: convection matrix
-    VecDescCL           rhs;  ///< rhs due to boundary conditions
+    VecDescCL           rhs;   ///< rhs due to boundary conditions, holding the couplings with H
 
     bool IsDiscontinuous(){ return IsDG; }
 
     const SurfaceTensionCL&   GetSF () const { return sf_; }
 
-LevelsetP2CL( MultiGridCL& mg, const LsetBndDataCL& bnd, SurfaceTensionCL& sf, FiniteElementT fetype, double SD= 0, double curvDiff= -1)
+    LevelsetP2CL( MultiGridCL& mg, const LsetBndDataCL& bnd, SurfaceTensionCL& sf, FiniteElementT fetype, double SD= 0, double curvDiff= -1)
     : base_( mg, LevelsetCoeffCL(), bnd), idx(fetype), idxC(NULL), MLPhi( &idx), PhiC(NULL), curvDiff_( curvDiff), SD_( SD),
         SF_(SF_ImprovedLBVar), sf_(sf), perDirections(NULL), IsDG(false)
     {}
@@ -141,7 +141,7 @@ LevelsetP2CL( MultiGridCL& mg, const LsetBndDataCL& bnd, SurfaceTensionCL& sf, F
     ///@}
 
     /// initialize level set function
-    virtual void Init( instat_scalar_fun_ptr, double t = 0) = 0;
+    virtual void Init( InstatScalarFunction, double t = 0) = 0;
 
     /// \remarks call SetupSystem \em before calling SetTimeStep!
     template<class DiscVelSolT>
@@ -177,9 +177,9 @@ LevelsetP2CL( MultiGridCL& mg, const LsetBndDataCL& bnd, SurfaceTensionCL& sf, F
     /// Get type of surface force.
     SurfaceForceT GetSurfaceForce() const { return SF_; }
 
-    ///returns the area of the two-phase flow interface(\phi=0)
+    /// returns the area of the two-phase flow interface(\phi=0)
     double GetInterfaceArea() const;
-    ///returns the area of the solid-liquid(phi<0) interface
+    /// returns the area of the solid-liquid(phi<0) interface
     double GetWetArea() const;
     /// Discretize surface force
     void   AccumulateBndIntegral( VecDescCL& f) const;
@@ -255,7 +255,7 @@ class SurfTensAccumulatorCL : public TetraAccumulatorCL
 
 
 /// levelset class for continuous P2FE
-///differs from discontinuous P2FE by Init and SetUpSystem
+/// differs from discontinuous P2FE by Init and SetUpSystem
 class LevelsetP2ContCL: public LevelsetP2CL
 {
   public:
@@ -288,7 +288,7 @@ class LevelsetP2ContCL: public LevelsetP2CL
     /// Update Phi (do nothing)
     virtual void UpdateDiscontinuous( );
 
-    void Init( instat_scalar_fun_ptr, double t = 0); //void Init( instat_scalar_fun_ptr, double);
+    void Init( InstatScalarFunction, double t = 0); //void Init( InstatScalarFunction, double);
 
     template<class DiscVelSolT>
     void SetupSystem( const DiscVelSolT&, const double);
@@ -296,7 +296,7 @@ class LevelsetP2ContCL: public LevelsetP2CL
 
 
 /// levelset class for discontinuous P2FE
-///differs from continuous P2FE by Init and SetUpSystem
+/// differs from continuous P2FE by Init and SetUpSystem
 class LevelsetP2DiscontCL: public LevelsetP2CL
 {
   public:
@@ -331,7 +331,7 @@ class LevelsetP2DiscontCL: public LevelsetP2CL
 
     /// \name Numbering
     ///@{
-    /* virtual void CreateNumbering( Uint level, IdxDescCL* idx, match_fun match= 0); */
+    /* virtual void CreateNumbering( Uint level, IdxDescCL* idx, MatchFunction match= 0); */
     /* virtual void DeleteNumbering( IdxDescCL* idx); */
     ///@}
 
@@ -344,8 +344,8 @@ class LevelsetP2DiscontCL: public LevelsetP2CL
     /// Update Phi (Prolongation...)
     virtual void UpdateDiscontinuous( );
 
-    void InitProjection( instat_scalar_fun_ptr, double t = 0);
-    void Init( instat_scalar_fun_ptr, double t = 0);
+    void InitProjection( InstatScalarFunction, double t = 0);
+    void Init( InstatScalarFunction, double t = 0);
 
     void ApplyZeroOrderClementInterpolation();
     void ApplyClementInterpolation();
@@ -415,7 +415,7 @@ public:
 
 
 /// marks all tetrahedra in the band |\p DistFct(x)| < \p width for refinement
-bool MarkInterface (instat_scalar_fun_ptr DistFct, double width, MultiGridCL&, Uint f_level=(Uint)(-1), Uint c_level=(Uint)(-1), double t=0.);
+bool MarkInterface (InstatScalarFunction DistFct, double width, MultiGridCL&, Uint f_level=(Uint)(-1), Uint c_level=(Uint)(-1), double t=0.);
 /// marks all tetrahedra in the band |\p lset(x)| < \p width for refinement
 void MarkInterface ( const LevelsetP2CL::const_DiscSolCL& lset, double width, MultiGridCL& mg);
 

@@ -99,7 +99,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 
     // initialization of surface tension
     // choose a proper model for surface tension coefficient, see levelset/surfacetension.h
-    instat_scalar_fun_ptr sigmap = inscamap[P.get<std::string>("NavStokes.Coeff.SurfTens.VarTensionFunc", "ConstTau")];
+    InstatScalarFunction sigmap = inscamap[P.get<std::string>("NavStokes.Coeff.SurfTens.VarTensionFunc", "ConstTau")];
     SurfaceTensionCL * sf;
     sf = new SurfaceTensionCL( sigmap);
     sf->SetInputMethod( Sigma_X);
@@ -108,8 +108,8 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     LevelsetP2CL & lset( * LevelsetP2CL::Create( MG, lsetbnddata, *sf, P.get_child("Levelset")) );
 
     //required to simulate flows with moving contact line
-    instat_scalar_fun_ptr Young_angle = inscamap[P.get<std::string>("NavStokes.BoundaryData.SlipBnd.ContactAngleFunc")];
-    instat_vector_fun_ptr bnd_outnormal = invecmap[P.get<std::string>("NavStokes.BoundaryData.SlipBnd.BndOuterNormal")];
+    InstatScalarFunction Young_angle = inscamap[P.get<std::string>("NavStokes.BoundaryData.SlipBnd.ContactAngleFunc")];
+    InstatVectorFunction bnd_outnormal = invecmap[P.get<std::string>("NavStokes.BoundaryData.SlipBnd.BndOuterNormal")];
     Stokes.SetYoungAngle(Young_angle);
     Stokes.SetBndOutNormal(bnd_outnormal);
     Stokes.SetSurfTension(sf);
@@ -417,7 +417,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
             ensight->Register( make_Ensight6IfaceScalar( MG, surfTransp->ic,  "InterfaceSol",  ensf + ".sur", true));
         }
         if (Stokes.UsesXFEM())
-            ensight->Register( make_Ensight6P1XScalar( MG, lset.Phi, Stokes.p, "XPressure",   ensf + ".pr", true));
+            ensight->Register( make_Ensight6P1XScalar( MG, *lset.PhiC, lset.GetBndData(), Stokes.p, "XPressure",   ensf + ".pr", true));
 
         ensight->Write( Stokes.v.t);
     }
@@ -442,7 +442,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         vtkwriter->Register( make_VTKVector( Stokes.GetVelSolution(), "velocity") );
         vtkwriter->Register( make_VTKScalar( Stokes.GetPrSolution(), "pressure") );
         if (P.get<int>("VTK.AddP1XPressure",0) && Stokes.UsesXFEM())
-            vtkwriter->Register( make_VTKP1XScalar( MG, *lset.PhiC, Stokes.p, "xpressure"));
+            vtkwriter->Register( make_VTKP1XScalar( MG, *lset.PhiC, lset.GetBndData(), Stokes.p, "xpressure"));
         vtkwriter->Register( make_VTKScalar( lset.GetSolution(), "level-set") );
         vtkwriter->Register( lset.GetVolumeAdjuster()->make_VTKComponentMap("ComponentMap") );
 
@@ -454,8 +454,9 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
             vtkwriter->Register( make_VTKIfaceScalar( MG, surfTransp->ic,  "InterfaceSol"));
         }
         vtkwriter->Write(Stokes.v.t);
-        vtkwriter->Register( make_VTKScalar( P1EvalCL<double, const StokesPrBndDataCL, const VecDescCL>( sigma_vtk, &Stokes.GetBndData().Pr, &MG), "tau"));
-        sf->SetVtkOutput( sigma_vtk);
+        /// \todo The use of sigma_vtk is not safe this way, it should be repaired whenever the grid changes by using some repair class as observer to AdapTriangCL.
+        // vtkwriter->Register( make_VTKScalar( P1EvalCL<double, const StokesPrBndDataCL, const VecDescCL>( sigma_vtk, &Stokes.GetBndData().Pr, &MG), "tau"));
+        // sf->SetVtkOutput( sigma_vtk);
     }
 
     VTKOutCL * dgvtkwriter = NULL;
@@ -610,7 +611,7 @@ int main (int argc, char** argv)
 
     const std::string perMatchName= P.get( "Mesh.PeriodicBnd.PeriodicMatching", std::string());
     const bool is_periodic = !perMatchName.empty();
-    DROPS::match_fun periodic_match = is_periodic ? DROPS::MatchMap::getInstance()[perMatchName] : nullptr;
+    DROPS::MatchFunction periodic_match = is_periodic ? DROPS::MatchMap::getInstance()[perMatchName] : nullptr;
 
     DROPS::MultiGridCL* mg= 0;
     typedef DROPS::BndDataCL<DROPS::Point3DCL> VelBndDataCL;

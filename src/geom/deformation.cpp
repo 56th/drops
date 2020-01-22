@@ -54,7 +54,7 @@ void MeshDeformationCL::MaybeUpdateNumbering()
 /// accordingly. The flag "only_bnd_edges_curved" allows to basically reduce the number
 /// of curved edges (and thus tetrahedra) by removing curvature information at inner edges
 /// and replacing them with the mean of the vertex values.
-void MeshDeformationCL::SetMeshTransformation(instat_vector_fun_ptr f, const double t, 
+void MeshDeformationCL::SetMeshTransformation(InstatVectorFunction f, const double t,
                                               bool only_bnd_edges_curved, bool P2){
     MaybeUpdateNumbering();
     const Uint pidx = mlidx_.GetIdx();

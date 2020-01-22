@@ -41,7 +41,7 @@ using namespace DROPS;
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void InitVecLaplace(const MultiGridCL& MG, LevelsetP2CL& lset, DROPS::VecDescCL& rhs, DROPS::VecDescCL& vSol, DROPS::VecDescCL& pSol,
-                   instat_vector_fun_ptr f_rhs, instat_vector_fun_ptr f_vsol, instat_scalar_fun_ptr f_psol, double t = 0.0)
+                    InstatVectorFunction f_rhs, InstatVectorFunction f_vsol, InstatScalarFunction f_psol, double t = 0.0)
 {
     if( vSol.RowIdx->NumUnknownsEdge()) {
         DROPS::SetupInterfaceVectorRhsP2(MG, &rhs, lset.Phi, lset.GetBndData(), f_rhs);
@@ -77,7 +77,7 @@ int main (int argc, char* argv[])
 
 
     // choose level set
-    instat_scalar_fun_ptr levelset_fun;
+    InstatScalarFunction levelset_fun;
     std::string levelset_fun_str = P.get<std::string>("Levelset.case");
 
     if( !levelset_fun_str.compare("sphere_2")) {
@@ -102,7 +102,7 @@ int main (int argc, char* argv[])
     adap.set_marking_strategy( 0 );
 
     // create level set
-    instat_scalar_fun_ptr sigma (0);
+    InstatScalarFunction sigma (0);
     SurfaceTensionCL sf( sigma, 0);
 
     BndDataCL<double> lsbnd( 0);
@@ -141,7 +141,7 @@ int main (int argc, char* argv[])
     double eta 		   = 1.e0  * pow(h, eta_order);//std::pow(2.e0,eta_index);; //constant for tangential penalty
     double epsilon     = 1.e0  * pow(h, epsilon_order); //constant for velocity stabilisation
     double alpha       = 1.e0  * pow(h, alpha_order); //constant for volume stabilisation
-    double rho         = 1.e0 * pow(h, 1); //constant for Schur complement preconditioner
+    double rho         = 1.e0 * pow(h, 1); //constant for M_p complement preconditioner
 
     std::cout << "h is: " << h << std::endl;
     std::cout << "tau is: " << tau << std::endl;
@@ -305,7 +305,7 @@ int main (int argc, char* argv[])
       }
 
     // set function pointers and rhs vectors for different test cases
-    DROPS::instat_scalar_fun_ptr extchisol = &ZeroScalarFun,
+    DROPS::InstatScalarFunction extchisol = &ZeroScalarFun,
     							 extrhs3=&ZeroScalarFun,
 								 extrhs4=&ZeroScalarFun,
 								 extomegasol=&ZeroScalarFun;

@@ -52,14 +52,14 @@ class PoissonCoeffCL
     //source
     static scalar_tetra_function f;
     //initial condition
-    static instat_scalar_fun_ptr InitialCondition;
+    static InstatScalarFunction InitialCondition;
     //solution
     static scalar_tetra_function Solution;
-    //static instat_scalar_fun_ptr Solution;
+    //static InstatScalarFunction Solution;
     //velocity
     static vector_tetra_function Vel;
     //Free interface function
-    static instat_scalar_fun_ptr interface;
+    static InstatScalarFunction interface;
 
 
 

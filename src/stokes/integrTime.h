@@ -63,7 +63,7 @@ class TimeDiscStokesCL
             delete _b;
         else
             delete _old_b;
-            delete _cplM; delete _old_cplM;
+        delete _cplM; delete _old_cplM;
     }
 
     double GetTheta()    const { return _theta; }

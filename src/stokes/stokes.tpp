@@ -60,8 +60,8 @@ void StokesP2P1CL<Coeff>::CreateNumberingPr ( Uint level, MLIdxDescCL* idx)
 
 template <class Coeff>
   void
-  StokesP2P1CL<Coeff>::GetDiscError(instat_vector_fun_ptr LsgVel,
-      instat_scalar_fun_ptr LsgPr, double t) const
+  StokesP2P1CL<Coeff>::GetDiscError(InstatVectorFunction LsgVel,
+                                    InstatScalarFunction LsgPr, double t) const
 {
     const Uint lvl= A.GetRowLevel(),
               vidx= A.RowIdx->GetIdx(),
@@ -108,7 +108,7 @@ template <class Coeff>
 *****************************************************************************************************/
 
 // ToDo: Kann man auf diese haessliche Formel verzichten??
-inline double Quad( const TetraCL& s, instat_scalar_fun_ptr f, int i, int j,  double t= 0.0)
+inline double Quad( const TetraCL& s, InstatScalarFunction f, int i, int j,  double t= 0.0)
 // cubatur formula for int f(x)*phi_i*phi_j dx, exact up to degree 1
 {
     double a[5];
@@ -830,7 +830,7 @@ void StokesP2P1CL<Coeff>::SetupInstatRhs( VelVecDescCL* vecA, VelVecDescCL* vecB
 
 
 template <class Coeff>
-void StokesP2P1CL<Coeff>::InitVel(VelVecDescCL* vec, instat_vector_fun_ptr LsgVel, double t0) const
+void StokesP2P1CL<Coeff>::InitVel(VelVecDescCL* vec, InstatVectorFunction LsgVel, double t0) const
 {
     VectorCL& lsgvel= vec->Data;
     Uint lvl        = vec->GetLevel(),
@@ -865,7 +865,7 @@ void StokesP2P1CL<Coeff>::InitVel(VelVecDescCL* vec, instat_vector_fun_ptr LsgVe
 // CheckSolution
 template <class Coeff>
 void StokesP2P1CL<Coeff>::CheckSolution(const VelVecDescCL* lsgvel, const VecDescCL* lsgpr,
-    instat_vector_fun_ptr LsgVel, instat_matrix_fun_ptr DLsgVel, instat_scalar_fun_ptr LsgPr, bool is_stat) const
+                                        InstatVectorFunction LsgVel, InstatMatrixFunction DLsgVel, InstatScalarFunction LsgPr, bool is_stat) const
 {
     double t = lsgpr->t;
 #ifdef _PAR
@@ -1139,7 +1139,7 @@ void StokesP2P1CL<Coeff>::SetIdx()
 #ifndef _PAR
 //
 template <class Coeff>
-void StokesP1BubbleP1CL<Coeff>::GetDiscError(instat_vector_fun_ptr LsgVel, instat_scalar_fun_ptr LsgPr, double t) const
+void StokesP1BubbleP1CL<Coeff>::GetDiscError(InstatVectorFunction LsgVel, InstatScalarFunction LsgPr, double t) const
 {
     Uint lvl= A.GetRowLevel(),
         vidx= A.RowIdx->GetIdx(),
@@ -1423,7 +1423,7 @@ void StokesP1BubbleP1CL<Coeff>::SetupPrMass(MLMatDescCL* matM) const
 template <class Coeff>
 void StokesP1BubbleP1CL<Coeff>::SetNumVelLvl( size_t n)
 {
-    match_fun match= MG_.GetBnd().GetMatchFun();
+    MatchFunction match= MG_.GetBnd().GetMatchFun();
     vel_idx.resize( vecP1Bubble_FE, BndData_.Vel, match, n);
     A.Data.resize ( vel_idx.size());
 }
@@ -1431,7 +1431,7 @@ void StokesP1BubbleP1CL<Coeff>::SetNumVelLvl( size_t n)
 template <class Coeff>
 void StokesP1BubbleP1CL<Coeff>::SetNumPrLvl( size_t n)
 {
-    match_fun match= MG_.GetBnd().GetMatchFun();
+    MatchFunction match= MG_.GetBnd().GetMatchFun();
     pr_idx.resize( P1_FE,  BndData_.Pr, match, n);
     B.Data.resize( pr_idx.size());
 }
@@ -1585,7 +1585,7 @@ bool StokesDoerflerMarkCL<_TetraEst, _ProblemCL>::Estimate(const const_DiscPrSol
 
 template <class Coeff>
 void StokesP1BubbleP1CL<Coeff>::CheckSolution(const VelVecDescCL* lsgvel, const VecDescCL* lsgpr,
-    instat_vector_fun_ptr LsgVel, instat_scalar_fun_ptr LsgPr, double t) const
+                                              InstatVectorFunction LsgVel, InstatScalarFunction LsgPr, double t) const
 {
     double diff, maxdiff=0, norm2= 0;
     Uint lvl=lsgvel->GetLevel(),

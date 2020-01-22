@@ -55,10 +55,10 @@ namespace DROPS
 // class HyperTrigCL;
 // class Tetra4DCL;
 
-// typedef double    (*instat_scalar_fun_ptr)(const DROPS::Point3DCL&, double);
+// typedef double    (*InstatScalarFunction)(const DROPS::Point3DCL&, double);
 // typedef std::pair<double,double> TimeInterval;
 
-typedef double    (*instat_scalar_fun_ptr)(const DROPS::Point3DCL&, double);
+typedef double    (*InstatScalarFunction)(const DROPS::Point3DCL&, double);
 typedef std::pair<double,double> TimeInterval;
 
 class SpaceTimeXSolutionCL
@@ -100,7 +100,7 @@ public:
     typedef P2EvalCL<double, const BndDataCL<>, const VecDescCL> const_DiscSolCL;
 
     SpaceTimeXSolutionCL( MultiGridCL& mg, const BndDataCL<>& Bndneg, const BndDataCL<>& Bndpos, ParamCL & P);
-    void UpdateTimeSlab( const LevelsetP2CL & lsetold, const LevelsetP2CL & lsetnew, double vmax = 1.0, instat_scalar_fun_ptr lset_fpt = NULL);
+    void UpdateTimeSlab( const LevelsetP2CL & lsetold, const LevelsetP2CL & lsetnew, double vmax = 1.0, InstatScalarFunction lset_fpt = NULL);
 
     void EvalFutureTrace();
     void EvalPastTrace();
@@ -147,7 +147,7 @@ public:
 
 
 
-    inline double CheckFutureSolution(instat_scalar_fun_ptr Lsgn, instat_scalar_fun_ptr Lsgp, double time)
+    inline double CheckFutureSolution(InstatScalarFunction Lsgn, InstatScalarFunction Lsgp, double time)
     {
         IdxDescCL idx;
         VecDescCL cn(&idx);
@@ -155,7 +155,7 @@ public:
         if (idx.NumUnknowns() != 0)
             idx.DeleteNumbering( mg_);
         idx.CreateNumbering( futurevec.RowIdx->TriangLevel(), mg_, *futurevec.RowIdx);
-        P1XtoP1 ( *futurevec.RowIdx, futurevec.Data, idx, cp.Data, cn.Data, lsetp2new->Phi, mg_);
+        P1XtoP1 ( *futurevec.RowIdx, futurevec.Data, idx, cp.Data, cn.Data, lsetp2new->Phi, lsetp2new->GetBndData(), mg_);
         cp.Data *= 1.0/weight_pos_;
         cn.Data *= 1.0/weight_neg_;
         cp.t = lsetp2new->Phi.t;

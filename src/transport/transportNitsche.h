@@ -51,14 +51,14 @@ class VelocityContainer
     VecDescCL *v_;
     const VelBndDataT*    Bnd_v_;
     MultiGridCL*   MG_;
-    instat_vector_fun_ptr vfptr_;
+    InstatVectorFunction vfptr_;
     const_DiscVelSolCL * asp2;
   public:
     VelocityContainer(VecDescCL & v,const VelBndDataT& Bnd_v,MultiGridCL& MG)
       : v_(&v), Bnd_v_(&Bnd_v), MG_(&MG), vfptr_(0)
     { asp2= new const_DiscVelSolCL( v_, Bnd_v_, MG_); }
 
-    VelocityContainer(instat_vector_fun_ptr v)
+    VelocityContainer(InstatVectorFunction v)
      : v_(0), Bnd_v_(0), MG_(0), vfptr_(v), asp2(0)
     {}
 
@@ -82,7 +82,7 @@ class VelocityContainer
         return const_DiscVelSolCL( &vel, Bnd_v_, MG_);
     }
 
-    instat_vector_fun_ptr GetVelocityAsFunctionPointer() const
+    InstatVectorFunction GetVelocityAsFunctionPointer() const
     {
       if (!vfptr_)
           throw DROPSErrCL("velocity not prescribed as a function(pointer)");
@@ -117,8 +117,8 @@ class TransportP1XCL
     VecDescCL &lset_,  &oldlset_;   ///< levelset at current time step and previous step
     GSPcCL                  pc_;
     GMResSolverCL<GSPcCL>   gm_;
-    instat_scalar_fun_ptr f_;       ///<source term
-    instat_scalar_fun_ptr c_;       ///<mass/reaction term
+    InstatScalarFunction f_;       ///<source term
+    InstatScalarFunction c_;       ///<mass/reaction term
     double omit_bound_;             ///discard criteria for XFEM-Basis
     double sdstab_;
     void SetupInstatSystem(MatrixCL&, VecDescCL*, MatrixCL&, VecDescCL*, MatrixCL&, VecDescCL*, VecDescCL*,
@@ -143,7 +143,7 @@ class TransportP1XCL
 
 /*    TransportP1XCL( MultiGridCL& mg, BndDataT& Bnd, BndDataT& Bndt, const VelBndDataT& Bnd_v, LsetBndDataCL& Bnd_ls,
         double theta, double D[2], double H, VecDescCL* v, VecDescCL* oldv, VecDescCL& lset, VecDescCL& oldlset,
-        double dt, instat_scalar_fun_ptr rhs=0, int iter= 1000, double tol= 1e-7,
+        double dt, InstatScalarFunction rhs=0, int iter= 1000, double tol= 1e-7,
         double XFEMstab=0.1, double lambda=0.)
         : oldt_(v->t), t_( v->t),
         idx( P1X_FE, 1, Bndt, 0, XFEMstab), oldidx( P1X_FE, 1, Bndt, 0, XFEMstab),
@@ -160,7 +160,7 @@ class TransportP1XCL
 */
     TransportP1XCL( MultiGridCL& mg, BndDataT& Bnd, BndDataT& Bndt, VelocityContainer& v, LsetBndDataCL& Bnd_ls,
         VecDescCL& lset, VecDescCL& oldlset,
-        DROPS::ParamCL& P, double initialtime=0, instat_scalar_fun_ptr reac=0, instat_scalar_fun_ptr rhs=0)
+        DROPS::ParamCL& P, double initialtime=0, InstatScalarFunction reac=0, InstatScalarFunction rhs=0)
         : P_(P), MG_( mg), Bnd_( Bnd), Bndt_( Bndt), v_ (v), Bnd_ls_(Bnd_ls),
         theta_( P.get<double>("Time.Theta")), dt_( P.get<double>("Time.FinalTime")/P.get<int>("Time.NumSteps")),
         lambda_(P.get<double>("Transp.NitschePenalty")), H_( P.get<double>("Transp.HNeg")/P.get<double>("Transp.HPos")),
@@ -197,7 +197,7 @@ class TransportP1XCL
     }
     void DeleteNumbering( MLIdxDescCL* idx1) { idx1->DeleteNumbering( MG_); }
     /// initialize transformed concentration function
-    void Init( instat_scalar_fun_ptr, instat_scalar_fun_ptr, double t=0.0);
+    void Init( InstatScalarFunction, InstatScalarFunction, double t=0.0);
     /// Set one P1X Function as the other with according scaling parameters in the positive and negative domain parts
     void TransformWithScaling(const VecDescCL& concin, VecDescCL& concout, double scalingp, double scalingn);
 
@@ -213,7 +213,7 @@ class TransportP1XCL
 
     /// perform one time step
     void DoStep( double new_t);
-    void SetRHS( instat_scalar_fun_ptr rhs) {f_= rhs;}
+    void SetRHS( InstatScalarFunction rhs) {f_= rhs;}
     const_DiscSolCL GetSolution() const
         { return const_DiscSolCL( &c, &Bnd_, &MG_); }
     const_DiscSolCL GetSolution( const VecDescCL& Myc, bool Is_ct) const
@@ -250,8 +250,8 @@ class TransportP1XCL
         return H_;
     }
     double GetXFEMOmitBound(){ return omit_bound_; }
-    double CheckSolution(instat_scalar_fun_ptr Lsgn, instat_scalar_fun_ptr Lsgp,
-            instat_vector_fun_ptr Gradn, instat_vector_fun_ptr Gradp, double time);
+    double CheckSolution(InstatScalarFunction Lsgn, InstatScalarFunction Lsgp,
+                         InstatVectorFunction Gradn, InstatVectorFunction Gradp, double time);
 };
 
 /// \brief Observes the MultiGridCL-changes by AdapTriangCL to repair the function c.ct.
@@ -481,11 +481,11 @@ class GlobalConvDiffReacCoefficients{
     double H_;
     double time;
     const VelocityContainer& vel;
-    instat_scalar_fun_ptr source;
-    instat_scalar_fun_ptr mass;
+    InstatScalarFunction source;
+    InstatScalarFunction mass;
   public:
 
-    GlobalConvDiffReacCoefficients(const double D[2], double H, const VelocityContainer& u, instat_scalar_fun_ptr c, instat_scalar_fun_ptr f, double atime)
+    GlobalConvDiffReacCoefficients(const double D[2], double H, const VelocityContainer& u, InstatScalarFunction c, InstatScalarFunction f, double atime)
       : H_(H),time(atime),vel(u),source(f),mass(c){
       D_[0]=D[0];
       D_[1]=D[1];
@@ -505,8 +505,8 @@ class GlobalConvDiffReacCoefficients{
         return D_[1];
     }
 
-	instat_scalar_fun_ptr GetSourceAsFuntionPointer(){return source;}
-	instat_scalar_fun_ptr GetMassAsFuntionPointer(){return mass;}
+	InstatScalarFunction GetSourceAsFuntionPointer(){return source;}
+	InstatScalarFunction GetMassAsFuntionPointer(){return mass;}
 };
 
 class LocalConvDiffReacCoefficients{
@@ -546,7 +546,7 @@ class LocalConvDiffReacCoefficients{
       return gcdcoefs.GetDiffusionCoef(pospart);
     }
 
-	instat_scalar_fun_ptr GetSourceAsFuntionPointer(){
+	InstatScalarFunction GetSourceAsFuntionPointer(){
 	  return gcdcoefs.GetSourceAsFuntionPointer();
 	}
 	double GetTime(){return gcdcoefs.time;}

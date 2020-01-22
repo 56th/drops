@@ -52,7 +52,7 @@ class SurfaceTensionCL
   private:
     BndDataCL<> cBnd_;
     double C_[5], cp_;                  ///< coefficients for computing surface tension with Sigma_C
-    instat_scalar_fun_ptr sigma_;       ///< variable surface tension with Sigma_X
+    InstatScalarFunction sigma_;       ///< variable surface tension with Sigma_X
     InputMethodT input_;
     SurfaceModelT surfmodel_;
     VecDescCL * c_;                     ///< mass concentration
@@ -66,11 +66,11 @@ class SurfaceTensionCL
     double sigma_s(double s) const;     ///< variable surface tension with Sigma_S
 
   public:
-    SurfaceTensionCL ( instat_scalar_fun_ptr sigma)
+    SurfaceTensionCL ( InstatScalarFunction sigma)
         :  cBnd_(0),  cp_(0.), sigma_(sigma), input_(Sigma_X), surfmodel_(LANGMUIR), c_(0), smax_(0.), T_(0.), s_(0), sigma_vtk_(0)
     { std::memset( C_, 0, 5*sizeof( double));}
 
-    SurfaceTensionCL ( instat_scalar_fun_ptr sigma, BndDataCL<> cBnd)
+    SurfaceTensionCL ( InstatScalarFunction sigma, BndDataCL<> cBnd)
     :  cBnd_(cBnd),  cp_(0.), sigma_(sigma), input_(Sigma_X), surfmodel_(LANGMUIR), c_(0), smax_(0.), T_(0.), s_(0), sigma_vtk_(0)
     { std::memset( C_, 0, 5*sizeof( double));}
 
@@ -78,7 +78,7 @@ class SurfaceTensionCL
     :  cBnd_(cBnd),  cp_(cp), sigma_(0), input_(Sigma_C), surfmodel_(LANGMUIR), c_(c), smax_(0.), T_(0.), s_(0), sigma_vtk_(0)
     { std::memcpy( C_, C, 5*sizeof( double));}
 
-    SurfaceTensionCL ( double smax, instat_scalar_fun_ptr sigma, VecDescCL* s =0, double T =300, BndDataCL<> cBnd = BndDataCL<>( 0))
+    SurfaceTensionCL ( double smax, InstatScalarFunction sigma, VecDescCL* s =0, double T =300, BndDataCL<> cBnd = BndDataCL<>( 0))
     :  cBnd_(cBnd),  cp_(0.), sigma_(sigma), input_(Sigma_S), surfmodel_(LANGMUIR), c_(0), smax_(smax), T_(T), s_(s), sigma_vtk_(0)
     { std::memset( C_, 0, 5*sizeof( double));}
 
@@ -93,7 +93,7 @@ class SurfaceTensionCL
     void SetTime(double time) { if (c_) c_->t=time; if (s_) s_->t=time; }
     void SetVtkOutput(VecDescCL * sigma_vtk) {sigma_vtk_=sigma_vtk;}
 
-    instat_scalar_fun_ptr GetSigma() const {return sigma_;}
+    InstatScalarFunction GetSigma() const {return sigma_;}
     void SetCoeff (double C[5], double cp) {std::memcpy( C_, C, 5*sizeof( double)); cp_= cp;}
     void SetIFCoeff (double smax, double T) {smax_=smax; T_=T;}
 

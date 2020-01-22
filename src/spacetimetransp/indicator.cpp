@@ -290,7 +290,7 @@ MarkingDecisionT ConcentrationMarkingStrategyCL::GetDecision() const
     return decision_;
 }
 
-// void ConcentrationMarkingStrategyCL::SetDistFct( instat_scalar_fun_ptr fct, double time )
+// void ConcentrationMarkingStrategyCL::SetDistFct( InstatScalarFunction fct, double time )
 // {
 //     delete lsetgetter_;
 //     lsetgetter_ = 0; // Needed for exception safety.

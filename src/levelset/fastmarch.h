@@ -48,45 +48,56 @@ class ReparamDataCL
   public:
     typedef VectorBaseCL<IdxT>     perMapVecT;
     typedef std::vector<Point3DCL> perDirSetT;
-    enum { Finished= 1, Close= 2, Handled=3, Far=0};    ///< types of vertices (Handled is just for parallel)
+    enum class Type { Finished= 1, Close= 2, Handled=3, Far=0};    ///< types of vertices (Handled is just for parallel)
 
   private:
-    /// \brief Initialize data structures to handle periodic boundaries
+    /// \brief Initialize data structures to handle periodic or Dirichlet boundaries
     void InitPerMap();
-    /// \brief Determine coordinates of all vertices
+    /// \brief Determine coordinates of all vertices and initialize \a oldphi_augm
     void InitCoord();
+
+    VectorBaseCL<Type>       type_;       ///< type of each vertex, i.e., Finished, Close, Far
     bool gatherPerp;                      ///< Check if perpendicular foots are to be gathered
+    
+    friend class FastmarchingOnMasterCL;
 
   public:
     MultiGridCL&             mg;          ///< reference to the multigrid
     VecDescCL&               phi;         ///< reference to the level set function
-    VectorCL                 old;         ///< old values of the level set function
-    VectorBaseCL<Point3DCL>  coord;       ///< coordinates of all vertices
-    VectorBaseCL<byte>       typ;         ///< type of each vertex, i.e., Finished, Close, Far
+    VectorCL                 oldphi_augm; ///< values of the level set function (augmented vector, i.e. based on \a augmIdx)
+    VectorBaseCL<Point3DCL>  coord;       ///< coordinates of all vertices (augmented vector, i.e. based on \a augmIdx)
     VectorBaseCL<Point3DCL*> perpFoot;    ///< perpendicular foots of frontier vertices
 
-    // data for periodic boundaries
+    // data for periodic and Dirichlet boundaries
     bool                     per;         ///< periodic boundaries are used
-    IdxDescCL*               augmIdx;     ///< augmented index for periodic boundaries
+    IdxDescCL*               augmIdx;     ///< augmented index for periodic and Dirichlet boundaries
     const BndDataCL<>*       bnd;         ///< boundary for level set function
     perMapVecT               map;         ///< mapping of periodic boundary conditions
     perDirSetT               perDir;      ///< set of directions to be considered in case of periodic boundaries (only used by DirectDistanceCL)
 
   public:
     // \brief Allocate memory, store references and init coordinates as well as map periodic boundary dofs
-    ReparamDataCL( MultiGridCL& MG, VecDescCL& Phi, bool GatherPerp, bool Periodic=false, const BndDataCL<>* Bnd=0)
-        : gatherPerp(GatherPerp), mg( MG), phi( Phi), old( phi.Data),
-          coord( Phi.Data.size()), typ( Far, Phi.Data.size()),
+    ReparamDataCL( MultiGridCL& MG, VecDescCL& Phi, bool GatherPerp, const BndDataCL<>* Bnd=0)
+        : type_( Type::Far, Phi.Data.size()), gatherPerp(GatherPerp), mg( MG), 
+          phi( Phi), oldphi_augm( phi.Data), coord( Phi.Data.size()), 
           perpFoot( (Point3DCL*)0, GatherPerp ? Phi.Data.size() : 0),
-          per( Periodic), augmIdx( 0), bnd( Bnd), map( 0), perDir( 1, Point3DCL())
+          per( false), augmIdx( nullptr), bnd( Bnd), map( 0), perDir( 1, Point3DCL())
     { InitPerMap(); InitCoord(); }
     /// \brief Delete all perpendicular feet
     ~ReparamDataCL();
 
     /// \brief When using DirectDistanceCL for propagation, a direction has to be appended for each pair of periodic boundaries (Per1BC/Per2BC).
     void AppendPeriodicDirection( const Point3DCL& dir);
-    /// \brief for periodic boundary conditions, some mapping is necessary
-    inline IdxT Map( IdxT i) const { return !per || i<phi.Data.size() ? i : map[ i-phi.Data.size()]; }
+    /// \brief for periodic boundary conditions, some mapping is necessary. NoIdx is mapped to NoIdx for convenience.
+    inline IdxT Map( IdxT i) const { return i==NoIdx ? NoIdx : (!per || i<phi.Data.size() ? i : map[ i-phi.Data.size()]); }
+    /// \brief Get type of vertex
+    inline Type GetType( IdxT mapI) const { return mapI==NoIdx ? Type::Finished : type_[mapI]; }
+    /// \brief Set type of vertex
+    inline void SetType( IdxT mapI, Type t) { if (mapI!=NoIdx) type_[mapI]= t; }
+    /// \brief Is vertex finished?
+    inline bool IsFinished( IdxT mapI) const { return mapI==NoIdx ? true : type_[mapI]==Type::Finished; }
+    /// \brief Get value of phi. For Dirichlet bnd vertices, get absolute value of bnd data.
+    inline double GetPhi( IdxT i) const { const IdxT mapI= Map(i); return mapI!=NoIdx ? phi.Data[mapI] : std::abs(oldphi_augm[i]); }
     /// \brief Normalize b onto unit interval [0,1]
     inline void Normalize( double& b) const;
     /// \brief Normalize (b1,b2) onto unit triangle
@@ -214,6 +225,7 @@ void InitZeroP1CL<scale>::ComputeOnChild( IdxT* /*Numb*/, int* /*sign*/, const C
 
 /// \brief Computes the distance-function of the level set of ls to the neighboring
 ///        vertices of the triangulation.
+/// \todo  Make this work for Dirichlet bnd, similar to as it has been done for TriangNeighborCL.
 class InitZeroExactCL : public InitZeroCL
 {
   public:
@@ -624,7 +636,7 @@ class ReparamCL
 
   public:
     /// \brief Constructor
-    ReparamCL( MultiGridCL& mg, VecDescCL& phi, bool gatherPerp, bool periodic=false, const BndDataCL<>* bnd=0);
+    ReparamCL( MultiGridCL& mg, VecDescCL& phi, bool gatherPerp, const BndDataCL<>* bnd=nullptr);
     ~ReparamCL();
     /// \brief Perform the reparametrization
     void Perform();

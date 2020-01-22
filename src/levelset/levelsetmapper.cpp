@@ -660,7 +660,7 @@ void compute_tetra_neighborhoods (const MultiGridCL& mg, const VecDescCL& lsetPh
     DROPS_FOR_TRIANG_CONST_TETRA( mg, lsetPhi.GetLevel(), it) {
         locp2_ls.assign( *it, lsetPhi, lsetbnd);
         evaluate_on_vertexes( locp2_ls, lat, Addr( ls_loc));
-        if (equal_signs( ls_loc))
+        if (equalSigns(ls_loc))
             continue;
 
         tetra_neighborhoods[&*it]; // insert it with an empty set of neighbors.

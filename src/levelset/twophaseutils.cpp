@@ -104,8 +104,8 @@ void MakeP1P1XProlongation (size_t NumUnknownsVel, size_t NumUnknownsPr, size_t 
     PPr= MatrixCL( diag);
 }
 
-void ComputeErrorsP2R( const instat_vector_fun_ptr uPos, const instat_vector_fun_ptr uNeg, const VecDescCL& u_h, const BndDataCL<Point3DCL>& bnd,
-        Point3DCL& L2, Point3DCL& H1, Point3DCL& L2_norm, Point3DCL& H1_norm, const LevelsetP2CL& lset, double t)
+void ComputeErrorsP2R(const InstatVectorFunction uPos, const InstatVectorFunction uNeg, const VecDescCL& u_h, const BndDataCL<Point3DCL>& bnd,
+                      Point3DCL& L2, Point3DCL& H1, Point3DCL& L2_norm, Point3DCL& H1_norm, const LevelsetP2CL& lset, double t)
 {
     const IdxDescCL& idx= *u_h.RowIdx;
     const ExtIdxDescCL& extIdx= idx.GetXidx();

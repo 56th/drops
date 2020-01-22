@@ -36,8 +36,8 @@ namespace ParameterNS {
 namespace Torus {
     double R=1;
     double r=0.2;
-       double k=0.0;
-       double f=0.0;
+    double k=0.0;
+    double f=0.0;
 //    double k=0.3;
 //    double f=4.0;
 }
@@ -61,14 +61,30 @@ bnd_val_fun bf[6]= {
 
 ///////////////////////// Levelset-functions //////////////////////////////////////
 
-DROPS::Point3DCL sphere_2_shift(0.);
-double sphere_2 (const DROPS::Point3DCL& p, double)
-{
-//    DROPS::Point3DCL x( p - P.get<DROPS::Point3DCL>("Exp.PosDrop"));
+double sphere_2(const DROPS::Point3DCL& p, double) {
+    return pow(p[0], 2.) + pow(p[1], 2.) + pow(p[2], 2.) - 1.;
+}
 
-//    return x.norm() - P.get<DROPS::Point3DCL>("Exp.RadDrop")[0];
-//    return p[0]*p[0]+p[1]*p[1]+p[2]*p[2]-1;
-    return pow(p[0] - sphere_2_shift[0], 2.) + pow(p[1] - sphere_2_shift[1], 2.) + pow(p[2] - sphere_2_shift[2], 2.) - 1.;
+DROPS::Point3DCL sphere_2_normal(const DROPS::Point3DCL& p, double) {
+    auto den = std::sqrt(p[0]*p[0]+p[1]*p[1]+p[2]*p[2]);
+    DROPS::Point3DCL v(p[0]/den, p[1]/den, p[2]/den);
+    return v;
+}
+
+SMatrixCL<3, 3> sphere_2_shape(const DROPS::Point3DCL& p, double) {
+    SMatrixCL<3, 3> res;
+    // auto den = pow(pow(p[0],2) + pow(p[1],2) + pow(p[2],2),1.5);
+    auto den = pow(p[0],2) + pow(p[1],2) + pow(p[2],2);
+    res(0, 0) = (pow(p[1],2) + pow(p[2],2)) / den;
+    res(0, 1) = (-1.*p[0]*p[1]) / den;
+    res(0, 2) = (-1.*p[0]*p[2]) / den;
+    res(1, 0) = res(0, 1);
+    res(1, 1) = (pow(p[0],2) + pow(p[2],2)) / den;
+    res(1, 2) = (-1.*p[1]*p[2]) / den;
+    res(2, 0) = res(0, 2);
+    res(2, 1) = res(1, 2);
+    res(2, 2) = (pow(p[0],2) + pow(p[1],2)) / den;
+    return res;
 }
 
 double tamarind (const DROPS::Point3DCL& p, double)
@@ -144,15 +160,8 @@ double cube_madeof_edges (const DROPS::Point3DCL& p, double)
 ;
 }
 
-double torus (const DROPS::Point3DCL& p, double)
-{
-    //return pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) - 0.4e1, 0.2e1) + pow(pow(p[1], 0.2e1) - 0.1e1, 0.2e1) + pow(pow(p[1], 0.2e1) + pow(p[2], 0.2e1) - 0.4e1, 0.2e1) + pow(pow(p[0], 0.2e1) - 0.1e1, 0.2e1) + pow(pow(p[0], 0.2e1) + pow(p[2], 0.2e1) - 0.4e1, 0.2e1) + pow(pow(p[2], 0.2e1) - 0.1e1, 0.2e1) - 0.13e2;
-
-   double R=Torus::R;
-//    double r=0.4;
-    //return pow(p[2],2.0) + pow(std::sqrt(pow(p[0],2.0) + pow(p[1], 2.0)) - R, 2.0) - r*r;
-    return pow( pow(p[0],2.0) + pow(p[1], 2.0) + pow(p[2],2.0) + Torus::R*Torus::R - Torus::r*Torus::r, 2.0) - 4*Torus::R*Torus::R*(pow(p[0],2.0) + pow(p[1], 2.0));
-    //return (p[0]*p[0]+p[1]*p[1]+p[2]*p[2]-1)*(p[0]*p[0]+p[1]*p[1]+p[2]*p[2]-0.33);
+double torus (const DROPS::Point3DCL& p, double) {
+   return pow(pow(p[0], 2.) + pow(p[1], 2.) + pow(p[2], 2.) + Torus::R * Torus::R - Torus::r * Torus::r, 2.) - 4. * Torus::R * Torus::R * (pow(p[0], 2.) + pow(p[1], 2.));
 }
 
 double flower_shape(double x)
@@ -1074,29 +1083,79 @@ DROPS::Point3DCL Test_A_plus_M_vSolVectorFun7_Gradient3 (const DROPS::Point3DCL&
 
 
 
+DROPS::Point3DCL Test_A_plus_M_RhsVectorFun85 (const DROPS::Point3DCL& p, double) {
+    if(p[0] == 0 && p[1] == 0 && p[2] == 0) {
+        0.;
+    }
+    DROPS::Point3DCL v;
+    v[0] = (-1.*(pow(p[0],4)*p[2]*sqrt(pow(p[0],2) + pow(p[1],2) + pow(p[2],2)) + pow(p[0],3)*(pow(p[1],2) + p[2])*sqrt(pow(p[0],2) + pow(p[1],2) + pow(p[2],2)) + p[0]*sqrt(pow(p[0],2) + pow(p[1],2) + pow(p[2],2))*(pow(p[1],4) + pow(p[2],3) + pow(p[1],2)*(10. + p[2] + pow(p[2],2))) - 1.*(pow(p[1],2) + pow(p[2],2))*(pow(p[1],3) - 1.*pow(p[1],2)*(-2. + pow(p[2],2)) - 1.*p[2]*(8.*p[2] + pow(p[2],3) - 5.*sqrt(pow(p[0],2) + pow(p[1],2) + pow(p[2],2)))) + pow(p[0],2)*(3.*pow(p[1],3) + pow(p[1],2)*(-2. + p[2]*(p[2] + sqrt(pow(p[0],2) + pow(p[1],2) + pow(p[2],2)))) + p[2]*(5.*sqrt(pow(p[0],2) + pow(p[1],2) + pow(p[2],2)) + p[2]*(-14. + p[2]*(p[2] + sqrt(pow(p[0],2) + pow(p[1],2) + pow(p[2],2))))))))/pow(pow(p[0],2) + pow(p[1],2) + pow(p[2],2),3);
+    v[1] = (p[1]*(-2.*pow(p[0],3) + 3.*pow(p[0],3)*p[1] - 2.*p[0]*pow(p[1],2) - 1.*p[0]*pow(p[1],3) + 20.*p[0]*pow(p[2],2) + pow(p[0],3)*pow(p[2],2) + 3.*p[0]*p[1]*pow(p[2],2) + p[0]*pow(p[1],2)*pow(p[2],2) + p[0]*pow(p[2],4) + 10.*pow(p[0],2)*sqrt(pow(p[0],2) + pow(p[1],2) + pow(p[2],2)) - 10.*p[0]*p[2]*sqrt(pow(p[0],2) + pow(p[1],2) + pow(p[2],2)) + 10.*pow(p[2],2)*sqrt(pow(p[0],2) + pow(p[1],2) + pow(p[2],2)) + pow(p[0],2)*pow(pow(p[0],2) + pow(p[1],2) + pow(p[2],2),1.5) - 1.*p[2]*pow(pow(p[0],2) + pow(p[1],2) + pow(p[2],2),1.5) - 1.*p[0]*p[2]*pow(pow(p[0],2) + pow(p[1],2) + pow(p[2],2),1.5) + pow(p[2],2)*pow(pow(p[0],2) + pow(p[1],2) + pow(p[2],2),1.5)))/pow(pow(p[0],2) + pow(p[1],2) + pow(p[2],2),3);
+    v[2] = (-4.*p[0]*pow(p[1],3)*p[2] + 22.*p[0]*pow(p[2],3) - 10.*pow(p[1],2)*p[2]*sqrt(pow(p[0],2) + pow(p[1],2) + pow(p[2],2)) - 10.*p[0]*pow(p[2],2)*sqrt(pow(p[0],2) + pow(p[1],2) + pow(p[2],2)) - 14.*p[0]*p[2]*(pow(p[0],2) + pow(p[1],2) + pow(p[2],2)) + p[0]*pow(p[2],3)*(pow(p[0],2) + pow(p[1],2) + pow(p[2],2)) + 5.*p[0]*pow(pow(p[0],2) + pow(p[1],2) + pow(p[2],2),1.5) - 1.*pow(p[1],2)*p[2]*pow(pow(p[0],2) + pow(p[1],2) + pow(p[2],2),1.5) - 1.*pow(p[2],2)*pow(pow(p[0],2) + pow(p[1],2) + pow(p[2],2),1.5) - 1.*p[0]*pow(p[2],2)*pow(pow(p[0],2) + pow(p[1],2) + pow(p[2],2),1.5) + pow(pow(p[0],2) + pow(p[1],2) + pow(p[2],2),2.5) + p[0]*pow(pow(p[0],2) + pow(p[1],2) + pow(p[2],2),2.5))/pow(pow(p[0],2) + pow(p[1],2) + pow(p[2],2),3);
+    return v;
+}
+
+double Test_A_plus_M_rhs2Fun85 (const DROPS::Point3DCL& p, double) {
+    if(p[0] == 0 && p[1] == 0 && p[2] == 0) {
+        return 0.;
+    }
+	return (-1.*(4.*p[0]*pow(p[2],2) - 3.*pow(p[1],2)*sqrt(pow(p[0],2) + pow(p[1],2) + pow(p[2],2)) - 3.*p[0]*p[2]*sqrt(pow(p[0],2) + pow(p[1],2) + pow(p[2],2)) + pow(pow(p[0],2) + pow(p[1],2) + pow(p[2],2),1.5)))/pow(pow(p[0],2) + pow(p[1],2) + pow(p[2],2),2);
+}
+
+double Test_A_plus_M_pSolScalarFun85 (const DROPS::Point3DCL& p, double) {
+    if(p[0] == 0 && p[1] == 0 && p[2] == 0) {
+        return 0.;
+    }
+    return (p[0]*pow(p[1],3))/pow(pow(p[0],2) + pow(p[1],2) + pow(p[2],2),2) + p[2]/sqrt(pow(p[0],2) + pow(p[1],2) + pow(p[2],2));
+}
+
+DROPS::Point3DCL Test_A_plus_M_vSolVectorFun85 (const DROPS::Point3DCL& p, double) {
+    if(p[0] == 0 && p[1] == 0 && p[2] == 0) {
+        return DROPS::Point3DCL(0,0,0);
+    }
+    DROPS::Point3DCL v;
+    v[0] = (-1.*(pow(p[2],4) + pow(p[0],2)*p[2]*sqrt(pow(p[0],2) + pow(p[1],2) + pow(p[2],2)) + pow(p[1],2)*(pow(p[2],2) + p[0]*sqrt(pow(p[0],2) + pow(p[1],2) + pow(p[2],2)))))/pow(pow(p[0],2) + pow(p[1],2) + pow(p[2],2),2);
+    v[1] = (p[1]*(p[0]*pow(p[2],2) - 1.*p[0]*p[2]*sqrt(pow(p[0],2) + pow(p[1],2) + pow(p[2],2)) + (pow(p[0],2) + pow(p[2],2))*sqrt(pow(p[0],2) + pow(p[1],2) + pow(p[2],2))))/pow(pow(p[0],2) + pow(p[1],2) + pow(p[2],2),2);
+    v[2] = (p[0]*pow(p[2],3) + p[0]*(pow(p[0],2) + pow(p[1],2))*sqrt(pow(p[0],2) + pow(p[1],2) + pow(p[2],2)) - 1.*pow(p[1],2)*p[2]*sqrt(pow(p[0],2) + pow(p[1],2) + pow(p[2],2)))/pow(pow(p[0],2) + pow(p[1],2) + pow(p[2],2),2);
+    return v;
+}
+
+DROPS::Point3DCL Test_A_plus_M_vSolVectorFun85_Gradient1 (const DROPS::Point3DCL& p, double) {
+	throw std::logic_error("not implemented");
+}
+
+DROPS::Point3DCL Test_A_plus_M_vSolVectorFun85_Gradient2 (const DROPS::Point3DCL& p, double) {
+    throw std::logic_error("not implemented");
+}
+
+DROPS::Point3DCL Test_A_plus_M_vSolVectorFun85_Gradient3 (const DROPS::Point3DCL& p, double) {
+    throw std::logic_error("not implemented");
+}
+
+
+
 DROPS::Point3DCL Test_A_plus_M_RhsVectorFun8 (const DROPS::Point3DCL& p, double)
 {
-	if(p[0] == 0 && p[1] == 0 && p[2] == 0) {
-			return DROPS::Point3DCL(0,0,0);
-		}
-	DROPS::Point3DCL v,w;
-	v[0] = 0.2e1 * pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1), -0.2e1) * (pow(p[1], 0.4e1) + (pow(p[0], 0.2e1) - 0.3e1 * pow(p[2], 0.2e1) - 0.5e1 * p[0] + 0.5e1 / 0.2e1 * p[2]) * pow(p[1], 0.2e1) + 0.7e1 * pow(p[0], 0.2e1) * pow(p[2], 0.2e1) - 0.4e1 * pow(p[2], 0.4e1) - 0.5e1 / 0.2e1 * pow(p[0], 0.2e1) * p[2] + 0.5e1 / 0.2e1 * pow(p[2], 0.3e1)) + (-pow(p[1], 0.2e1) * pow(p[2], 0.2e1) - pow(p[2], 0.4e1) - pow(p[0], 0.2e1) * p[2] - p[0] * pow(p[1], 0.2e1)) / (pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1));
-	v[1] = -0.2e1 * p[1] * ((-0.10e2 * p[0] - 0.5e1) * pow(p[2], 0.2e1) + 0.5e1 * p[0] * p[2] + p[0] * (pow(p[0], 0.2e1) + pow(p[1], 0.2e1) - 0.5e1 * p[0])) * pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1), -0.2e1) + (pow(p[0], 0.2e1) + (pow(p[2], 0.2e1) - p[2]) * p[0] + pow(p[2], 0.2e1)) * p[1] / (pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1));
-	v[2] = (0.8e1 * p[0] * pow(p[2], 0.3e1) - 0.5e1 * p[0] * pow(p[2], 0.2e1) + ((-0.14e2 * p[0] - 0.10e2) * pow(p[1], 0.2e1) - 0.14e2 * pow(p[0], 0.3e1)) * p[2] + 0.5e1 * pow(p[0], 0.3e1) + 0.5e1 * p[0] * pow(p[1], 0.2e1)) * pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1), -0.2e1) + (pow(p[1], 0.2e1) * (p[0] - p[2]) + p[0] * pow(p[2], 0.3e1) + pow(p[0], 0.3e1)) / (pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1));
+    if(p[0] == 0 && p[1] == 0 && p[2] == 0) {
+        return DROPS::Point3DCL(0,0,0);
+    }
+    DROPS::Point3DCL v,w;
+    v[0] = 0.2e1 * pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1), -0.2e1) * (pow(p[1], 0.4e1) + (pow(p[0], 0.2e1) - 0.3e1 * pow(p[2], 0.2e1) - 0.5e1 * p[0] + 0.5e1 / 0.2e1 * p[2]) * pow(p[1], 0.2e1) + 0.7e1 * pow(p[0], 0.2e1) * pow(p[2], 0.2e1) - 0.4e1 * pow(p[2], 0.4e1) - 0.5e1 / 0.2e1 * pow(p[0], 0.2e1) * p[2] + 0.5e1 / 0.2e1 * pow(p[2], 0.3e1)) + (-pow(p[1], 0.2e1) * pow(p[2], 0.2e1) - pow(p[2], 0.4e1) - pow(p[0], 0.2e1) * p[2] - p[0] * pow(p[1], 0.2e1)) / (pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1));
+    v[1] = -0.2e1 * p[1] * ((-0.10e2 * p[0] - 0.5e1) * pow(p[2], 0.2e1) + 0.5e1 * p[0] * p[2] + p[0] * (pow(p[0], 0.2e1) + pow(p[1], 0.2e1) - 0.5e1 * p[0])) * pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1), -0.2e1) + (pow(p[0], 0.2e1) + (pow(p[2], 0.2e1) - p[2]) * p[0] + pow(p[2], 0.2e1)) * p[1] / (pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1));
+    v[2] = (0.8e1 * p[0] * pow(p[2], 0.3e1) - 0.5e1 * p[0] * pow(p[2], 0.2e1) + ((-0.14e2 * p[0] - 0.10e2) * pow(p[1], 0.2e1) - 0.14e2 * pow(p[0], 0.3e1)) * p[2] + 0.5e1 * pow(p[0], 0.3e1) + 0.5e1 * p[0] * pow(p[1], 0.2e1)) * pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1), -0.2e1) + (pow(p[1], 0.2e1) * (p[0] - p[2]) + p[0] * pow(p[2], 0.3e1) + pow(p[0], 0.3e1)) / (pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1));
 
-	    w[0] = (-p[0] * pow(p[2], 0.5e1) + (-0.2e1 * pow(p[0], 0.3e1) - 0.2e1 * p[0] * pow(p[1], 0.2e1)) * pow(p[2], 0.3e1) + sqrt(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1)) * pow(p[1], 0.3e1) * pow(p[2], 0.2e1) - p[0] * pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1), 0.2e1) * p[2] - sqrt(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1)) * pow(p[1], 0.3e1) * (0.3e1 * pow(p[0], 0.2e1) - pow(p[1], 0.2e1))) * pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1), -0.7e1 / 0.2e1);
-	    w[1] = p[1] * (-pow(p[2], 0.5e1) + (-0.2e1 * pow(p[0], 0.2e1) - 0.2e1 * pow(p[1], 0.2e1)) * pow(p[2], 0.3e1) + 0.3e1 * sqrt(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1)) * p[0] * p[1] * pow(p[2], 0.2e1) - pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1), 0.2e1) * p[2] + sqrt(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1)) * p[0] * p[1] * (0.3e1 * pow(p[0], 0.2e1) - pow(p[1], 0.2e1))) * pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1), -0.7e1 / 0.2e1);
-	    w[2] = (pow(p[0], 0.6e1) + (0.3e1 * pow(p[1], 0.2e1) + 0.2e1 * pow(p[2], 0.2e1)) * pow(p[0], 0.4e1) + (0.3e1 * pow(p[1], 0.4e1) + 0.4e1 * pow(p[1], 0.2e1) * pow(p[2], 0.2e1) + pow(p[2], 0.4e1)) * pow(p[0], 0.2e1) - 0.4e1 * sqrt(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1)) * p[0] * pow(p[1], 0.3e1) * p[2] + pow(p[1], 0.2e1) * pow(pow(p[1], 0.2e1) + pow(p[2], 0.2e1), 0.2e1)) * pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1), -0.7e1 / 0.2e1);
+    w[0] = (-p[0] * pow(p[2], 0.5e1) + (-0.2e1 * pow(p[0], 0.3e1) - 0.2e1 * p[0] * pow(p[1], 0.2e1)) * pow(p[2], 0.3e1) + sqrt(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1)) * pow(p[1], 0.3e1) * pow(p[2], 0.2e1) - p[0] * pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1), 0.2e1) * p[2] - sqrt(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1)) * pow(p[1], 0.3e1) * (0.3e1 * pow(p[0], 0.2e1) - pow(p[1], 0.2e1))) * pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1), -0.7e1 / 0.2e1);
+    w[1] = p[1] * (-pow(p[2], 0.5e1) + (-0.2e1 * pow(p[0], 0.2e1) - 0.2e1 * pow(p[1], 0.2e1)) * pow(p[2], 0.3e1) + 0.3e1 * sqrt(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1)) * p[0] * p[1] * pow(p[2], 0.2e1) - pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1), 0.2e1) * p[2] + sqrt(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1)) * p[0] * p[1] * (0.3e1 * pow(p[0], 0.2e1) - pow(p[1], 0.2e1))) * pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1), -0.7e1 / 0.2e1);
+    w[2] = (pow(p[0], 0.6e1) + (0.3e1 * pow(p[1], 0.2e1) + 0.2e1 * pow(p[2], 0.2e1)) * pow(p[0], 0.4e1) + (0.3e1 * pow(p[1], 0.4e1) + 0.4e1 * pow(p[1], 0.2e1) * pow(p[2], 0.2e1) + pow(p[2], 0.4e1)) * pow(p[0], 0.2e1) - 0.4e1 * sqrt(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1)) * p[0] * pow(p[1], 0.3e1) * p[2] + pow(p[1], 0.2e1) * pow(pow(p[1], 0.2e1) + pow(p[2], 0.2e1), 0.2e1)) * pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1), -0.7e1 / 0.2e1);
 
-	return v+w;
+    return v+w;
 }
 
 double Test_A_plus_M_rhs2Fun8 (const DROPS::Point3DCL& p, double)
 {
 
-	if(p[0] == 0 && p[1] == 0 && p[2] == 0) {
-		return(0.0);
-	}
+    if(p[0] == 0 && p[1] == 0 && p[2] == 0) {
+        return(0.0);
+    }
 
     double v;
     v = (pow(p[0], 0.2e1) + (0.4e1 * pow(p[2], 0.2e1) - 0.3e1 * p[2]) * p[0] - 0.2e1 * pow(p[1], 0.2e1) + pow(p[2], 0.2e1)) / (pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1));
@@ -1106,17 +1165,17 @@ double Test_A_plus_M_rhs2Fun8 (const DROPS::Point3DCL& p, double)
 
 double Test_A_plus_M_pSolScalarFun8 (const DROPS::Point3DCL& p, double)
 {
-	if(p[0] == 0 && p[1] == 0 && p[2] == 0) {
-			return(0.0);
-		}
-	return (p[0] * pow(p[1], 0.3e1) * pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1), -0.2e1) + pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1), -0.1e1 / 0.2e1) * p[2]);
+    if(p[0] == 0 && p[1] == 0 && p[2] == 0) {
+        return(0.0);
+    }
+    return (p[0] * pow(p[1], 0.3e1) * pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1), -0.2e1) + pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1), -0.1e1 / 0.2e1) * p[2]);
 }
 
 DROPS::Point3DCL Test_A_plus_M_vSolVectorFun8 (const DROPS::Point3DCL& p, double)
 {
-	if(p[0] == 0 && p[1] == 0 && p[2] == 0) {
-			return DROPS::Point3DCL(0,0,0);
-		}
+    if(p[0] == 0 && p[1] == 0 && p[2] == 0) {
+        return DROPS::Point3DCL(0,0,0);
+    }
     DROPS::Point3DCL v;
     v[0] = (-pow(p[1], 0.2e1) * pow(p[2], 0.2e1) - pow(p[2], 0.4e1) - pow(p[0], 0.2e1) * p[2] - p[0] * pow(p[1], 0.2e1)) / (pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1));
     v[1] = (pow(p[0], 0.2e1) + (pow(p[2], 0.2e1) - p[2]) * p[0] + pow(p[2], 0.2e1)) * p[1] / (pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1));
@@ -1128,9 +1187,9 @@ DROPS::Point3DCL Test_A_plus_M_vSolVectorFun8 (const DROPS::Point3DCL& p, double
 
 DROPS::Point3DCL Test_A_plus_M_vSolVectorFun8_Gradient1 (const DROPS::Point3DCL& p, double)
 {
-	if(p[0] == 0 && p[1] == 0 && p[2] == 0) {
-			return DROPS::Point3DCL(0,0,0);
-		}
+    if(p[0] == 0 && p[1] == 0 && p[2] == 0) {
+        return DROPS::Point3DCL(0,0,0);
+    }
     DROPS::Point3DCL v;
     v[0] = (pow(p[0], 0.2e1) * pow(p[1], 0.2e1) + 0.2e1 * p[2] * (p[2] - 0.1e1) * (pow(p[1], 0.2e1) + pow(p[2], 0.2e1)) * p[0] - pow(p[1], 0.4e1) - pow(p[1], 0.2e1) * pow(p[2], 0.2e1)) * pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1), -0.2e1);
     v[1] = -0.2e1 * (pow(p[0], 0.2e1) + (pow(p[2], 0.2e1) - p[2]) * p[0] + pow(p[2], 0.2e1)) * p[1] * pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1), -0.2e1) * p[0];
@@ -1141,11 +1200,11 @@ DROPS::Point3DCL Test_A_plus_M_vSolVectorFun8_Gradient1 (const DROPS::Point3DCL&
 
 DROPS::Point3DCL Test_A_plus_M_vSolVectorFun8_Gradient2 (const DROPS::Point3DCL& p, double)
 {
-	if(p[0] == 0 && p[1] == 0 && p[2] == 0) {
-			return DROPS::Point3DCL(0,0,0);
-		}
+    if(p[0] == 0 && p[1] == 0 && p[2] == 0) {
+        return DROPS::Point3DCL(0,0,0);
+    }
 
-	DROPS::Point3DCL v;
+    DROPS::Point3DCL v;
     v[0] = -p[1] * (-pow(p[2], 0.4e1) + pow(p[2], 0.3e1) + (pow(p[0], 0.2e1) - pow(p[1], 0.2e1)) * pow(p[2], 0.2e1) + (-pow(p[0], 0.2e1) + pow(p[1], 0.2e1)) * p[2] - 0.2e1 * p[0] * pow(p[1], 0.2e1)) * pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1), -0.2e1);
     v[1] = (pow(p[0], 0.2e1) + (pow(p[2], 0.2e1) - p[2]) * p[0] + pow(p[2], 0.2e1)) * (pow(p[0], 0.2e1) - pow(p[1], 0.2e1) + pow(p[2], 0.2e1)) * pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1), -0.2e1);
     v[2] = 0.2e1 * p[1] * ((p[2] - 0.1e1 / 0.2e1) * pow(p[0], 0.3e1) + ((p[2] - 0.1e1 / 0.2e1) * pow(p[1], 0.2e1) + pow(p[2], 0.2e1) / 0.2e1) * p[0] + pow(p[1], 0.2e1) * p[2]) * pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1), -0.2e1);
@@ -1155,10 +1214,10 @@ DROPS::Point3DCL Test_A_plus_M_vSolVectorFun8_Gradient2 (const DROPS::Point3DCL&
 
 DROPS::Point3DCL Test_A_plus_M_vSolVectorFun8_Gradient3 (const DROPS::Point3DCL& p, double)
 {
-	if(p[0] == 0 && p[1] == 0 && p[2] == 0) {
-			return DROPS::Point3DCL(0,0,0);
-		}
-	DROPS::Point3DCL v;
+    if(p[0] == 0 && p[1] == 0 && p[2] == 0) {
+        return DROPS::Point3DCL(0,0,0);
+    }
+    DROPS::Point3DCL v;
     v[0] = (pow(p[2], 0.5e1) + (-pow(p[0], 0.2e1) + pow(p[1], 0.2e1)) * pow(p[2], 0.3e1) + (0.3e1 * pow(p[0], 0.2e1) + pow(p[1], 0.2e1)) * pow(p[2], 0.2e1) + 0.2e1 * p[0] * pow(p[1], 0.2e1) * p[2] + pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1), 0.2e1)) * pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1), -0.2e1);
     v[1] = -0.2e1 * ((p[0] + 0.1e1) * pow(p[2], 0.2e1) - p[0] * p[2] + pow(p[0], 0.2e1)) * p[1] * p[2] * pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1), -0.2e1);
     v[2] = ((0.3e1 * pow(p[2], 0.2e1) - 0.2e1 * p[2]) * pow(p[0], 0.3e1) - pow(p[0], 0.2e1) * pow(p[1], 0.2e1) + (0.3e1 * pow(p[1], 0.2e1) * pow(p[2], 0.2e1) + pow(p[2], 0.4e1) - 0.2e1 * pow(p[1], 0.2e1) * p[2]) * p[0] - pow(p[1], 0.4e1) + pow(p[1], 0.2e1) * pow(p[2], 0.2e1)) * pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1), -0.2e1);

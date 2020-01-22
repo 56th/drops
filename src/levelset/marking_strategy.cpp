@@ -259,7 +259,7 @@ ValueGetterCL* LevelsetP2GetterCL::clone() const
     return new LevelsetP2GetterCL(*this);
 }
 
-FunPtrGetterCL::FunPtrGetterCL( instat_scalar_fun_ptr fct, double time ):
+FunPtrGetterCL::FunPtrGetterCL( InstatScalarFunction fct, double time ):
  time_( time ), fct_( fct )
 {}
 
@@ -300,7 +300,7 @@ DistMarkingStrategyCL::DistMarkingStrategyCL( const LevelsetP2CL &dist,
     }
 }
 
-DistMarkingStrategyCL::DistMarkingStrategyCL( instat_scalar_fun_ptr fct,
+DistMarkingStrategyCL::DistMarkingStrategyCL( InstatScalarFunction fct,
                                               double width,
                                               Uint coarse_level, Uint fine_level,
                                               double time ):
@@ -412,7 +412,7 @@ MarkingDecisionT DistMarkingStrategyCL::GetDecision() const
     return decision_;
 }
 
-void DistMarkingStrategyCL::SetDistFct( instat_scalar_fun_ptr fct, double time )
+void DistMarkingStrategyCL::SetDistFct( InstatScalarFunction fct, double time )
 {
     delete getter_;
     getter_ = 0; // Needed for exception safety.
@@ -519,7 +519,7 @@ void CurvatureMarkingStrategyCL::visit( const TetraCL &t )
 
         locp2_ls.assign( t, *ls, *lsetbnd);
         evaluate_on_vertexes( locp2_ls, *lat, Addr( ls_loc));
-        if (equal_signs( ls_loc))
+        if (equalSigns(ls_loc))
             return;
 
         GetTrafoTr( M, det, t);

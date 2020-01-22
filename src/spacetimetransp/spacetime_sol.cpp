@@ -71,7 +71,7 @@ SpaceTimeXSolutionCL::SpaceTimeXSolutionCL(MultiGridCL& mg, const BndDataCL<>& B
 
 
 void SpaceTimeXSolutionCL::UpdateTimeSlab(const LevelsetP2CL & lsetold, const LevelsetP2CL & lsetnew,
-                                          double vmax, instat_scalar_fun_ptr lset_fpt)
+                                          double vmax, InstatScalarFunction lset_fpt)
 {
     lsetp2old = &lsetold;
     lsetp2new = &lsetnew;
@@ -99,7 +99,7 @@ void SpaceTimeXSolutionCL::EvalFutureTrace()
     future_vec_pos.RowIdx = &p1idxp;
 
     P1XtoP1 ( fut_x_idx_, futurevec.Data, p1idxn, future_vec_pos.Data, 
-              future_vec_neg.Data, lsetp2new->Phi, mg_);
+              future_vec_neg.Data, lsetp2new->Phi, lsetp2new->GetBndData(), mg_);
     future_vec_neg.Data *= 1.0/weight_neg_;
     future_vec_pos.Data *= 1.0/weight_pos_;
     future_vec_neg.t = lsetp2new->Phi.t;
@@ -120,7 +120,7 @@ void SpaceTimeXSolutionCL::EvalPastTrace()
     p1idxn.CreateNumbering( mg_.GetLastLevel(), mg_, past_x_idx_);
     p1idxp.CreateNumbering( mg_.GetLastLevel(), mg_, past_x_idx_);
     P1XtoP1 ( past_x_idx_, pastvec.Data, p1idxn, past_vec_pos.Data, 
-              past_vec_neg.Data, lsetp2old->Phi, mg_);
+              past_vec_neg.Data, lsetp2old->Phi, lsetp2old->GetBndData(), mg_);
     past_vec_neg.Data *= 1.0/weight_neg_;
     past_vec_pos.Data *= 1.0/weight_pos_;
     past_vec_neg.t = lsetp2old->Phi.t;

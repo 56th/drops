@@ -76,7 +76,7 @@ public:
 
     MarkingDecisionT GetDecision() const;
 
-    /* void SetDistFct( instat_scalar_fun_ptr fct, double time = 0 ); */
+    /* void SetDistFct( InstatScalarFunction fct, double time = 0 ); */
     void SetDistFct( const LevelsetP2CL& fct );
 
     /* double GetWidth() const; */

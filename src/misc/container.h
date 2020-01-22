@@ -1036,6 +1036,16 @@ outer_product (const SVectorCL<_Rows>& a, const SVectorCL<_Rows>& b)
 }
 
 template <Uint _Rows>
+inline SMatrixCL<_Rows, _Rows>
+sym_part(SMatrixCL<_Rows, _Rows> const & m) {
+    SMatrixCL<_Rows,_Rows> m_s(Uninitialized);
+    for (Uint i = 0; i < _Rows; ++i)
+        for (Uint j = 0; j < _Rows; ++j)
+            m_s(i, j) = .5 * (m(i, j) + m(j, i));
+    return m_s;
+}
+
+template <Uint _Rows>
 inline double
 frobenius_norm_sq (const SMatrixCL<_Rows, _Rows>& a)
 {

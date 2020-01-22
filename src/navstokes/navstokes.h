@@ -82,7 +82,7 @@ class NavierStokesP2P1CL : public StokesP2P1CL<Coeff>
 
     // Check computed solution
     void CheckSolution(const VelVecDescCL*, MLIdxDescCL* idx, const VecDescCL*,
-        instat_vector_fun_ptr, instat_scalar_fun_ptr);
+                       InstatVectorFunction, InstatScalarFunction);
 };
 
 

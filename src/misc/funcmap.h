@@ -34,19 +34,19 @@ namespace DROPS
 {
 
 
-typedef SingletonMapCL< instat_vector_fun_ptr> InVecMap;
-typedef SingletonMapCL< instat_scalar_fun_ptr> InScaMap;
+typedef SingletonMapCL< InstatVectorFunction> InVecMap;
+typedef SingletonMapCL< InstatScalarFunction> InScaMap;
 typedef SingletonMapCL< vector_tetra_function> VecTetMap;
 typedef SingletonMapCL< scalar_tetra_function> ScaTetMap;
-typedef SingletonMapCL< match_fun> MatchMap;
-typedef SingletonMapCL< instat_matrix_fun_ptr> InMatMap;
+typedef SingletonMapCL< MatchFunction> MatchMap;
+typedef SingletonMapCL< InstatMatrixFunction> InMatMap;
 
-typedef MapRegisterCL< instat_vector_fun_ptr> RegisterVectorFunction;
-typedef MapRegisterCL< instat_scalar_fun_ptr> RegisterScalarFunction;
+typedef MapRegisterCL< InstatVectorFunction> RegisterVectorFunction;
+typedef MapRegisterCL< InstatScalarFunction> RegisterScalarFunction;
 typedef MapRegisterCL< vector_tetra_function> RegisterVectorTetraFunction;
 typedef MapRegisterCL< scalar_tetra_function> RegisterScalarTetraFunction;
-typedef MapRegisterCL< match_fun> RegisterMatchingFunction;
-typedef MapRegisterCL< instat_matrix_fun_ptr> RegisterMatrixFunction;
+typedef MapRegisterCL< MatchFunction> RegisterMatchingFunction;
+typedef MapRegisterCL< InstatMatrixFunction> RegisterMatrixFunction;
 
 
 } //end of namespace DROPS

@@ -81,16 +81,16 @@ void  OnlyOsmosisStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTria
     InVecMap & tdvectormap = InVecMap::getInstance();
     InScaMap & tdscalarmap = InScaMap::getInstance();
     InScaMap & scalarmap = InScaMap::getInstance();
-    instat_vector_fun_ptr Flowfield = tdvectormap[P.get("Transp.Flow", std::string("ZeroVel"))];
-    instat_scalar_fun_ptr Reaction = tdscalarmap["ReactionFct"];
-    instat_scalar_fun_ptr Rhs = tdscalarmap["Rhs"];
-    instat_scalar_fun_ptr Initialcneg = tdscalarmap[P.get("Osmosis.InitialConc", std::string("One"))];
-    instat_scalar_fun_ptr Zero = tdscalarmap["ZeroFct"];
-    instat_vector_fun_ptr ZeroVel = tdvectormap["ZeroFct"];
-    instat_scalar_fun_ptr distance = scalarmap[P.get("Osmosis.Levelset", std::string("Ellipsoid"))];
+    InstatVectorFunction Flowfield = tdvectormap[P.get("Transp.Flow", std::string("ZeroVel"))];
+    InstatScalarFunction Reaction = tdscalarmap["ReactionFct"];
+    InstatScalarFunction Rhs = tdscalarmap["Rhs"];
+    InstatScalarFunction Initialcneg = tdscalarmap[P.get("Osmosis.InitialConc", std::string("One"))];
+    InstatScalarFunction Zero = tdscalarmap["ZeroFct"];
+    InstatVectorFunction ZeroVel = tdvectormap["ZeroFct"];
+    InstatScalarFunction distance = scalarmap[P.get("Osmosis.Levelset", std::string("Ellipsoid"))];
 
     const c_bnd_val_fun c_bfun[6]= {Zero,Zero,Zero,Zero,Zero,Zero};
-    const instat_vector_fun_ptr v_bfun[6]= {ZeroVel,ZeroVel,ZeroVel,ZeroVel,ZeroVel,ZeroVel};
+    const InstatVectorFunction v_bfun[6]= {ZeroVel, ZeroVel, ZeroVel, ZeroVel, ZeroVel, ZeroVel};
     const c_bnd_val_fun c_bfunt[6]= {Zero,Zero,Zero,Zero,Zero,Zero};
 
     const DROPS::BndCondT c_bc[6]= {
@@ -107,7 +107,7 @@ void  OnlyOsmosisStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTria
     cBndDataCL Bnd_ct( 6, c_bc, c_bfunt);
     bool vdirvals = P.get("ZeroVelAtBnd.Active", 0);
     BndDataCL<Point3DCL> VelBnd(6, vdirvals? v_bc : c_bc , v_bfun); // dir. boundary conditions for extendedvel.?
-    DROPS::instat_scalar_fun_ptr sigmap = 0;
+    DROPS::InstatScalarFunction sigmap = 0;
     SurfaceTensionCL sf( sigmap, Bnd_c);
 
     LevelsetP2CL & lset( * LevelsetP2CL::Create( MG, lsetbnddata, sf, P.get_child("Levelset")) );
@@ -276,7 +276,7 @@ int main (int argc, char** argv)
     // otherwise the pde-solutions from the ensight files might not fit.
     if (!P.get<int>("Transp.UseNSSol") || (P.get<std::string>("Restart.InputData","") == "")){
         DROPS::InScaMap & scalarmap = DROPS::InScaMap::getInstance();
-        DROPS::instat_scalar_fun_ptr distance = scalarmap[P.get("Osmosis.Levelset", std::string("Ellipsoid"))];
+        DROPS::InstatScalarFunction distance = scalarmap[P.get("Osmosis.Levelset", std::string("Ellipsoid"))];
 
 	typedef DROPS::DistMarkingStrategyCL InitMarkerT;
 	InitMarkerT initmarker( distance, P.get<double>("Mesh.AdaptRef.Width"),

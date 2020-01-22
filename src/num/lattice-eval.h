@@ -70,11 +70,11 @@ template <class LocalFET, class DomainT, class ResultContT>
 ///@{
 template <class T, class DomainT, class ResultIterT>
   inline ResultIterT
-  evaluate_on_vertexes (T (*f)(const Point3DCL&, double), const TetraCL& tet, const DomainT& dom, double t, ResultIterT result_iterator);
+  evaluate_on_vertexes (std::function<T(const Point3DCL&, double)> const & f, const TetraCL& tet, const DomainT& dom, double t, ResultIterT result_iterator);
 
 template <class T, class DomainT, class ResultIterT>
   inline ResultIterT
-  evaluate_on_vertexes (T (*f)(const Point3DCL&, double), const TetraCL& tet, const DomainT& dom, TetraSignEnum s, double t, ResultIterT result_iterator);
+  evaluate_on_vertexes (std::function<T(const Point3DCL&, double)> const & f, const TetraCL& tet, const DomainT& dom, TetraSignEnum s, double t, ResultIterT result_iterator);
 ///@}
 
 ///\brief Evaluate the plain function f on [dom.vertex_begin(), dom.vertex_end()).
@@ -86,11 +86,11 @@ template <class T, class DomainT, class ResultIterT>
 ///@{
 template <class T, class DomainT, class ResultContT>
   inline const ResultContT&
-  resize_and_evaluate_on_vertexes (T (*f)(const Point3DCL&, double), const TetraCL& tet, const DomainT& dom, double t, ResultContT& result_container);
+  resize_and_evaluate_on_vertexes (std::function<T(const Point3DCL&, double)> const & f, const TetraCL& tet, const DomainT& dom, double t, ResultContT& result_container);
 
 template <class T, class DomainT, class ResultContT>
   inline const ResultContT&
-  resize_and_evaluate_on_vertexes (T (*f)(const Point3DCL&, double), const TetraCL& tet, const DomainT& dom, TetraSignEnum s, double t, ResultContT& result_container);
+  resize_and_evaluate_on_vertexes (std::function<T(const Point3DCL&, double)> const & f, const TetraCL& tet, const DomainT& dom, TetraSignEnum s, double t, ResultContT& result_container);
 ///@}
 
 ///\brief Evaluate the P2EvalCL-like function f on [dom.vertex_begin(), dom.vertex_end()).

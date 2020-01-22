@@ -232,25 +232,26 @@ class VTKP1XScalarCL : public VTKVariableCL
                       vpos_;
 
     const VecDescCL& lset_;
+    BndDataCL<double> lsetbnd_;
     BndDataCL<double> bndneg_;
     BndDataCL<double> bndpos_;
     MultiGridCL& mg_;
 
   public:
-    VTKP1XScalarCL(MultiGridCL& mg, const VecDescCL& lset, const VecDescCL& v,
+    VTKP1XScalarCL(MultiGridCL& mg, const VecDescCL& lset, const BndDataCL<>& lsetbnd, const VecDescCL& v,
                    const BndDataCL<>& bnd1, const BndDataCL<>& bnd2, std::string varName)
         : VTKVariableCL( varName), v_( v), vneg_( &p1idx_), vpos_( &p1idx_), 
-        lset_( lset), bndneg_( bnd1), bndpos_( bnd2), mg_( mg) {}
-    VTKP1XScalarCL(MultiGridCL& mg, const VecDescCL& lset, const VecDescCL& v, const BndDataCL<>& bnd,
+        lset_( lset), lsetbnd_( lsetbnd), bndneg_( bnd1), bndpos_( bnd2), mg_( mg) {}
+    VTKP1XScalarCL(MultiGridCL& mg, const VecDescCL& lset, const BndDataCL<>& lsetbnd, const VecDescCL& v, const BndDataCL<>& bnd,
                    std::string varName)
         : VTKVariableCL( varName), v_( v), vneg_( &p1idx_), vpos_( &p1idx_), 
-        lset_( lset), bndneg_( bnd), bndpos_( bnd), mg_( mg) {}
+        lset_( lset), lsetbnd_( lsetbnd), bndneg_( bnd), bndpos_( bnd), mg_( mg) {}
     ~VTKP1XScalarCL() { if (p1idx_.NumUnknowns() != 0) p1idx_.DeleteNumbering( mg_); }
     void put( VTKOutCL& cf) const {
         if (p1idx_.NumUnknowns() != 0)
             p1idx_.DeleteNumbering( mg_);
         p1idx_.CreateNumbering( v_.RowIdx->TriangLevel(), mg_, *v_.RowIdx);
-        P1XtoP1 ( *v_.RowIdx, v_.Data, p1idx_, vpos_.Data, vneg_.Data, lset_, mg_);
+        P1XtoP1 ( *v_.RowIdx, v_.Data, p1idx_, vpos_.Data, vneg_.Data, lset_, lsetbnd_, mg_);
         vpos_.t = lset_.t;
         vneg_.t = lset_.t;
         cf.PutScalar( P1EvalCL<double, const BndDataCL<>, const VecDescCL>(&vneg_, &bndneg_, &mg_), varName()+ "_neg"); 
@@ -264,25 +265,25 @@ class VTKP1XScalarCL : public VTKVariableCL
 /// This is just for uniform code; the analoguous functions for scalars and vectors are more useful because
 /// they help to avoid template parameters in user code.
 inline  VTKP1XScalarCL&
-    make_VTKP1XScalar(MultiGridCL& mg, const VecDescCL& lset, const VecDescCL& v, const BndDataCL<>& bnd,
+    make_VTKP1XScalar(MultiGridCL& mg, const VecDescCL& lset, const BndDataCL<>& lsetbnd, const VecDescCL& v, const BndDataCL<>& bnd,
                    std::string varName)
 {
-    return *new VTKP1XScalarCL( mg,lset,v,bnd,varName);
+    return *new VTKP1XScalarCL( mg,lset,lsetbnd,v,bnd,varName);
 }
 
 inline  VTKP1XScalarCL&
-    make_VTKP1XScalar(MultiGridCL& mg, const VecDescCL& lset, const VecDescCL& v, 
+    make_VTKP1XScalar(MultiGridCL& mg, const VecDescCL& lset, const BndDataCL<>& lsetbnd, const VecDescCL& v, 
                       const BndDataCL<>& bnd1, const BndDataCL<>& bnd2,
                       std::string varName)
 {
-    return *new VTKP1XScalarCL( mg,lset,v,bnd1,bnd2,varName);
+    return *new VTKP1XScalarCL( mg,lset,lsetbnd,v,bnd1,bnd2,varName);
 }
 
 inline  VTKP1XScalarCL&
-    make_VTKP1XScalar(MultiGridCL& mg, const VecDescCL& lset, const VecDescCL& v,
+    make_VTKP1XScalar(MultiGridCL& mg, const VecDescCL& lset, const BndDataCL<>& lsetbnd, const VecDescCL& v,
                    std::string varName)
 {
-    return *new VTKP1XScalarCL( mg,lset,v,BndDataCL<>( 0),varName);
+    return *new VTKP1XScalarCL( mg,lset,lsetbnd,v,BndDataCL<>( 0),varName);
 }
 
 

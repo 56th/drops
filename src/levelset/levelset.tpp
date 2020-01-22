@@ -271,6 +271,7 @@ void LevelsetAccumulator_P2CL<DiscVelSolT>::begin_accumulation ()
     const IdxT num_unks= ls_.Phi.RowIdx->NumUnknowns();
     bE_= new SparseMatBuilderCL<double>(&ls_.E, num_unks, num_unks);
     bH_= new SparseMatBuilderCL<double>(&ls_.H, num_unks, num_unks);
+    ls_.rhs.SetIdx( ls_.Phi.RowIdx);
 
 #ifndef _PAR
     __UNUSED__ const IdxT allnum_unks= num_unks;
@@ -323,23 +324,33 @@ void LevelsetAccumulator_P2CL<DiscVelSolT>::visit (const TetraCL& t)
 
     SparseMatBuilderCL<double> &bE= *bE_, &bH= *bH_;
     for(int i=0; i<10; ++i)    // assemble row Numb[i]
-        for(int j=0; j<10; ++j)
-        {
-            // E is of mass matrix type:    E_ij = ( v_j       , v_i + SD * u grad v_i )
-            bE( n.num[i], n.num[j])+= P2DiscCL::GetMass(i,j) * absdet
-                                 + u_Grad[i].quadP2(j, absdet)*SD_/maxV*h_T;
+        if (n.WithUnknowns(i)) {
+            for(int j=0; j<10; ++j)
+                if (n.WithUnknowns(j)) 
+                {
+                    // E is of mass matrix type:    E_ij = ( v_j       , v_i + SD * u grad v_i )
+                    bE( n.num[i], n.num[j])+= P2DiscCL::GetMass(i,j) * absdet
+                                        + u_Grad[i].quadP2(j, absdet)*SD_/maxV*h_T;
 
-            // H describes the convection:  H_ij = ( u grad v_j, v_i + SD * u grad v_i )
-            bH( n.num[i], n.num[j])+= u_Grad[j].quadP2(i, absdet)
-                                 + Quad5CL<>(u_Grad[i]*u_Grad[j]).quad( absdet) * SD_/maxV*h_T;
+                    // H describes the convection:  H_ij = ( u grad v_j, v_i + SD * u grad v_i )
+                    bH( n.num[i], n.num[j])+= u_Grad[j].quadP2(i, absdet)
+                                        + Quad5CL<>(u_Grad[i]*u_Grad[j]).quad( absdet) * SD_/maxV*h_T;
+                } else { // Dirichlet bnd: put couplings with H into rhs
+                    auto bf= ls_.GetBndData().GetBndSeg( n.bndnum[j]).GetBndFun();
+                    const double bval= j<4 ? bf( t.GetVertex( j)->GetCoord(), 0.)
+                                           : bf( GetBaryCenter( *t.GetEdge( j-4)), 0.),
+                        H_ij= u_Grad[j].quadP2(i, absdet)
+                              + Quad5CL<>(u_Grad[i]*u_Grad[j]).quad( absdet) * SD_/maxV*h_T;
+                    ls_.rhs.Data[n.num[i]]-= H_ij*bval;
+                }
         }
 }
 
 
 /// \brief Accumulator to set up the matrices E and H for the discontinous P2 level set equation.
-/// takes care of volume integarls only
+/// takes care of volume integrals only
 /// creates SparseMatBuilder for E and H, but creates E only
-///creating H is accomplished in the FaceAccumulator
+/// creating H is accomplished in the FaceAccumulator
 template<class DiscVelSolT>
 class LevelsetTetraAccumulator_P2DCL : public TetraAccumulatorCL
 {
@@ -701,8 +712,6 @@ void LevelsetP2ContCL::SetupSystem( const DiscVelSolT& vel, const double dt)
     MaybeAddProgressBar(MG_, "Levelset Setup", accus, Phi.RowIdx->TriangLevel());
     accus.push_back( &accu);
     accumulate( accus, MG_, Phi.RowIdx->TriangLevel(), Phi.RowIdx->GetBndInfo());
-    rhs.SetIdx( &idx.GetFinest());
-    // rhs.Data.resize(Phi.RowIdx->NumUnknowns());
 }
 
 template<class DiscVelSolT>

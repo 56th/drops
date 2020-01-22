@@ -89,8 +89,8 @@ double f2sq (const Point3DCL& p, double)
     return std::pow( f2( p, 0.), 2);
 }
 
-void InitPiecewiseP2 (instat_scalar_fun_ptr fneg, VecDescCL& un,
-    instat_scalar_fun_ptr fpos, VecDescCL& up, MultiGridCL& MG, VecDescCL& Phi, const BndDataCL<>& lsbnd)
+void InitPiecewiseP2 (InstatScalarFunction fneg, VecDescCL& un,
+    InstatScalarFunction fpos, VecDescCL& up, MultiGridCL& MG, VecDescCL& Phi, const BndDataCL<>& lsbnd)
 {
     const Uint idx= Phi.RowIdx->GetIdx(),
                unidx= un.RowIdx->GetIdx(),
@@ -198,7 +198,7 @@ int main (int argc, char** argv)
                                //2*std_basis<3>( 2), 2*std_basis<3>( 3));
  //   MultiGridCL mg( builder);
 
-    instat_scalar_fun_ptr sigma (0);
+    InstatScalarFunction sigma (0);
     SurfaceTensionCL sf( sigma, 0);
     BndCondT bc[6]= { NoBC, NoBC, NoBC, NoBC, NoBC, NoBC };
     LsetBndDataCL::bnd_val_fun bfun[6]= { 0,0,0,0,0,0};
@@ -298,7 +298,7 @@ int main (int argc, char** argv)
     ensight.Register( make_Ensight6Scalar   ( make_P2Eval( mg, ubnd, upos),    "up",       filename + ".up"));
     ensight.Register( make_Ensight6Scalar   ( make_P2Eval( mg, ubnd, uneg),    "un",       filename + ".un"));
     // Output the L_2-projection
-    ensight.Register( make_Ensight6P1XScalar( mg, lset.Phi, beta,              "ul",       filename + ".ul"));
+    ensight.Register( make_Ensight6P1XScalar( mg, lset.Phi, lset.GetBndData(), beta, "ul", filename + ".ul"));
 
     ensight.Write();
 

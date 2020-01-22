@@ -32,24 +32,19 @@
 
 namespace DROPS{
 
-typedef DROPS::Point3DCL (*vector_fun_ptr)       (const DROPS::Point3DCL&);
-typedef double    (*instat_scalar_fun_ptr)(const DROPS::Point3DCL&, double);
-typedef DROPS::Point3DCL (*instat_vector_fun_ptr)(const DROPS::Point3DCL&, double);
-typedef DROPS::SMatrixCL<3, 3> (*instat_matrix_fun_ptr) (const DROPS::Point3DCL&, double);
-
 class StokesFlowCoeffCL
 {
   public:
   //reaction
-    static instat_scalar_fun_ptr q;
+    static InstatScalarFunction q;
   //source term
-    static instat_vector_fun_ptr f;
+    static InstatVectorFunction f;
   //solution of velocity
-    static instat_vector_fun_ptr LsgVel;
+    static InstatVectorFunction LsgVel;
   //solution of Jacobi-matrix of exact solution for velocity
-    static instat_matrix_fun_ptr DLsgVel;
+    static InstatMatrixFunction DLsgVel;
     //solution of pressure
-    static instat_scalar_fun_ptr LsgPr;
+    static InstatScalarFunction LsgPr;
 
     const double rho, nu;
     const DROPS::Point3DCL g;
@@ -82,11 +77,11 @@ class StokesFlowCoeffCL
 
 };
 
-instat_scalar_fun_ptr StokesFlowCoeffCL::q;
-instat_vector_fun_ptr StokesFlowCoeffCL::f;
-instat_vector_fun_ptr StokesFlowCoeffCL::LsgVel;
-instat_matrix_fun_ptr StokesFlowCoeffCL::DLsgVel;
-instat_scalar_fun_ptr StokesFlowCoeffCL::LsgPr;
+InstatScalarFunction StokesFlowCoeffCL::q;
+InstatVectorFunction StokesFlowCoeffCL::f;
+InstatVectorFunction StokesFlowCoeffCL::LsgVel;
+InstatMatrixFunction StokesFlowCoeffCL::DLsgVel;
+InstatScalarFunction StokesFlowCoeffCL::LsgPr;
 }//end of namespace
 
 #endif

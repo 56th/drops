@@ -38,8 +38,11 @@
 #include "misc/singletonmap.h"
 #include "misc/problem.h"
 #include "num/gauss.h"
+#include "geom/principallattice.h"
+#include "geom/subtriangulation.h"
 #include <iterator>
 #include <set>
+#include <stokes/stokesCoeff.h>
 
 namespace DROPS
 {
@@ -50,7 +53,7 @@ BoundaryCL::~BoundaryCL()
         delete *It;
 }
 
-void BoundaryCL::SetPeriodicBnd( const BndTypeCont& type, match_fun match) const
+void BoundaryCL::SetPeriodicBnd(const BndTypeCont& type, MatchFunction match) const
 {
     if (type.size()!=GetNumBndSeg())
         throw DROPSErrCL("BoundaryCL::SetPeriodicBnd: inconsistent vector size!");
@@ -459,7 +462,7 @@ void MultiGridCL::Scale( __UNUSED__ double s)
 #endif
 }
 
-void MultiGridCL::Transform( __UNUSED__ Point3DCL (*mapping)(const Point3DCL&))
+void MultiGridCL::Transform(VectorFunction const & mapping)
 {
 #ifndef _PAR
     for (VertexIterator it= GetAllVertexBegin(), end= GetAllVertexEnd(); it!=end; ++it)
@@ -831,6 +834,18 @@ bool MultiGridCL::IsSane (std::ostream& os, int Level) const
     return sane;
 }
 
+// std::vector<MultiGridCL::const_TriangTetraIteratorCL> MultiGridCL::getCutTetras(LevelsetP2CL const & lset) const {
+//    std::vector<const_TriangTetraIteratorCL> res;
+//    res.reserve(GetTetras().size());
+//    auto const & lat = PrincipalLatticeCL::instance(2);
+//    LocalP2CL<> ls_loc(lat.vertex_size());
+//    for (auto it = GetTriangTetraBegin(GetLastLevel()); it != GetTriangTetraEnd(GetLastLevel()); ++it) {
+//        ls_loc.assign(*it, lset.Phi, lset.GetBndData());
+//        if (!equalSigns(ls_loc))
+//            res.push_back(it);
+//    }
+//    return res;
+//}
 
 void MultiGridCL::SizeInfo(std::ostream& os)
 {
@@ -960,6 +975,14 @@ void MultiGridCL::DebugInfo(std::ostream& os, int Level) const
         sit->DebugInfo( os);
 }
 
+/// \brief Get number of tetrahedra of a given level
+Uint MultiGridCL::GetNumTriangTetra(int Level) {
+    Uint numTetra = 0;
+    DROPS_FOR_TRIANG_TETRA((*this), Level, It)
+        ++numTetra;
+    return numTetra;
+}
+
 #ifdef _PAR
 /// \brief Get number of distributed objects on local processor
 Uint MultiGridCL::GetNumDistributedObjects() const
@@ -977,16 +1000,6 @@ Uint MultiGridCL::GetNumDistributedObjects() const
         if (!sit->IsLocal()) ++numdistTetra;
 
     return numdistVert+numdistEdge+numdistFace+numdistTetra;
-}
-
-/// \brief Get number of tetrahedra of a given level
-Uint MultiGridCL::GetNumTriangTetra(int Level)
-{
-    Uint numTetra=0;
-    DROPS_FOR_TRIANG_TETRA( (*this), Level, It) {
-        ++numTetra;
-    }
-    return numTetra;
 }
 
 /// \brief Get number of faces of a given level
@@ -1344,7 +1357,7 @@ void read_PeriodicBoundaries (MultiGridCL& mg, const ParamCL& P)
     const BoundaryCL& bnd= mg.GetBnd();
     const BndIdxT num_bnd= bnd.GetNumBndSeg();
 
-    match_fun mfun= 0;
+    MatchFunction mfun= 0;
     BoundaryCL::BndTypeCont bnd_type( num_bnd, BoundaryCL::OtherBnd);
 
     // Try to read and set PeriodicMatching.
@@ -1356,7 +1369,7 @@ void read_PeriodicBoundaries (MultiGridCL& mg, const ParamCL& P)
         try {
             const std::string s= child->get_value<std::string>();
             if (s != "")
-                mfun= SingletonMapCL<match_fun>::getInstance()[s];
+                mfun= SingletonMapCL<MatchFunction>::getInstance()[s];
         } catch (DROPSErrCL e) {
             std:: cerr << "read_PeriodicBoundaries: While processing 'PeriodicMatching'...\n";
             throw e;

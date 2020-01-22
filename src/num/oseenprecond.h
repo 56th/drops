@@ -891,7 +891,7 @@ void MinCommPreCL::Update(const ExT& vel_ex, const ExT& pr_ex) const
 
 //**************************************************************************
 // Preconditioner for the instationary (Navier-) Stokes-equations.
-// It uses the approximate Schur complement B diag(L)^{-1} B^T
+// It uses the approximate M_p complement B diag(L)^{-1} B^T
 // with L the upper left block of the saddle point system, and can be used
 // with P1X-elements.
 //**************************************************************************

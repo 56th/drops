@@ -45,7 +45,7 @@ class STSurfaceTestAccumulatorCL : public TetraAccumulatorCL
 
     const LevelsetP2CL * lsetp2old;
     const LevelsetP2CL * lsetp2new;
-    instat_scalar_fun_ptr lset_fpt;
+    InstatScalarFunction lset_fpt;
 
     // - sharable (for future changes)
     Point3DCL G[4];
@@ -74,7 +74,7 @@ class STSurfaceTestAccumulatorCL : public TetraAccumulatorCL
 
 public:
     STSurfaceTestAccumulatorCL (const MultiGridCL& MG,
-                                instat_scalar_fun_ptr lset_fpt_in,
+                                InstatScalarFunction lset_fpt_in,
                                 const LevelsetP2CL * lsetp2old_in,
                                 const LevelsetP2CL * lsetp2new_in,
                                 const double t1, const double t2,
@@ -99,7 +99,7 @@ public:
 
 
 STSurfaceTestAccumulatorCL::STSurfaceTestAccumulatorCL (const MultiGridCL& MG,
-                                                        instat_scalar_fun_ptr lset_fpt_in,
+                                                        InstatScalarFunction lset_fpt_in,
                                                         const LevelsetP2CL * lsetp2old_in,
                                                         const LevelsetP2CL * lsetp2new_in,
                                                         const double t1, const double t2,
@@ -257,7 +257,7 @@ double Run (int numref, int numsteps, int subdivspace, int subdivtime)
                                    2*numref, numref, numref);
       MultiGridCL mg( brick);
 
-      instat_scalar_fun_ptr sigma (0);
+      InstatScalarFunction sigma (0);
       SurfaceTensionCL sf( sigma, 0);
       BndCondT bc[6]= { NoBC, NoBC, NoBC, NoBC, NoBC, NoBC };
       LsetBndDataCL::bnd_val_fun bfun[6]= { 0,0,0,0,0,0};

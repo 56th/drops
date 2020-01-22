@@ -1,6 +1,6 @@
-/// \file surfacestokes.cpp
-/// \brief Solve Vector Laplace on manifold
-/// \author LNM RWTH Aachen: Thomas Jankuhn
+/// \file surfnavierstokes.cpp
+/// \brief Trace FEM discretization of a surface Navier-Stokes problem
+/// \author Alexander Zhiliakov alex@math.uh.edu
 
 /*
  * This file is part of DROPS.
@@ -13,7 +13,7 @@
  * DROPS is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
+ * GNU Lesser General Public License for more dtau_uils.
  *
  * You should have received a copy of the GNU Lesser General Public License
  * along with DROPS. If not, see <http://www.gnu.org/licenses/>.
@@ -22,6 +22,10 @@
  * Copyright 2009 LNM/SC RWTH Aachen, Germany
 */
 
+
+#include <fstream>
+#include <unordered_map>
+
 #include "surfactant/ifacetransp.h"
 #include "misc/params.h"
 #include "geom/builder.h"
@@ -29,1367 +33,863 @@
 #include "levelset/adaptriang.h"
 #include "levelset/surfacetension.h"
 #include "misc/dynamicload.h"
-#include "out/vtkOut.h"
 #include "num/bndData.h"
-#include "num/precond.h"
+#include "surfactant/ifacetransp.h"
 
-#include "num/oseensolver.h"
-#include <fstream>
+#include "VTKWriter.hpp"
+#include "SurfNavierStokesData.hpp"
+#include "surfnavierstokes_utils.h"
+#include "SingletonLogger.hpp"
 
-#include "surfnavierstokes/surfnavierstokes_funcs.h"
-#include "surfnavierstokes/surfnavierstokes_utils.h"
-#include "surfnavierstokes/surfnavierstokes_tests.h"
+// belos (iterative solvers)
+#include "BelosSolverFactory.hpp"
+#include "BelosLinearProblem.hpp"
+#include "BelosEpetraAdapter.hpp"
+// amesos (sparse-direct solvers)
+#include "Amesos.h"
+#include "Amesos_ConfigDefs.h"
+#include "Amesos_BaseSolver.h"
+// epetra (vectors and operators / matrices)
+#include "Epetra_OperatorApply.hpp"
+#include "Epetra_CrsMatrix.h"
+#include "Epetra_Vector.h"
+#ifdef HAVE_MPI
+    #include "Epetra_MpiComm.h"
+#else
+    #include "Epetra_SerialComm.h"
+#endif
 
 using namespace DROPS;
 
-/////////////////////////////////////////////////////////////////////////////////////////////////////////
-/////////////////////////////////////// Model Test Cases ////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-void InitVecLaplace(const MultiGridCL& MG, LevelsetP2CL& lset, DROPS::VecDescCL& rhs, DROPS::VecDescCL& vSol, DROPS::VecDescCL& pSol,
-                    instat_vector_fun_ptr f_rhs, instat_vector_fun_ptr f_vsol, instat_scalar_fun_ptr f_psol, double t = 0.0) {
-    if( vSol.RowIdx->NumUnknownsEdge()) {
-        DROPS::SetupInterfaceVectorRhsP2(MG, &rhs, lset.Phi, lset.GetBndData(), f_rhs);
-    } else {
-        DROPS::SetupInterfaceVectorRhsP1(MG, &rhs, lset.Phi, lset.GetBndData(), f_rhs, t);
-    }
-    InitScalar(MG, pSol, f_psol);
-    InitVector(MG, vSol, f_vsol);
-}
-
-int main (int argc, char* argv[]) {
-
-  try {
-    
-    DROPS::read_parameter_file_from_cmdline( P, argc, argv, "../../param/surfnavierstokes/No_Bnd_Condition.json");
-    std::cout << P << std::endl;
-
-    DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
-
-    // build initial mesh
-    std::cout << "Setting up interface-PDE:\n";
-    //    DROPS::BrickBuilderCL brick( DROPS::MakePoint3D( -2., -2., -53./48),
-    //                                 DROPS::MakePoint3D(4., 0., -1.),
-    //                                 4.*DROPS::std_basis<3>( 2),
-    //                                 4.*DROPS::std_basis<3>( 3),
-    //                                 P.get<int>("InitialDivisions"), P.get<int>("InitialDivisions"), P.get<int>("InitialDivisions"));
-    //    DROPS::MultiGridCL mg( brick);
-    std::auto_ptr<DROPS::MGBuilderCL> builder( DROPS::make_MGBuilder( P));
-    DROPS::MultiGridCL mg( *builder);
-    const DROPS::ParamCL::ptree_type* ch= 0;
+int main(int argc, char* argv[]) {
+    auto& logger = SingletonLogger::instance();
     try {
-        ch= &P.get_child( "Mesh.Periodicity");
-    }
-    catch (DROPS::DROPSParamErrCL) {}
-    if (ch)
-        read_PeriodicBoundaries( mg, *ch);
-
-    DROPS::AdapTriangCL adap( mg );
-
-    // choose level set
-    instat_scalar_fun_ptr levelset_fun;
-    std::string levelset_fun_str = P.get<std::string>("Levelset.case");
-    if( !levelset_fun_str.compare("sphere_2")) {
-        levelset_fun = &sphere_2;
-        std::cout << "The levelset is the unit sphere." << std::endl;
-    } else if( !levelset_fun_str.compare("xy_plane")) {
-        levelset_fun = &xy_plane;
-        std::cout << "The levelset is the xy-plane." << std::endl;
-    } else if( !levelset_fun_str.compare("tilted_plane")) {
-        levelset_fun = &tilted_plane;
-        std::cout << "The levelset is the tilted plane." << std::endl;
-    } else if( !levelset_fun_str.compare("tilted_plane_xy")) {
-        levelset_fun = &tilted_plane_xy;
-        std::cout << "The levelset is the tilted xy-plane." << std::endl;
-    } else if( !levelset_fun_str.compare("cube_madeof_edges")) {
-        levelset_fun = &cube_madeof_edges;
-        std::cout << "The levelset is the cube_madeof_edges." << std::endl;
-    }
-    else if( !levelset_fun_str.compare("torus")) {
-        levelset_fun = &torus;
-        std::cout << "The levelset is the torus." << std::endl;
-    }
-    else if( !levelset_fun_str.compare("torus_flower")) {
-        levelset_fun = &torus_flower;
-        std::cout << "The levelset is the torus_flower." << std::endl;
-    }
-
-    // adaptive mesh refinement based on level set function
-    typedef DROPS::DistMarkingStrategyCL InitMarkerT;
-    InitMarkerT initmarker( levelset_fun, P.get<double>("Mesh.AdaptRef.Width"), 0, P.get<int>("Mesh.AdaptRef.FinestLevel") );
-    adap.set_marking_strategy( &initmarker );
-    adap.MakeInitialTriang();
-    adap.set_marking_strategy( 0 );
-    double h = P.get<DROPS::Point3DCL>("Mesh.E1")[0]/P.get<double>("Mesh.N1")*std::pow(2., -P.get<double>("Mesh.AdaptRef.FinestLevel"));
-
-    if (levelset_fun_str == "sphere_2" && (P.exists("Levelset.ShiftNorm") || P.exists("Levelset.ShiftNormRel")) && P.exists("Levelset.ShiftDir")) {
-        auto shiftNorm = P.exists("Levelset.ShiftNormRel") ? P.get<double>("Levelset.ShiftNormRel") * h : P.get<double>("Levelset.ShiftNorm");
-        sphere_2_shift = P.get<DROPS::Point3DCL>("Levelset.ShiftDir");
-        sphere_2_shift /= sphere_2_shift.norm();
-        sphere_2_shift *= shiftNorm;
-        std::cout << "Refined bulk mesh is constracted w/ Levelset.ShiftNorm = 0; now we set\n\tsphere_2_shift = " << sphere_2_shift << '\n';
-    }
-
-    // create level set
-    instat_scalar_fun_ptr sigma (0);
-    SurfaceTensionCL sf( sigma, 0);
-
-    BndDataCL<double> lsbnd( 0);
-
-    read_BndData( lsbnd, mg, P.get_child( "Levelset.BndData"));
-
-    DROPS::LevelsetP2CL & lset( * DROPS::LevelsetP2CL::Create( mg, lsbnd, sf) );
-
-    lset.CreateNumbering( mg.GetLastLevel(), &lset.idx);
-    lset.Phi.SetIdx( &lset.idx);
-//    LinearLSInit( mg, lset.Phi, levelset_fun);
-    lset.Init( levelset_fun);
-
-    // parse FE types and some other parameters from json file
-    std::string FE = P.get<std::string>("SurfNavStokes.FE");
-    std::string velFE, prFE, LgFE;
-    velFE = FE.substr(0,2);
-    prFE = FE.substr(2,2);
-    if( FE.size()>4) {
-        LgFE = FE.substr(4,2);
-    } else {
-        LgFE = FE.substr(2,2);
-    }
-
-    bool fullgrad = P.get<bool>("SurfNavStokes.fullgrad");
-    std::string model = P.get<std::string>("SurfNavStokes.model");
-    std::string testcase = P.get<std::string>("SurfNavStokes.testcase");
-    double tau = P.get<double>("Time.StepSize");
-    ParameterNS::nu = P.get<double>("SurfNavStokes.kinematic_viscosity");
-
-    double eta_order=-2.0;
-    double epsilon_order=1.0;
-    double alpha_order=1.0;
-    double eta 		   = 1.e0  * pow(h, eta_order);//std::pow(2.e0,eta_index);// //constant for tangential penalty
-    double epsilon     = 1.e0  * pow(h, epsilon_order); //constant for velocity stabilisation
-    double alpha       = 1.e0  * pow(h, alpha_order); //constant for pressure stabilisation
-    double rho         = 1.e0  * pow(h, 1); //constant for Schur complement preconditioner
-
-    double hat_epsilon =           epsilon; //Constant for L_stab
-
-    std::cout << "h is: " << h << std::endl;
-    std::cout << "tau is: " << tau << std::endl;
-    ParameterNS::h = h;
-
-    // construct FE spaces
-    BndDataCL<Point3DCL> vbnd( 0);
-    read_BndData( vbnd, mg, P.get_child( "Stokes.VelocityBndData"));
-
-//  BndDataCL<double> vscalarbnd( 0);
-//  read_BndData( vscalarbnd, mg, P.get_child( "Stokes.VelocityBndData"));
-
-    BndDataCL<double> pbnd( 0);
-    read_BndData( pbnd, mg, P.get_child( "Stokes.PressureBndData"));
-
-    DROPS::IdxDescCL ifaceVecP2idx( vecP2IF_FE, vbnd);
-    DROPS::IdxDescCL ifaceVecP1idx( vecP1IF_FE, vbnd);
-    DROPS::IdxDescCL ifaceP1idx( P1IF_FE, pbnd);
-    DROPS::IdxDescCL ifaceP2idx( P2IF_FE, pbnd);
-    DROPS::IdxDescCL vecP2idx( vecP2_FE, vbnd);
-    DROPS::IdxDescCL vecP1idx( vecP1_FE, vbnd);
-    DROPS::IdxDescCL P1FEidx( P1_FE, pbnd);
-    DROPS::IdxDescCL P2FEidx( P2_FE, pbnd);
-
-    ifaceVecP2idx.GetXidx().SetBound( P.get<double>("SurfTransp.OmitBound"));
-    ifaceVecP2idx.CreateNumbering( mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData());
-    ifaceVecP1idx.GetXidx().SetBound( P.get<double>("SurfTransp.OmitBound"));
-    ifaceVecP1idx.CreateNumbering( mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData());
-    ifaceP1idx.GetXidx().SetBound( P.get<double>("SurfTransp.OmitBound"));
-    ifaceP1idx.CreateNumbering( mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData());
-    ifaceP2idx.GetXidx().SetBound( P.get<double>("SurfTransp.OmitBound"));
-    ifaceP2idx.CreateNumbering( mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData());
-    vecP2idx.GetXidx().SetBound( P.get<double>("SurfTransp.OmitBound"));
-    vecP2idx.CreateNumbering(mg.GetLastLevel(), mg);
-    vecP1idx.GetXidx().SetBound( P.get<double>("SurfTransp.OmitBound"));
-    vecP1idx.CreateNumbering(mg.GetLastLevel(), mg);
-    P1FEidx.GetXidx().SetBound( P.get<double>("SurfTransp.OmitBound"));
-    P1FEidx.CreateNumbering(mg.GetLastLevel(), mg);
-    P2FEidx.GetXidx().SetBound( P.get<double>("SurfTransp.OmitBound"));
-    P2FEidx.CreateNumbering(mg.GetLastLevel(), mg);
-    std::cout << "NumUnknowns Vector IFP2: " << ifaceVecP2idx.NumUnknowns() << std::endl;
-    std::cout << "NumUnknowns Vector IFP1: " << ifaceVecP1idx.NumUnknowns() << std::endl;
-    std::cout << "NumUnknowns Scalar IFP2: " << ifaceP2idx.NumUnknowns() << std::endl;
-    std::cout << "NumUnknowns Scalar IFP1: " << ifaceP1idx.NumUnknowns() << std::endl;
-    std::cout << "NumUnknowns Vector P2: " << vecP2idx.NumUnknowns() << std::endl;
-    std::cout << "NumUnknowns Vector P1: " << vecP1idx.NumUnknowns() << std::endl;
-    std::cout << "NumUnknowns Scalar P2: " << P2FEidx.NumUnknowns() << std::endl;
-    std::cout << "NumUnknowns Scalar P1: " << P1FEidx.NumUnknowns() << std::endl;
-
-    //TestAllP2MatricesWithP1Matrices(mg, lset, ifaceVecP2idx, ifaceVecP1idx, ifaceP1idx, fullgrad);
-
-    // construct FE vectors (initialized with zero)
-     DROPS::VecDescCL v, vSol, vInit, p, curl,curlSol, pSol, rhs, rhs2, curl_proj, ZeroVec;
-     DROPS::VecDescCL v_iter, v_temp,v_aux,v_old,v_oldold,p_aux,p_temp,p_iter,p_old;//for steady nonlinear procedure or BDF2
-     if( !FE.compare("P2P1")) {
-         v.SetIdx( &ifaceVecP2idx);
-         vSol.SetIdx( &ifaceVecP2idx);
-         p.SetIdx( &ifaceP1idx);
-         pSol.SetIdx( &ifaceP1idx);
-         rhs.SetIdx( &ifaceVecP2idx);
-         rhs2.SetIdx(&ifaceP1idx);
-         ZeroVec.SetIdx( &ifaceVecP2idx);
-     } else if( !FE.compare("P1P1")) {
-         v.SetIdx( &ifaceVecP1idx);
-         vSol.SetIdx( &ifaceVecP1idx);
-         vInit.SetIdx( &ifaceVecP1idx);
-         v_old.SetIdx( &ifaceVecP1idx);
-         v_oldold.SetIdx( &ifaceVecP1idx);
-
-         v_iter.SetIdx( &ifaceVecP1idx);
-         v_temp.SetIdx( &ifaceVecP1idx);
-         v_aux.SetIdx( &ifaceVecP1idx);
-         p.SetIdx( &ifaceP1idx);
-         curl.SetIdx( &ifaceP1idx);
-         curlSol.SetIdx( &ifaceP1idx);
-         p_old.SetIdx( &ifaceP1idx);
-         p_aux.SetIdx( &ifaceP1idx);
-         p_temp.SetIdx( &ifaceP1idx);
-         p_iter.SetIdx( &ifaceP1idx);
-         pSol.SetIdx( &ifaceP1idx);
-         rhs2.SetIdx(&ifaceP1idx);
-         curl_proj.SetIdx(&ifaceP1idx);
-         rhs.SetIdx( &ifaceVecP1idx);
-         ZeroVec.SetIdx( &ifaceVecP1idx);
-     } else if( !FE.compare("P2P2")) {
-         v.SetIdx( &ifaceVecP2idx);
-         vSol.SetIdx( &ifaceVecP2idx);
-         p.SetIdx( &ifaceP2idx);
-         pSol.SetIdx( &ifaceP2idx);
-         rhs.SetIdx( &ifaceVecP2idx);
-         ZeroVec.SetIdx( &ifaceVecP2idx);
-     } else if( !FE.compare("P1P2")) {
-         v.SetIdx( &ifaceVecP1idx);
-         vSol.SetIdx( &ifaceVecP1idx);
-         p.SetIdx( &ifaceP2idx);
-         pSol.SetIdx( &ifaceP2idx);
-         rhs.SetIdx( &ifaceVecP1idx);
-         ZeroVec.SetIdx( &ifaceVecP1idx);
-     }
-
-    // setup matrices
-    DROPS::MatDescCL A, A_stab, B, Omega, N, NT, M,D, S, L, L_stab, Schur, Schur_stab, Schur_normal_stab;
-    MatrixCL Schur_hat;
-
-    if( !FE.compare("P2P1")) {
-        A.SetIdx( &ifaceVecP2idx, &ifaceVecP2idx);
-        A_stab.SetIdx( &ifaceVecP2idx, &ifaceVecP2idx);
-        N.SetIdx( &ifaceVecP2idx, &ifaceVecP2idx);
-        B.SetIdx( &ifaceP1idx, &ifaceVecP2idx);
-        M.SetIdx( &ifaceVecP2idx, &ifaceVecP2idx);
-        D.SetIdx( &ifaceVecP2idx, &ifaceVecP2idx);
-        S.SetIdx( &ifaceVecP2idx, &ifaceVecP2idx);
-        L.SetIdx( &ifaceP1idx, &ifaceVecP2idx);
-        L_stab.SetIdx( &ifaceP1idx, &ifaceVecP2idx);
-        Schur.SetIdx(&ifaceP1idx, &ifaceP1idx);
-        Schur_stab.SetIdx(&ifaceP1idx, &ifaceP1idx);
-
-        SetupStokesIF_P2P1(mg, &A, &A_stab, &B, &M, &S, &L, &L_stab, &Schur, &Schur_stab, lset.Phi, lset.GetBndData(), fullgrad);
-
-        Schur_hat.LinComb(1., Schur.Data, rho, Schur_stab.Data);
-    } else if( !FE.compare("P1P1")) {
-        A.SetIdx( &ifaceVecP1idx, &ifaceVecP1idx);
-        A_stab.SetIdx( &ifaceVecP1idx, &ifaceVecP1idx);
-        B.SetIdx( &ifaceP1idx, &ifaceVecP1idx);
-        Omega.SetIdx( &ifaceP1idx, &ifaceVecP1idx);
-        N.SetIdx( &ifaceVecP1idx, &ifaceVecP1idx);
-        NT.SetIdx( &ifaceVecP1idx, &ifaceVecP1idx);
-
-        M.SetIdx( &ifaceVecP1idx, &ifaceVecP1idx);
-        D.SetIdx( &ifaceVecP1idx, &ifaceVecP1idx);
-        S.SetIdx( &ifaceVecP1idx, &ifaceVecP1idx);
-
-        L.SetIdx( &ifaceP1idx, &ifaceVecP1idx);
-        L_stab.SetIdx( &ifaceP1idx, &ifaceVecP1idx);
-        Schur.SetIdx(&ifaceP1idx, &ifaceP1idx);
-        Schur_stab.SetIdx(&ifaceP1idx, &ifaceP1idx);
-        Schur_normal_stab.SetIdx(&ifaceP1idx, &ifaceP1idx);
-
-        SetupNavierStokesIF_P1P1(mg, &A, &A_stab, &B, &Omega, &N, &NT, &M, &D, &S, &L, &L_stab, &Schur, &Schur_stab, &Schur_normal_stab, lset.Phi, lset.GetBndData(), v, vbnd, fullgrad);
-        //    SetupStokesIF_P1P1(mg, &A, &A_stab, &B, &M, &S, &L, &L_stab, &Schur, &Schur_stab, lset.Phi, lset.GetBndData(), fullgrad);
-
-        Schur_hat.LinComb(1., Schur.Data, rho, Schur_stab.Data);
-
-    } else if( !FE.compare("P2P2")) {
-        A.SetIdx( &ifaceVecP2idx, &ifaceVecP2idx);
-        A_stab.SetIdx( &ifaceVecP2idx, &ifaceVecP2idx);
-        B.SetIdx( &ifaceP2idx, &ifaceVecP2idx);
-        M.SetIdx( &ifaceVecP2idx, &ifaceVecP2idx);
-        S.SetIdx( &ifaceVecP2idx, &ifaceVecP2idx);
-        L.SetIdx( &ifaceP2idx, &ifaceVecP2idx);
-        L_stab.SetIdx( &ifaceP2idx, &ifaceVecP2idx);
-        Schur.SetIdx(&ifaceP2idx, &ifaceP2idx);
-        Schur_stab.SetIdx(&ifaceP2idx, &ifaceP2idx);
-
-        SetupStokesIF_P2P2(mg, &A, &A_stab, &B, &M, &S, &L, &L_stab, &Schur, &Schur_stab, lset.Phi, lset.GetBndData(), fullgrad);
-
-        Schur_hat.LinComb(1., Schur.Data, rho, Schur_stab.Data);
-    } else if( !FE.compare("P1P2")) {
-        A.SetIdx( &ifaceVecP1idx, &ifaceVecP1idx);
-        A_stab.SetIdx( &ifaceVecP1idx, &ifaceVecP1idx);
-        B.SetIdx( &ifaceP2idx, &ifaceVecP1idx);
-        M.SetIdx( &ifaceVecP1idx, &ifaceVecP1idx);
-        S.SetIdx( &ifaceVecP1idx, &ifaceVecP1idx);
-        L.SetIdx( &ifaceP2idx, &ifaceVecP1idx);
-        L_stab.SetIdx( &ifaceP2idx, &ifaceVecP1idx);
-        Schur.SetIdx(&ifaceP2idx, &ifaceP2idx);
-        Schur_stab.SetIdx(&ifaceP2idx, &ifaceP2idx);
-
-        SetupStokesIF_P1P2(mg, &A, &A_stab, &B, &M, &S, &L, &L_stab, &Schur, &Schur_stab, lset.Phi, lset.GetBndData(), fullgrad);
-
-        Schur_hat.LinComb(1., Schur.Data, rho, Schur_stab.Data);
-    }
-
-    // construct preconditioners
-    typedef SSORPcCL      SymmPcPcT;
-    typedef PCGSolverCL<SymmPcPcT> PCGSolverT;
-    typedef SolverAsPreCL<PCGSolverT> PCGPcT;
-
-    SymmPcPcT symmPcPc_;
-    std::stringstream Astream;
-    PCGSolverT PCGSolver_( symmPcPc_, P.get<int>("Solver.PcAIter"), P.get<double>("Solver.PcATol"), true, &Astream);
-    PCGPcT PCGPc_( PCGSolver_);//velocity preconditioner
-
-    std::stringstream Schurstream;
-    PCGSolverT SchurPCGSolver (symmPcPc_, P.get<int>("Solver.PcBIter"), P.get<double>("Solver.PcBTol"), true, &Schurstream);
-    SchurPreBaseCL *spc_ = new SurfaceLaplacePreCL<PCGSolverT>( Schur_hat, SchurPCGSolver);//pressure preconditioner
-    
-    //construct symmteric block iterative solver
-    typedef BlockPreCL<ExpensivePreBaseCL, SchurPreBaseCL, DiagSpdBlockPreCL>  DiagBlockPcT;
-    typedef PLanczosONBCL<VectorCL, DiagBlockPcT> LanczosT;
-    typedef PMResSolverCL<LanczosT> MinResT;
-
-    DiagBlockPcT    *DBlock_ = new DiagBlockPcT( PCGPc_, *spc_);
-    LanczosT *lanczos_ = new LanczosT( *DBlock_);
-    MinResT *MinRes_ = new MinResT( *lanczos_,  P.get<int>("Solver.Iter"), P.get<double>("Solver.Tol"), /*relative*/ false);
-    BlockMatrixSolverCL<MinResT> *stokessolver= new BlockMatrixSolverCL<MinResT>( *MinRes_);
-
-    // construct preconditioners for nonsymmetric case
-    typedef /*JACPcCL*/ SSORPcCL NonSymmPcPcT;
-    typedef GMResSolverCL<NonSymmPcPcT> GMResSolverT;
-    typedef SolverAsPreCL<GMResSolverT> GMResPcT;
-
-    NonSymmPcPcT nonsymmPcPc_;
-
-    std::stringstream PCstream;
-    GMResSolverT GMResSolver_( nonsymmPcPc_, P.get<int>("Solver.PcAIter"), P.get<int>("Solver.PcAIter"), P.get<double>("Solver.PcATol"),
-    		 /*bool relative=*/ true, /*bool calculate2norm=*/ false, /*PreMethGMRES method=*/ LeftPreconditioning,
-			     /*bool mod =*/ true,      /*bool useModGS =*/ false, &PCstream);
-    GMResPcT GMResPc_nonsym( GMResSolver_);
-
-    //setup iterative block solver for nonsymmetric case
-    typedef GMResSolverCL<DiagBlockPcT> GMResT;
-
-    DiagBlockPcT    *DBlock_nonsym = new DiagBlockPcT( GMResPc_nonsym, *spc_);
-    GMResT *GMRes_ = new GMResT( *DBlock_nonsym, P.get<int>("Solver.Iter"), P.get<int>("Solver.Iter"), P.get<double>("Solver.Tol"),
-    		 /*bool relative=*/ false, /*bool calculate2norm=*/ false, /*PreMethGMRES method=*/ LeftPreconditioning,
-		          /*bool mod =*/ true,      /*bool useModGS =*/ false);
-    BlockMatrixSolverCL<GMResT> *nonsym_stokessolver= new BlockMatrixSolverCL<GMResT>( *GMRes_);
-
-
-    //pick correct solver
-    StokesSolverBaseCL *Solver;
-    if (  ( P.get<std::string>("SurfNavStokes.nonlinear_term") == "convective" )
-       || ( P.get<std::string>("SurfNavStokes.nonlinear_term") == "rotational")
-	   || ( P.get<std::string>("SurfNavStokes.nonlinear_term") == "strain")
-       || ( P.get<std::string>("SurfNavStokes.nonlinear_term") == "skew-symmetric")
-       || ( P.get<std::string>("SurfNavStokes.nonlinear_term") == "conservative")
-	   || ( P.get<std::string>("SurfNavStokes.nonlinear_term") == "EMAC")
-		)
-    {
-    	Solver = nonsym_stokessolver;
-    }
-    else
-    {
-    	Solver = stokessolver;
-    }
-
-    // export matrices to test inf-sup constant for P1-P1 / P2-P1
-    if (P.get<std::string>("SurfNavStokes.instationary") == "infsup") {
-        std::cout << "test inf-sup constant\n";
-        MatrixCL A_final, B_final, C_full, C_n, M_final;
-        A_final.LinComb(1., A.Data, 1., M.Data, eta, S.Data, epsilon, A_stab.Data);
-        B_final.LinComb(1., B.Data, 0., B.Data);
-        C_full. LinComb(alpha, Schur_stab.Data, 0., Schur_stab.Data);
-        C_n.    LinComb(alpha, Schur_normal_stab.Data, 0., Schur_normal_stab.Data);
-        M_final.LinComb(1., Schur.Data, 0., Schur.Data);
-        auto surfName = P.get<std::string>("Levelset.case");
-        if (P.exists("Levelset.ShiftNormRel"))
-            surfName += "_shift=" + P.get<std::string>("Levelset.ShiftNormRel") + "h";
-        std::string outDir = P.get<std::string>("Output.Directory") + '/' + surfName + '/' + P.get<std::string>("SurfNavStokes.FE") + "/blocks/h=" + std::to_string(float(h)) + "_";
-        std::cout << "exporting matrices to " + outDir + "*\n";
-        std::ofstream(outDir + "A.mtx") << A_final;
-        std::ofstream(outDir + "B.mtx") << B_final;
-        std::ofstream(outDir + "M.mtx") << M_final;
-        if (P.get<std::string>("SurfNavStokes.FE") == "P1P1") {
-            std::ofstream(outDir + "C_full.mtx") << C_full;
-            std::ofstream(outDir + "C_n.mtx") << C_n;
-        }
-        return 0;
-    }
-
-    // set function pointers and rhs vectors for different test cases
-    DROPS::instat_vector_fun_ptr extvsol, extsol_grad1, extsol_grad2, extsol_grad3, extvinit, extrhs;
-    DROPS::instat_scalar_fun_ptr extpsol = &ZeroScalarFun, extrhs2, extcurlsol=&ZeroScalarFun;
-
-    if( !levelset_fun_str.compare("sphere_2")) {
-        if( !testcase.compare("1")) {
-            std::cout << "Test case 1 with vSol = P[-z^2, y, x]^T" << std::endl;
-            extvsol = &Test_A_plus_M_vSolVectorFun1;
-            extsol_grad1 = &Test_A_plus_M_vSolVectorFun1_Gradient1;
-            extsol_grad2 = &Test_A_plus_M_vSolVectorFun1_Gradient2;
-            extsol_grad3 = &Test_A_plus_M_vSolVectorFun1_Gradient3;
-            extpsol = &Test_A_plus_M_pSolScalarFun1;
-            InitVecLaplace(mg, lset, rhs, vSol, pSol, Test_A_plus_M_RhsVectorFun1, extvsol, extpsol);
-            SetupInterfaceRhsP1(mg, &rhs2, lset.Phi, lset.GetBndData(), Test_A_plus_M_rhs2Fun1);
-
-        } else if( !testcase.compare("2")) {
-            std::cout << "Test case 2 with vSol = [-y, x, 0]^T" << std::endl;
-            extvsol = &Test_A_plus_M_vSolVectorFun2;
-            extsol_grad1 = &Test_A_plus_M_vSolVectorFun2_Gradient1;
-            extsol_grad2 = &Test_A_plus_M_vSolVectorFun2_Gradient2;
-            extsol_grad3 = &Test_A_plus_M_vSolVectorFun2_Gradient3;
-            extpsol = &Test_A_plus_M_pSolScalarFun2;
-            InitVecLaplace(mg, lset, rhs, vSol, pSol, Test_A_plus_M_RhsVectorFun2, extvsol, extpsol);
-        } else if( !testcase.compare("3")) {
-            std::cout << "Test case 3 with vSol = [-x*y-x*z+y^2+z^2, x^2-x*y-y*z+z^2, x^2-x*z+y^2-y*z]^T" << std::endl;
-            extvsol = &Test_A_plus_M_vSolVectorFun3;
-            extsol_grad1 = &Test_A_plus_M_vSolVectorFun3_Gradient1;
-            extsol_grad2 = &Test_A_plus_M_vSolVectorFun3_Gradient2;
-            extsol_grad3 = &Test_A_plus_M_vSolVectorFun3_Gradient3;
-            extpsol = &Test_A_plus_M_pSolScalarFun3;
-            InitVecLaplace(mg, lset, rhs, vSol, pSol, Test_A_plus_M_RhsVectorFun3, extvsol, extpsol);
-        } else if( !testcase.compare("4")) {
-            std::cout << "Test case 4 (only mass matrix) with vSol = [-x*y-x*z+y^2+z^2, x^2-x*y-y*z+z^2, x^2-x*z+y^2-y*z]^T" << std::endl;
-            extvsol = &Test_A_plus_M_vSolVectorFun3;
-            extsol_grad1 = &Test_A_plus_M_vSolVectorFun3_Gradient1;
-            extsol_grad2 = &Test_A_plus_M_vSolVectorFun3_Gradient2;
-            extsol_grad3 = &Test_A_plus_M_vSolVectorFun3_Gradient3;
-            InitVecLaplace(mg, lset, rhs, vSol, pSol, Test_A_plus_M_RhsVectorFun3, extvsol, extpsol);
-        } else if( !testcase.compare("5")) {
-            std::cout << "Test case 5 (1_in_spherical) with vSol = P[-z^2, y, x]^T" << std::endl;
-            extvsol = &Test_A_plus_M_vSolVectorFun5;
-            extsol_grad1 = &Test_A_plus_M_vSolVectorFun5_Gradient1;
-            extsol_grad2 = &Test_A_plus_M_vSolVectorFun5_Gradient2;
-            extsol_grad3 = &Test_A_plus_M_vSolVectorFun5_Gradient3;
-            extpsol = &Test_A_plus_M_pSolScalarFun5;//&TestL_LagrangeFun24;
-            //SetupInterfaceRhsP1(mg, &rhs2, lset.Phi, lset.GetBndData(), Test_A_plus_M_rhs2Fun1);
-            InitVecLaplace(mg, lset, rhs, vSol, pSol, Test_A_plus_M_RhsVectorFun5, extvsol, extpsol);
-        } else if( !testcase.compare("0")) {
-            std::cout << "Test case 0 zero solution" << std::endl;
-            extvsol = &ZeroVectorFun;
-            extsol_grad1 = &ZeroVectorFun;
-            extsol_grad2 = &ZeroVectorFun;
-            extsol_grad3 = &ZeroVectorFun;
-            extpsol = &ZeroScalarFun    ;
-            extrhs = &ZeroVectorFun;
-            extrhs2 = &ZeroScalarFun;
-            InitVector(mg, vInit, &ZeroVectorFun);
-            InitVecLaplace(mg, lset, rhs, vSol, pSol, extrhs, extvsol, extpsol);
-            SetupInterfaceRhsP1(mg, &rhs2, lset.Phi, lset.GetBndData(), extrhs2);
-        }
-        else if( !testcase.compare("6")) {
-            std::cout << "Test case 6 with vSol = P[1, 0, 0]^T, pSol = y/(x^2+y^2+z^2)^(1/2)" << std::endl;
-            extvsol = &Test_A_plus_M_vSolVectorFun6;
-            extsol_grad1 = &Test_A_plus_M_vSolVectorFun6_Gradient1;
-            extsol_grad2 = &Test_A_plus_M_vSolVectorFun6_Gradient2;
-            extsol_grad3 = &Test_A_plus_M_vSolVectorFun6_Gradient3;
-            extpsol = &Test_A_plus_M_pSolScalarFun6;
-            extrhs = &Test_A_plus_M_RhsVectorFun6;
-            extrhs2 = &Test_A_plus_M_rhs2Fun6;
-            InitVector(mg, vInit, &Test_A_plus_M_vSolVectorFun6);
-            InitVecLaplace(mg, lset, rhs, vSol, pSol, extrhs, extvsol, extpsol);
-      	    SetupInterfaceRhsP1(mg, &rhs2, lset.Phi, lset.GetBndData(), extrhs2);
-        } else if( !testcase.compare("7")) {
-        	std::cout << "Test case 7 with pSol = x*y^3/(x^2+y^2+z^2)^2+z/(x^2+y^2+z^2)^(1/2); " << std::endl;
-        	extvsol = &Test_A_plus_M_vSolVectorFun7;
-        	extsol_grad1 = &Test_A_plus_M_vSolVectorFun7_Gradient1;
-        	extsol_grad2 = &Test_A_plus_M_vSolVectorFun7_Gradient2;
-        	extsol_grad3 = &Test_A_plus_M_vSolVectorFun7_Gradient3;
-        	extpsol = &Test_A_plus_M_pSolScalarFun7;
-            extrhs = &Test_A_plus_M_RhsVectorFun7;
-            extrhs2 = &Test_A_plus_M_rhs2Fun7;
-            InitVector(mg, vInit, &Test_A_plus_M_vSolVectorFun7);
-            InitVecLaplace(mg, lset, rhs, vSol, pSol, extrhs, extvsol, extpsol);
-        	SetupInterfaceRhsP1(mg, &rhs2, lset.Phi, lset.GetBndData(), extrhs2);
-        }
-        else if( !testcase.compare("8")) {
-        	std::cout << "Test case 8 with vSol = P[-z^2, y, x]^T, pSol = (x*y^3/(x^2+y^2+z^2)^2+z/(x^2+y^2+z^2)^(1/2)); " << std::endl;
-        	extvsol = &Test_A_plus_M_vSolVectorFun8;
-        	extsol_grad1 = &Test_A_plus_M_vSolVectorFun8_Gradient1;
-        	extsol_grad2 = &Test_A_plus_M_vSolVectorFun8_Gradient2;
-        	extsol_grad3 = &Test_A_plus_M_vSolVectorFun8_Gradient3;
-        	extpsol = &Test_A_plus_M_pSolScalarFun8;
-            extrhs = &Test_A_plus_M_RhsVectorFun8;
-            extrhs2 = &Test_A_plus_M_rhs2Fun8;
-            InitVector(mg, vInit, &Test_A_plus_M_vSolVectorFun8);
-        	InitVecLaplace(mg, lset, rhs, vSol, pSol, extrhs, extvsol, extpsol);
-        	SetupInterfaceRhsP1(mg, &rhs2, lset.Phi, lset.GetBndData(), extrhs2);
-        }
-        else if( !testcase.compare("9")) {
-        	std::cout << "Test case 9 with vSol = n x grad(y*z), pSol = (x*y^3/(x^2+y^2+z^2)^2+z/(x^2+y^2+z^2)^(1/2)); " << std::endl;
-        	extvsol = &Test_A_plus_M_vSolVectorFun9;
-        	extsol_grad1 = &Test_A_plus_M_vSolVectorFun9_Gradient1;
-        	extsol_grad2 = &Test_A_plus_M_vSolVectorFun9_Gradient2;
-        	extsol_grad3 = &Test_A_plus_M_vSolVectorFun9_Gradient3;
-        	extpsol = &Test_A_plus_M_pSolScalarFun9;
-            extrhs = &Test_A_plus_M_RhsVectorFun9;
-            extrhs2 = &Test_A_plus_M_rhs2Fun9;
-            InitVector(mg, vInit, &Test_A_plus_M_vSolVectorFun9);
-            InitVecLaplace(mg, lset, rhs, vSol, pSol, extrhs, extvsol, extpsol);
-            SetupInterfaceRhsP1(mg, &rhs2, lset.Phi, lset.GetBndData(), extrhs2);
-        }
-        else if( !testcase.compare("95")) {
-            std::cout << "Test case 95 with vSol = P[1,0,0]^T, pSol = (x*y^3/(x^2+y^2+z^2)^2+z/(x^2+y^2+z^2)^(1/2)); " << std::endl;
-            extvsol = &Test_A_plus_M_vSolVectorFun95;
-            extsol_grad1 = &Test_A_plus_M_vSolVectorFun95_Gradient1;
-            extsol_grad2 = &Test_A_plus_M_vSolVectorFun95_Gradient2;
-            extsol_grad3 = &Test_A_plus_M_vSolVectorFun95_Gradient3;
-            extpsol = &Test_A_plus_M_pSolScalarFun9;
-            extrhs = &Test_A_plus_M_RhsVectorFun95;
-            extrhs2 = &Test_A_plus_M_rhs2Fun95;
-            InitVector(mg, vInit, &Test_A_plus_M_vSolVectorFun95);
-            InitVecLaplace(mg, lset, rhs, vSol, pSol, extrhs, extvsol, extpsol);
-            SetupInterfaceRhsP1(mg, &rhs2, lset.Phi, lset.GetBndData(), extrhs2);
-        }
-        else if( !testcase.compare("10")) {
-        	std::cout << "Test case 10 initial velocity = (2+3)spherical harmonics; " << std::endl;
-        	extvsol = &Test_A_plus_M_vSolVectorFun10;
-        	extvinit = &Test_A_plus_M_vInitVectorFun10;
-        	extsol_grad1 = &Test_A_plus_M_vSolVectorFun10_Gradient1;
-        	extsol_grad2 = &Test_A_plus_M_vSolVectorFun10_Gradient2;
-        	extsol_grad3 = &Test_A_plus_M_vSolVectorFun10_Gradient3;
-        	extpsol = &Test_A_plus_M_pSolScalarFun10;
-        	extrhs = &Test_A_plus_M_RhsVectorFun10;
-        	InitVecLaplace(mg, lset, rhs, vSol, pSol, extrhs, extvsol, extpsol);
-        	InitVector(mg, vInit, extvinit);
-        	SetupInterfaceRhsP1(mg, &rhs2, lset.Phi, lset.GetBndData(), Test_A_plus_M_rhs2Fun10);
-        }
-        else if( !testcase.compare("11")) {
-        	std::cout << "Test case 11 = (6 + convection) with vSol = P[1, 0, 0]^T, pSol = y/(x^2+y^2+z^2)^(1/2)" << std::endl;
-        	extvsol = &Test_A_plus_M_vSolVectorFun6;
-        	extsol_grad1 = &Test_A_plus_M_vSolVectorFun6_Gradient1;
-        	extsol_grad2 = &Test_A_plus_M_vSolVectorFun6_Gradient2;
-        	extsol_grad3 = &Test_A_plus_M_vSolVectorFun6_Gradient3;
-        	extpsol = &Test_A_plus_M_pSolScalarFun6;
-        	InitVecLaplace(mg, lset, rhs, vSol, pSol, Test_A_plus_M_RhsVectorFun11, extvsol, extpsol);
-        	SetupInterfaceRhsP1(mg, &rhs2, lset.Phi, lset.GetBndData(), Test_A_plus_M_rhs2Fun6);
-        }
-        else if( !testcase.compare("12")) {
-               	std::cout << "Test case 12 = (11 + Bernouli pressure) with vSol = P[1, 0, 0]^T, pSol = vSol^2/2 + y/(x^2+y^2+z^2)^(1/2)" << std::endl;
-               	extvsol = &Test_A_plus_M_vSolVectorFun6;
-               	extsol_grad1 = &Test_A_plus_M_vSolVectorFun6_Gradient1;
-               	extsol_grad2 = &Test_A_plus_M_vSolVectorFun6_Gradient2;
-               	extsol_grad3 = &Test_A_plus_M_vSolVectorFun6_Gradient3;
-               	extpsol = &Test_A_plus_M_pBerSolScalarFun12;
-               	InitVecLaplace(mg, lset, rhs, vSol, pSol, Test_A_plus_M_RhsVectorFun11, extvsol, extpsol);
-               	SetupInterfaceRhsP1(mg, &rhs2, lset.Phi, lset.GetBndData(), Test_A_plus_M_rhs2Fun6);
-               }
-        else if( !testcase.compare("13")) {
-                	std::cout << "Test case 13 = (8 + convection) with vSol = P[-z^2, y, x]^T, pSol = (x*y^3/(x^2+y^2+z^2)^2+z/(x^2+y^2+z^2)^(1/2)); " << std::endl;
-                	extvsol = &Test_A_plus_M_vSolVectorFun8;
-                	extsol_grad1 = &Test_A_plus_M_vSolVectorFun8_Gradient1;
-                	extsol_grad2 = &Test_A_plus_M_vSolVectorFun8_Gradient2;
-                	extsol_grad3 = &Test_A_plus_M_vSolVectorFun8_Gradient3;
-                	extrhs = &Test_A_plus_M_RhsVectorFun13;
-                	extrhs2 = &Test_A_plus_M_rhs2Fun8;
-                	extpsol = &Test_A_plus_M_pSolScalarFun8;
-                    InitVector(mg, vInit, &Test_A_plus_M_vSolVectorFun8);
-                    InitVecLaplace(mg, lset, rhs, vSol, pSol, extrhs, extvsol, extpsol);
-                    SetupInterfaceRhsP1(mg, &rhs2, lset.Phi, lset.GetBndData(), extrhs2);
-
+        logger.beg("mpi init");
+            #ifdef HAVE_MPI
+                MPI_Init(&argc, &argv);
+                Epetra_MpiComm comm(MPI_COMM_WORLD);
+                logger.log("using Epetra_MpiComm");
+            #else
+                Epetra_SerialComm comm;
+                logger.log("using Epetra_SerialComm");
+            #endif
+            auto myRank = comm.MyPID();
+            if (myRank == 0) {
+                logger.buf << "num proc = " << comm.NumProc();
+                logger.log();
+            }
+        logger.end();
+        logger.beg("read input .json");
+            ParamCL inpJSON;
+            read_parameter_file_from_cmdline(inpJSON, argc, argv, "../../param/surfnavierstokes/No_Bnd_Condition.json");
+            dynamicLoad(inpJSON.get<std::string>("General.DynamicLibsPrefix"), inpJSON.get<std::vector<std::string>>("General.DynamicLibs"));
+            auto dirName = inpJSON.get<std::string>("Output.Directory");
+            system(("mkdir -p " + dirName).c_str());
+            system(("rm -r -f " + dirName + "/*").c_str());
+            system((
+                "mkdir " + dirName + "/matrices ; "
+                "mkdir " + dirName + "/vtk ; "
+                "mkdir " + dirName + "/stats"
+            ).c_str());
+            {
+                std::ofstream input(dirName + "/input.json");
+                input << inpJSON;
+                logger.buf << inpJSON;
+                logger.log();
+            }
+        logger.end();
+        logger.beg("set up test case");
+            auto h = inpJSON.get<Point3DCL>("Mesh.E1")[0] / inpJSON.get<double>("Mesh.N1") * std::pow(2., -inpJSON.get<double>("Mesh.AdaptRef.FinestLevel"));
+            auto tau_u_order  = inpJSON.get<double>("SurfNavStokes.NormalPenaltyPower");
+            auto tau_u_factor = inpJSON.get<double>("SurfNavStokes.NormalPenaltyFactor");
+            auto tau_u 		  = tau_u_factor * pow(h, tau_u_order); // constant for normal penalty
+            auto rho_u_order  = inpJSON.get<double>("SurfNavStokes.VelocityVolumestabPower");
+            auto rho_u_factor = inpJSON.get<double>("SurfNavStokes.VelocityVolumestabFactor");
+            auto rho_u        = rho_u_factor  * pow(h, rho_u_order); // constant for velocity stabilisation
+            auto rho_p_order  = inpJSON.get<double>("SurfNavStokes.PressureVolumestabPower");
+            auto rho_p_factor = inpJSON.get<double>("SurfNavStokes.PressureVolumestabFactor");
+            auto rho_p        = rho_p_factor  * pow(h, rho_p_order); // constant for pressure stabilisation
+            auto numbOfSteps  = inpJSON.get<size_t>("Time.NumbOfSteps");
+            auto finalTime    = inpJSON.get<double>("Time.FinalTime");
+            auto stepSize     = finalTime / numbOfSteps;
+            auto everyStep = inpJSON.get<int>("Output.EveryStep");
+            logger.buf << "$\\Delta t$ = " << stepSize << '\n';
+            // parse FE types and some other parameters from json file
+            auto FE = inpJSON.get<std::string>("SurfNavStokes.FE");
+            if (FE != "P2P1")
+                throw std::invalid_argument("TODO: refactor P1P1 assembly");
+            auto velFE = FE.substr(0,2);
+            auto preFE = FE.substr(2,2);
+            logger.buf
+                << "velocity FE = " << velFE << '\n'
+                << "pressure FE = " << preFE << '\n';
+            auto testName = inpJSON.get<std::string>("SurfNavStokes.TestName");
+            auto nu = inpJSON.get<double>("SurfNavStokes.nu");
+            auto gamma = inpJSON.get<double>("SurfNavStokes.gamma");
+            auto surfNavierStokesData = SurfNavierStokesDataFactory(testName, nu, inpJSON);
+            logger.buf << surfNavierStokesData.description;
+            logger.buf << "$\\nu$ = " << nu << '\n';
+            logger.buf << "$\\gamma$ = " << gamma << " (AL / grad-div stabilization constant)\n";
+            SurfOseenParam param;
+            param.input.f = inpJSON.get<bool>("SurfNavStokes.IntegrateRHS") ? surfNavierStokesData.f_T : nullptr;
+            param.input.g = inpJSON.get<bool>("SurfNavStokes.IntegrateRHS") ? surfNavierStokesData.m_g : nullptr;
+            param.input.exactNormal = inpJSON.get<bool>("SurfNavStokes.ComputeNormalErr") ? surfNavierStokesData.surface.n : nullptr;
+            param.input.exactShape = inpJSON.get<bool>("SurfNavStokes.ComputeShapeErr") ? surfNavierStokesData.surface.H : nullptr;
+            param.input.numbOfVirtualSubEdges = inpJSON.get<size_t>("SurfNavStokes.NumbOfVirtualSubEdges");
+            param.input.usePatchNormal = inpJSON.get<bool>("SurfNavStokes.UsePatchNormals");
+            if (param.input.usePatchNormal)  logger.log("using patch normals in surf integrands");
+            auto formulation = inpJSON.get<std::string>("SurfNavStokes.Formulation");
+            if (formulation == "consistent") {
+                param.input.formulation = SurfOseenParam::Formulation::consistent;
+                logger.buf << "using consistent penalty formulation\n";
+            }
+            else {
+                param.input.formulation = SurfOseenParam::Formulation::inconsistent;
+                logger.buf << "using inconsistent penalty formulation\n";
+            }
+            SurfOseenSystem surfOseenSystem;
+            auto stab = inpJSON.get<std::string>("SurfNavStokes.PressureVolumestabType");
+            if (stab == "full") {
+                param.input.stab = SurfOseenParam::PressureVolumestab::full;
+                logger.buf << "using full pressure volume stabilization\n";
+            }
+            else {
+                param.input.stab = SurfOseenParam::PressureVolumestab::normal;
+                logger.buf << "using normal pressure volume stabilization\n";
+            }
+            if (gamma == 0.)
+                surfOseenSystem.AL.assemble = false;
+            logger.log();
+            auto reFactorizeTol = inpJSON.get<double>("Solver.Inner.A.ReFactorizeTol");
+        logger.end();
+        logger.beg("build mesh");
+            logger.beg("build initial bulk mesh");
+                std::auto_ptr<MGBuilderCL> builder(make_MGBuilder(inpJSON));
+                MultiGridCL mg(*builder);
+                const ParamCL::ptree_type* ch= 0;
+                try {
+                    ch = &inpJSON.get_child("Mesh.Periodicity");
+                } catch (DROPSParamErrCL) {}
+                if (ch) read_PeriodicBoundaries(mg, *ch);
+                // levelset shift
+                auto shift = inpJSON.get<Point3DCL>("Levelset.ShiftDir", Point3DCL(0., 0., 0.));
+                shift /= shift.norm();
+                auto shiftNorm = fabs(inpJSON.get<double>("Levelset.ShiftNorm", 0.));
+                shift *= shiftNorm;
+                mg.Transform([&](Point3DCL const & p) {
+                    return p - shift;
+                });
+                logger.buf << "surface shift = " << shift;
+                logger.log();
+            logger.end();
+            logger.beg("refine towards the surface");
+                AdapTriangCL adap(mg);
+                /*if (testName == "KelvinHelmholtzCristophSphere") {
+                    logger.beg("refine around equator");
+                        auto delta_0 = inpJSON.get<double>("SurfNavStokes.IC.KelvinHelmholtzCristophSphere.Delta_0");
+                        auto refEquator = [&](Point3DCL const & p, double t) {
+                            if (std::fabs(p[2]) > delta_0) return std::numeric_limits<double>::max();
+                            return 0.;
+                        };
+                        DistMarkingStrategyCL markerEquator(refEquator, inpJSON.get<double>("Mesh.AdaptRef.Width"), inpJSON.get<int>("Mesh.AdaptRef.CoarsestLevel"), inpJSON.get<int>("Mesh.AdaptRef.CoarsestLevel") + 1);
+                        adap.set_marking_strategy(&markerEquator);
+                        adap.MakeInitialTriang();
+                    logger.end();
+                }*/
+                // adaptive mesh refinement based on level set function
+                DistMarkingStrategyCL markerLset(surfNavierStokesData.surface.phi, inpJSON.get<double>("Mesh.AdaptRef.Width"), inpJSON.get<int>("Mesh.AdaptRef.CoarsestLevel"), inpJSON.get<int>("Mesh.AdaptRef.FinestLevel"));
+                adap.set_marking_strategy(&markerLset);
+                adap.MakeInitialTriang();
+                adap.set_marking_strategy(nullptr);
+                auto numbOfTetras = mg.GetNumTriangTetra();
+                logger.buf
+                    << "h = " << h << '\n'
+                    << "numb of tetras = " << numbOfTetras;
+                logger.log();
+            logger.end();
+        logger.end();
+        logger.beg("interpolate level-set");
+            InstatScalarFunction sigma(0);
+            SurfaceTensionCL sf(sigma, 0);
+            BndDataCL<double> lsbnd(0);
+            read_BndData(lsbnd, mg, inpJSON.get_child("Levelset.BndData"));
+            std::shared_ptr<LevelsetP2CL> lsetPtr(LevelsetP2CL::Create(mg, lsbnd, sf));
+            auto& lset = *lsetPtr;
+            lset.CreateNumbering(mg.GetLastLevel(), &lset.idx);
+            lset.Phi.SetIdx(&lset.idx);
+            lset.Init(surfNavierStokesData.surface.phi);
+        logger.end();
+        logger.beg("build FE spaces");
+            BndDataCL<Point3DCL> vbnd(0);
+            read_BndData(vbnd, mg, inpJSON.get_child("Stokes.VelocityBndData"));
+            BndDataCL<double> pbnd(0);
+            read_BndData(pbnd, mg, inpJSON.get_child("Stokes.PressureBndData"));
+            IdxDescCL ifaceVecP2idx(vecP2IF_FE, vbnd);
+            IdxDescCL ifaceVecP1idx(vecP1IF_FE, vbnd);
+            IdxDescCL ifaceP1idx(P1IF_FE, pbnd);
+            IdxDescCL ifaceP2idx(P2IF_FE, pbnd);
+            IdxDescCL vecP2idx(vecP2_FE, vbnd);
+            IdxDescCL vecP1idx(vecP1_FE, vbnd);
+            IdxDescCL P1FEidx(P1_FE, pbnd);
+            IdxDescCL P2FEidx(P2_FE, pbnd);
+            ifaceVecP2idx.GetXidx().SetBound(inpJSON.get<double>("SurfTransp.OmitBound"));
+            auto numbOfActiveTetrasP2 = ifaceVecP2idx.CreateNumbering(mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData());
+            ifaceVecP1idx.GetXidx().SetBound(inpJSON.get<double>("SurfTransp.OmitBound"));
+            auto numbOfActiveTetrasP1 = ifaceVecP1idx.CreateNumbering(mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData());
+            if (numbOfActiveTetrasP2 != numbOfActiveTetrasP1) {
+                std::stringstream err;
+                err << "inconsistent numb of cut tetras for P2 and P1: " << numbOfActiveTetrasP2 << " vs. " << numbOfActiveTetrasP1;
+                throw std::logic_error(err.str());
+            }
+            logger.buf << "numb of active (cut) tetras is: " << numbOfActiveTetrasP1 << " (" << (100. * numbOfActiveTetrasP1) / numbOfTetras << "%)\n";
+            logger.log();
+            ifaceP1idx.GetXidx().SetBound(inpJSON.get<double>("SurfTransp.OmitBound"));
+            ifaceP1idx.CreateNumbering(mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData());
+            ifaceP2idx.GetXidx().SetBound(inpJSON.get<double>("SurfTransp.OmitBound"));
+            ifaceP2idx.CreateNumbering(mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData());
+            vecP2idx.GetXidx().SetBound(inpJSON.get<double>("SurfTransp.OmitBound"));
+            vecP2idx.CreateNumbering(mg.GetLastLevel(), mg);
+            vecP1idx.GetXidx().SetBound(inpJSON.get<double>("SurfTransp.OmitBound"));
+            vecP1idx.CreateNumbering(mg.GetLastLevel(), mg);
+            P1FEidx.GetXidx().SetBound(inpJSON.get<double>("SurfTransp.OmitBound"));
+            P1FEidx.CreateNumbering(mg.GetLastLevel(), mg);
+            P2FEidx.GetXidx().SetBound(inpJSON.get<double>("SurfTransp.OmitBound"));
+            P2FEidx.CreateNumbering(mg.GetLastLevel(), mg);
+            logger.buf
+                    << "numb of d.o.f. vector interface P2: " << ifaceVecP2idx.NumUnknowns() << '\n'
+                    << "numb of d.o.f. vector interface P1: " << ifaceVecP1idx.NumUnknowns() << '\n'
+                    << "numb of d.o.f. scalar interface P2: " << ifaceP2idx.NumUnknowns() << '\n'
+                    << "numb of d.o.f. scalar interface P1: " << ifaceP1idx.NumUnknowns() << '\n'
+                    << "numb of d.o.f. vector P2: " << vecP2idx.NumUnknowns() << '\n'
+                    << "numb of d.o.f. vector P1: " << vecP1idx.NumUnknowns() << '\n'
+                    << "numb of d.o.f. scalar P2: " << P2FEidx.NumUnknowns() << '\n'
+                    << "numb of d.o.f. scalar P1: " << P1FEidx.NumUnknowns();
+            logger.log();
+            VecDescCL u_star, u_star_ext, u, u_ext, u_prev, u_prev_prev, surf_curl_u, surf_curl_u_ext, p_star, p_star_ext, p, p_ext;
+            size_t n, m;
+            if (FE == "P2P1") {
+                n = ifaceVecP2idx.NumUnknowns();
+                m = ifaceP1idx.NumUnknowns();
+                u.SetIdx(&ifaceVecP2idx);
+                u_ext.SetIdx(&vecP2idx);
+                u_star.SetIdx(&ifaceVecP2idx);
+                u_star_ext.SetIdx(&vecP2idx);
+                u_prev.SetIdx(&ifaceVecP2idx);
+                u_prev_prev.SetIdx(&ifaceVecP2idx);
+                surf_curl_u.SetIdx(&ifaceP1idx);
+                surf_curl_u_ext.SetIdx(&P1FEidx);
+                surfOseenSystem.w.SetIdx(&ifaceVecP2idx);
+                surfOseenSystem.fRHS.SetIdx(&ifaceVecP2idx);
+                surfOseenSystem.alRHS.SetIdx(&ifaceVecP2idx);
+                surfOseenSystem.A.SetIdx(&ifaceVecP2idx, &ifaceVecP2idx);
+                surfOseenSystem.AL.SetIdx(&ifaceVecP2idx, &ifaceVecP2idx);
+                surfOseenSystem.N.SetIdx(&ifaceVecP2idx, &ifaceVecP2idx);
+                surfOseenSystem.A_stab.SetIdx(&ifaceVecP2idx, &ifaceVecP2idx);
+                surfOseenSystem.B.SetIdx(&ifaceP1idx, &ifaceVecP2idx);
+                surfOseenSystem.Q.SetIdx(&ifaceP1idx, &ifaceVecP2idx);
+                surfOseenSystem.M.SetIdx(&ifaceVecP2idx, &ifaceVecP2idx);
+                surfOseenSystem.S.SetIdx(&ifaceVecP2idx, &ifaceVecP2idx);
+            }
+            else throw std::invalid_argument(FE + ": unknown FE pair");
+            p.SetIdx(&ifaceP1idx);
+            p_ext.SetIdx(&P1FEidx);
+            p_star.SetIdx(&ifaceP1idx);
+            p_star_ext.SetIdx(&P1FEidx);
+            surfOseenSystem.gRHS.SetIdx(&ifaceP1idx);
+            surfOseenSystem.M_p.SetIdx(&ifaceP1idx, &ifaceP1idx);
+            surfOseenSystem.A_p.SetIdx(&ifaceP1idx, &ifaceP1idx);
+            surfOseenSystem.C.SetIdx(&ifaceP1idx, &ifaceP1idx);
+            logger.beg("interpolate initial data");
+                InitVector(mg, u_star, surfNavierStokesData.u_T, 0.);
+                InitScalar(mg, p_star, surfNavierStokesData.p, 0.);
+                u = u_star;
+                p = p_star;
+            logger.end();
+        logger.end();
+        logger.beg("set up vtk");
+            VTKWriter vtkWriter(dirName + "/vtk/" + testName, mg, inpJSON.get<bool>("Output.Binary"));
+            auto writeVTK = [&](double t) {
+                Extend(mg, u_star, u_star_ext);
+                Extend(mg, u, u_ext);
+                Extend(mg, surf_curl_u, surf_curl_u_ext);
+                Extend(mg, p_star, p_star_ext);
+                Extend(mg, p, p_ext);
+                vtkWriter.write(t);
+            };
+            if (everyStep > 0) {
+                VTKWriter::VTKVar vtkLevelSet;
+                vtkLevelSet.name = "level-set";
+                vtkLevelSet.value = &lset.Phi.Data;
+                vtkLevelSet.type = VTKWriter::VTKVar::Type::P2;
+                vtkWriter
+                    .add(vtkLevelSet)
+                    .add(VTKWriter::VTKVar({ "u_h", &u_ext.Data, VTKWriter::VTKVar::Type::vecP2 }))
+                    .add(VTKWriter::VTKVar({ "w_h", &surf_curl_u_ext.Data, VTKWriter::VTKVar::Type::P1 }))
+                    .add(VTKWriter::VTKVar({ "p_h", &p_ext.Data, VTKWriter::VTKVar::Type::P1 }));
+                if (surfNavierStokesData.exactSoln)
+                    vtkWriter
+                        .add(VTKWriter::VTKVar({ "u_*", &u_star_ext.Data, VTKWriter::VTKVar::Type::vecP2 }))
+                        .add(VTKWriter::VTKVar({ "p_*", &p_star_ext.Data, VTKWriter::VTKVar::Type::P1 }));
+            }
+        logger.end();
+        logger.beg("set up linear solver");
+            using MV = Epetra_MultiVector;
+            using OP = Epetra_Operator;
+            using ST = double;
+            using namespace Teuchos;
+            using namespace Belos;
+            RCP<ParameterList> belosParams = parameterList();
+            belosParams->set("Num Blocks", inpJSON.get<int>("Solver.Outer.KrylovSubspaceSize"));
+            belosParams->set("Maximum Iterations", inpJSON.get<int>("Solver.Outer.MaxIter"));
+            belosParams->set("Convergence Tolerance", inpJSON.get<double>("Solver.Outer.RelResTol"));
+            belosParams->set( "Output Frequency", inpJSON.get<int>("Solver.Outer.OutputFrequency"));
+            belosParams->set("Verbosity", Belos::Errors + Belos::Warnings + Belos::StatusTestDetails + Belos::TimingDetails + Belos::FinalSummary + Belos::IterationDetails);
+            belosParams->set<int>("Output Style", Belos::Brief);
+            SolverFactory<ST, MV, OP> belosFactory;
+            logger.buf << "available iterations: " << belosFactory.supportedSolverNames();
+            logger.log();
+            auto belosSolver = belosFactory.create(inpJSON.get<std::string>("Solver.Outer.Iteration"), belosParams);
+            logger.buf << "outer solver: " << belosSolver->description();
+            logger.log();
+        logger.end();
+        logger.beg("t = t_1");
+            logger.beg("assemble");
+                InitVector(mg, u_prev, surfNavierStokesData.u_T, 0.);
+                param.input.t = stepSize;
+                auto setWind = [&](VectorCL const & wind) {
+                    if (surfNavierStokesData.w_T) // Oseen (and Stokes) case
+                        InitVector(mg, surfOseenSystem.w, surfNavierStokesData.w_T, param.input.t);
+                    else surfOseenSystem.w.Data = wind; // Navier-Stokes case
+                };
+                auto wind = u_prev.Data;
+                setWind(wind);
+                auto Pe = supnorm(surfOseenSystem.w.Data) / nu;
+                logger.buf << "Pe = " << Pe;
+                logger.log();
+                SetupSurfOseen_P2P1(mg, lset, &surfOseenSystem, &param);
+                VectorCL I_p;
+                I_p.resize(m, 1.);
+                surfOseenSystem.gRHS.Data -= (dot(surfOseenSystem.gRHS.Data, I_p) / dot(I_p, I_p)) * I_p;
+                surfOseenSystem.fRHS.Data += (1. / stepSize) * (surfOseenSystem.M.Data * u_prev.Data) - gamma * surfOseenSystem.alRHS.Data;
+                auto alpha = 1. / stepSize;
+                logger.buf << "$\\alpha$ = " << alpha;
+                logger.log();
+                surfOseenSystem.sumA.Data.LinComb(alpha, surfOseenSystem.M.Data, gamma, surfOseenSystem.AL.Data, 1., surfOseenSystem.N.Data, nu, surfOseenSystem.A.Data, tau_u, surfOseenSystem.S.Data, rho_u, surfOseenSystem.A_stab.Data);
+                surfOseenSystem.C.Data *= -rho_p;
+                MatrixCL S_M_tmp, S_L_tmp;
+                S_M_tmp.LinComb(1. / (gamma + nu), surfOseenSystem.M_p.Data, -1., surfOseenSystem.C.Data);
+                S_L_tmp.LinComb(1. / alpha, surfOseenSystem.A_p.Data, -1., surfOseenSystem.C.Data);
+            auto assembleTime = logger.end();
+            logger.beg("t_0: project surface vorticity and export initial data to vtk");
+                // mtx
+                MatrixCL M_tmp;
+                M_tmp.LinComb(1., surfOseenSystem.M_p.Data, -1., surfOseenSystem.C.Data);
+                auto M = static_cast<Epetra_CrsMatrix>(M_tmp);
+                // rhs
+                auto Q_times_u = surfOseenSystem.Q.Data * u.Data;
+                auto Q_times_u_view_0 = static_cast<Epetra_Vector>(Q_times_u);
+                // solver
+                auto belosParamsW = parameterList();
+                belosParamsW->set("Maximum Iterations", 1000);
+                belosParamsW->set("Convergence Tolerance", 1e-8);
+                belosParamsW->set( "Output Frequency", 10);
+                belosParamsW->set("Verbosity", Belos::Errors + Belos::Warnings + Belos::StatusTestDetails);
+                belosParamsW->set<int>("Output Style", Belos::Brief);
+                auto belosSolverW = belosFactory.create("CG", belosParamsW);
+                // solve
+                Epetra_Map mapPressure(static_cast<int>(m), 0, comm);
+                Epetra_Vector surf_curl_u_epetra(mapPressure);
+                surf_curl_u_epetra.PutScalar(0.);
+                LinearProblem<ST, MV, OP> belosProblemW(rcpFromRef(M), rcpFromRef(surf_curl_u_epetra), rcpFromRef(Q_times_u_view_0));
+                belosProblemW.setProblem();
+                belosSolverW->setProblem(rcpFromRef(belosProblemW));
+                auto belosSolverResultW = belosSolverW->solve();
+                if (myRank == 0) {
+                    if (belosSolverResultW == Belos::Converged)
+                        logger.log("belos converged");
+                    else
+                        logger.wrn("belos did not converge");
                 }
-        else if( !testcase.compare("14")) {
-        	std::cout << "Test case 14 = (13 + Bernouli pressure) with vSol = P[-z^2, y, x]^T, pSol = vSol^2/2 +  (x*y^3/(x^2+y^2+z^2)^2+z/(x^2+y^2+z^2)^(1/2)); " << std::endl;
-        	extvsol = &Test_A_plus_M_vSolVectorFun8;
-        	extsol_grad1 = &Test_A_plus_M_vSolVectorFun8_Gradient1;
-        	extsol_grad2 = &Test_A_plus_M_vSolVectorFun8_Gradient2;
-        	extsol_grad3 = &Test_A_plus_M_vSolVectorFun8_Gradient3;
-        	extpsol = &Test_A_plus_M_pBerSolScalarFun14;
-        	InitVecLaplace(mg, lset, rhs, vSol, pSol, Test_A_plus_M_RhsVectorFun13, extvsol, extpsol);
-        	SetupInterfaceRhsP1(mg, &rhs2, lset.Phi, lset.GetBndData(), Test_A_plus_M_rhs2Fun8);
-        }
-        else if( !testcase.compare("15")) {
-                	std::cout << "Test case 15 = (13 - Bernouli pressure) with vSol = P[-z^2, y, x]^T, pSol = - vSol^2/2 +  (x*y^3/(x^2+y^2+z^2)^2+z/(x^2+y^2+z^2)^(1/2)); " << std::endl;
-                	extvsol = &Test_A_plus_M_vSolVectorFun8;
-                	extrhs  = &Test_A_plus_M_RhsVectorFun13;
-                	extsol_grad1 = &Test_A_plus_M_vSolVectorFun8_Gradient1;
-                	extsol_grad2 = &Test_A_plus_M_vSolVectorFun8_Gradient2;
-                	extsol_grad3 = &Test_A_plus_M_vSolVectorFun8_Gradient3;
-                	extpsol = &Test_A_plus_M_pBerSolScalarFun15;
-                	InitVecLaplace(mg, lset, rhs, vSol, pSol, extrhs, extvsol, extpsol);
-                	SetupInterfaceRhsP1(mg, &rhs2, lset.Phi, lset.GetBndData(), Test_A_plus_M_rhs2Fun8);
+                for (size_t i = 0; i < m; ++i) surf_curl_u.Data[i] = surf_curl_u_epetra[i];
+                if (everyStep > 0) {
+                    logger.beg("write vtk");
+                       writeVTK(0.);
+                    logger.end();
                 }
-        else if( !testcase.compare("16")) {
-        	std::cout << "Test case 16 = from Killing to Killing; " << std::endl;
-        	extvsol = &Test_A_plus_M_vSolVectorFun16;
-        	extpsol = &Test_A_plus_M_pSolScalarFun10;
-        	extrhs  = //&ZeroVectorFun;
-        			&Test_A_plus_M_rhs_convFun16;
-        	extrhs2  = &ZeroScalarFun;
-        	extsol_grad1 = &Test_A_plus_M_vSolVectorFun10_Gradient1;
-        	extsol_grad2 = &Test_A_plus_M_vSolVectorFun10_Gradient2;
-        	extsol_grad3 = &Test_A_plus_M_vSolVectorFun10_Gradient3;
-        	InitVector(mg, vInit, &Test_A_plus_M_vSolVectorFun16);
-        	InitVecLaplace(mg, lset, rhs, vSol, pSol, extrhs, extvsol, extpsol);
-        }
-        else if( !testcase.compare("17")) {
-                	std::cout << "Test case 17 = swirled Killing; " << std::endl;
-                	ParameterNS::nu = P.get<double>("SurfNavStokes.kinematic_viscosity");
-                	extvsol = &Test_A_plus_M_vSolVectorFun17;
-                	extpsol = &Test_A_plus_M_pSolScalarFun10;
-                	extrhs  = &Test_A_plus_M_RhsVectorFun17  ;//viscosity is here!
-                	extrhs2  = &ZeroScalarFun;
-                	extsol_grad1 = &Test_A_plus_M_vSolVectorFun17_Gradient1;
-                	extsol_grad2 = &Test_A_plus_M_vSolVectorFun17_Gradient2;
-                	extsol_grad3 = &Test_A_plus_M_vSolVectorFun17_Gradient3;
-                	InitVector(mg, vInit, &Test_A_plus_M_vSolVectorFun17);
-                	InitVecLaplace(mg, lset, rhs, vSol, pSol, extrhs, extvsol, extpsol);
-                }
-        else if( !testcase.compare("18")) {
-                        	std::cout << "Test case 18 = Kelvin-Helmholtz; " << std::endl;
-                        	ParameterNS::nu = P.get<double>("SurfNavStokes.kinematic_viscosity");
-                        	extvsol = &Test_A_plus_M_vSolVectorFun18;
-                        	extpsol = &Test_A_plus_M_pSolScalarFun10;
-                        	extrhs  = &ZeroVectorFun  ;
-                        	extrhs2  = &ZeroScalarFun;
-                        	extsol_grad1 = &Test_A_plus_M_vSolVectorFun10_Gradient1;
-                        	extsol_grad2 = &Test_A_plus_M_vSolVectorFun10_Gradient2;
-                        	extsol_grad3 = &Test_A_plus_M_vSolVectorFun10_Gradient3;
-                        	InitVector(mg, vInit, &Test_A_plus_M_vSolVectorFun18);
-                        	InitVecLaplace(mg, lset, rhs, vSol, pSol, extrhs, extvsol, extpsol);
-
+            logger.end();
+            logger.beg("convert to Epetra");
+                logger.beg("cast matrices");
+                    auto A = static_cast<Epetra_CrsMatrix>(surfOseenSystem.sumA.Data);
+                    auto printStat = [&](std::string const & name, Epetra_CrsMatrix const & A) {
+                        logger.buf << name << ": " << A.NumGlobalRows() << 'x' << A.NumGlobalCols() << ", " << A.NumGlobalNonzeros() << " nonzeros (" << (100. * A.NumGlobalNonzeros()) / (static_cast<double>(A.NumGlobalRows()) * A.NumGlobalCols()) << "%)";
+                        logger.log();
+                    };
+                    printStat("A", A);
+                    auto B = static_cast<Epetra_CrsMatrix>(surfOseenSystem.B.Data);
+                    printStat("B", B);
+                    auto C = static_cast<Epetra_CrsMatrix>(surfOseenSystem.C.Data);
+                    printStat("C := -rho_p (pressure volume stabilization mtx)", C);
+                    auto S_M = static_cast<Epetra_CrsMatrix>(S_M_tmp);
+                    printStat("S_M := (\\nu + \\gamma)^{-1} M_p - C", S_M);
+                    auto S_L = static_cast<Epetra_CrsMatrix>(S_L_tmp);
+                    printStat("S_L := \\alpha^{-1} L_p - C", S_L);
+                logger.end();
+                logger.beg("cast rhs vectors");
+                    auto fRHS = static_cast<Epetra_Vector>(surfOseenSystem.fRHS.Data);
+                    auto gRHS = static_cast<Epetra_Vector>(surfOseenSystem.gRHS.Data);
+                    Epetra_Map mapVelocity(static_cast<int>(n), 0, comm), mapVelocityPressure(static_cast<int>(n + m), 0, comm);
+                    Epetra_Vector belosLHS(mapVelocityPressure), belosRHS(mapVelocityPressure);
+                    auto joinEpetraVectors = [&](Epetra_Vector const & a, Epetra_Vector const & b, MV& ab) {
+                        for (size_t i = 0; i < n; ++i) (*ab(0))[i] = a[i];
+                        for (size_t i = 0; i < m; ++i) (*ab(0))[i + n] = b[i];
+                    };
+                    joinEpetraVectors(fRHS, gRHS, belosRHS);
+                logger.end();
+                RCP<OP> belosMTX = rcp(new Epetra_OperatorApply([&](MV const & X, MV& Y) {
+                    double* view;
+                    X(0)->ExtractView(&view);
+                    Epetra_Vector x1(Epetra_DataAccess::View, mapVelocity, view);
+                    Epetra_Vector x2(Epetra_DataAccess::View, mapPressure, view + n);
+                    Y(0)->ExtractView(&view);
+                    Epetra_Vector y11(Epetra_DataAccess::View, mapVelocity, view);
+                    auto y12 = y11;
+                    Epetra_Vector y21(Epetra_DataAccess::View, mapPressure, view + n);
+                    auto y22 = y21;
+                    // y1
+                    A.Multiply(false, x1, y11);
+                    B.Multiply(true, x2, y12);
+                    y11.Update(1., y12, 1.);
+                    // y2
+                    B.Multiply(false, x1, y21);
+                    C.Multiply(false, x2, y22);
+                    y21.Update(1., y22, 1.);
+                }));
+            logger.end();
+            logger.beg("build preconditioners");
+                auto identity = [](MV const & X, MV& Y) {
+                    double* view;
+                    Y(0)->ExtractView(&view);
+                    X(0)->ExtractCopy(view);
+                };
+                logger.beg("diffusion-convection-reaction block");
+                    Epetra_OperatorApply::ApplyType invA = identity;
+                    size_t numItersA = 0;
+                    logger.log(inpJSON.get<std::string>("Solver.Inner.A.Comment"));
+                    auto iterationA = inpJSON.get<std::string>("Solver.Inner.A.Iteration");
+                    // amesos
+                    Epetra_LinearProblem amesosProblem;
+                    RCP<Amesos_BaseSolver> amesosSolver;
+                    Amesos amesosFactory;
+                    // belos
+                    auto belosParamsA = parameterList();
+                    decltype(belosSolver) belosSolverA;
+                    // choose
+                    auto factorizationTime = 0.;
+                    std::string factorize = "Yes";
+                    auto useAmesos = iterationA.find("Amesos") != std::string::npos;
+                    std::function<void()> runFactorization;
+                    if (useAmesos) { // Amesos
+                        logger.log("using Amesos");
+                        if (!amesosFactory.Query(iterationA))
+                            throw std::invalid_argument("solver " + iterationA + " is not available");
+                        logger.log("solver: " + iterationA);
+                        amesosProblem.SetOperator(&A);
+                        amesosSolver = rcp(amesosFactory.Create(iterationA, amesosProblem));
+                        runFactorization = [&]() {
+                            logger.beg("factorization");
+                                logger.beg("symbolic factorization");
+                                    AMESOS_CHK_ERR(amesosSolver->SymbolicFactorization());
+                                logger.end();
+                                logger.beg("numeric factorization");
+                                    AMESOS_CHK_ERR(amesosSolver->NumericFactorization());
+                                logger.end();
+                            factorizationTime = logger.end();
+                        };
+                        runFactorization();
+                        invA = [&](MV const &X, MV &Y) {
+                            amesosProblem.SetLHS(&Y);
+                            amesosProblem.SetRHS(const_cast<MV*>(&X));
+                            amesosSolver->Solve();
+                            numItersA++;
+                        };
+                    } else { // Belos
+                        logger.log("using Belos");
+                        belosParamsA->set("Maximum Iterations", inpJSON.get<int>("Solver.Inner.A.MaxIter"));
+                        belosParamsA->set("Convergence Tolerance", inpJSON.get<double>("Solver.Inner.A.RelResTol"));
+                        belosSolverA = belosFactory.create(iterationA, belosParamsA);
+                        logger.buf << "inner solver: " << belosSolverA->description();
+                        logger.log();
+                        invA = [&](MV const &X, MV &Y) {
+                            Y.PutScalar(0.);
+                            LinearProblem<ST, MV, OP> belosProblemA(rcpFromRef(A), rcpFromRef(Y), rcpFromRef(X));
+                            belosProblemA.setProblem();
+                            belosSolverA->setProblem(rcpFromRef(belosProblemA));
+                            belosSolverA->solve();
+                            numItersA += belosSolverA->getNumIters();
+                        };
+                    }
+                logger.end();
+                logger.beg("schur complement block");
+                    Epetra_OperatorApply::ApplyType invS = identity;
+                    size_t numItersS_M = 0, numItersS_L = 0;
+                    RCP<ParameterList> belosParamsS = parameterList();
+                    belosParamsS->set("Maximum Iterations", inpJSON.get<int>("Solver.Inner.S.MaxIter"));
+                    belosParamsS->set("Convergence Tolerance", inpJSON.get<double>("Solver.Inner.S.RelResTol"));
+                    auto belosSolverS_M = belosFactory.create(inpJSON.get<std::string>("Solver.Inner.S.Iteration"), belosParamsS);
+                    auto belosSolverS_L = belosFactory.create(inpJSON.get<std::string>("Solver.Inner.S.Iteration"), belosParamsS);
+                    logger.buf << "inner solver: " << belosSolverS_M->description();
+                    logger.log();
+                    invS = [&](MV const & X, MV& Y) {
+                        // ini guess
+                        Y.PutScalar(0.);
+                        auto& Y_M = Y;
+                        auto  Y_L = Y;
+                        // normalized rhs
+                        auto X_nrm = X;
+                        {
+                            double mean;
+                            X_nrm.MeanValue(&mean);
+                            for (size_t i = 0; i < m; ++i) (*X_nrm(0))[i] -= mean;
                         }
-        else if( !testcase.compare("19")) {
-                                	std::cout << "Test case 19 = vorteces; " << std::endl;
-                                	ParameterNS::nu = P.get<double>("SurfNavStokes.kinematic_viscosity");
-                                	extvsol = &ZeroVectorFun;
-                                	extpsol = &ZeroScalarFun;
-                                 	extrhs  = &ZeroVectorFun  ;
-                                	extrhs2  = &ZeroScalarFun;
-                                	extsol_grad1 = &ZeroVectorFun;
-                                	extsol_grad2 = &ZeroVectorFun;
-                                	extsol_grad3 = &ZeroVectorFun;
-                                	InitVector(mg, vInit, &Test_A_plus_M_disturbed_test18);
-                                	InitVecLaplace(mg, lset, rhs, vSol, pSol, extrhs, extvsol, extpsol);
+                        // Y_M
+                        LinearProblem<ST, MV, OP> belosProblemS_M(rcpFromRef(S_M), rcpFromRef(Y_M), rcpFromRef(X_nrm));
+                        belosProblemS_M.setProblem();
+                        belosSolverS_M->setProblem(rcpFromRef(belosProblemS_M));
+                        belosSolverS_M->solve();
+                        numItersS_M += belosSolverS_M->getNumIters();
+                        // Y_L
+                        // TODO: make parallel
+                        if (inpJSON.get<bool>("Solver.Inner.S.S_L")) {
+                            LinearProblem<ST, MV, OP> belosProblemS_L(rcpFromRef(S_L), rcpFromRef(Y_L), rcpFromRef(X_nrm));
+                            belosProblemS_L.setProblem();
+                            belosSolverS_L->setProblem(rcpFromRef(belosProblemS_L));
+                            belosSolverS_L->solve();
+                            numItersS_L += belosSolverS_L->getNumIters();
+                        }
+                        // result
+                        Y_M.Update(1., Y_L, 1.);
+                    };
+                logger.end();
+                auto precType = inpJSON.get<std::string>("Solver.Inner.Type");
+                RCP<OP> belosPRE;
+                if (precType == "BlockDiagonal") {
+                    logger.log("using block-diagonal preconditioner");
+                    belosPRE = rcp(new Epetra_OperatorApply([&](MV const & X, MV& Y) {
+                        double* view;
+                        X(0)->ExtractView(&view);
+                        Epetra_Vector x1(Epetra_DataAccess::View, mapVelocity, view);
+                        Epetra_Vector x2(Epetra_DataAccess::View, mapPressure, view + n);
+                        Y(0)->ExtractView(&view);
+                        Epetra_Vector y1(Epetra_DataAccess::View, mapVelocity, view);
+                        Epetra_Vector y2(Epetra_DataAccess::View, mapPressure, view + n);
+                        #ifdef _OPENMP
+                            #pragma omp parallel num_threads(2)
+                            {
+                                #pragma omp single
+                                {
+                                    #pragma omp task
+                                        invA(x1, y1); // y1
+                                    #pragma omp task
+                                        invS(x2, y2); // y2
                                 }
-        else if( !testcase.compare("20")) {
-                                      	std::cout << "Test case 20 = test 17 + swirling depends on x; " << std::endl;
-                                      	ParameterNS::nu = P.get<double>("SurfNavStokes.kinematic_viscosity");
-                                      	extvsol = &Test_A_plus_M_vSolVectorFun20;
-                                      	extpsol = &ZeroScalarFun;
-                                      	extcurlsol = &Test_A_plus_M_curlFun20;
-                                      	extrhs  = &Test_A_plus_M_RhsVectorFun20  ;//viscosity is here!
-                                      	extrhs2  = &Test_A_plus_M_rhs2Fun20;
-                                      	extsol_grad1 = &Test_A_plus_M_vSolVectorFun20_Gradient1;
-                                      	extsol_grad2 = &Test_A_plus_M_vSolVectorFun20_Gradient2;
-                                      	extsol_grad3 = &Test_A_plus_M_vSolVectorFun20_Gradient3;
-                                      	InitVector(mg, vInit, &Test_A_plus_M_vSolVectorFun20);
-                                      	InitVecLaplace(mg, lset, rhs, vSol, pSol, extrhs, extvsol, extpsol);
-                                    	SetupInterfaceRhsP1(mg, &rhs2, lset.Phi, lset.GetBndData(), extrhs2);
-
-        }
-
-    } else if( !levelset_fun_str.compare("xy_plane")) {
-        if( !testcase.compare("1")) {
-            std::cout << "Test case 1 with vSol = [sin(Pi*x)sin(Pi*y), sin(Pi*x)sin(Pi*y), 0]^T" << std::endl;
-            extvsol = &Test_A_plus_M_xy_plane_vSolVectorFun1;
-            extsol_grad1 = &Test_A_plus_M_xy_plane_vSolVectorFun1_Gradient1;
-            extsol_grad2 = &Test_A_plus_M_xy_plane_vSolVectorFun1_Gradient2;
-            extsol_grad3 = &Test_A_plus_M_xy_plane_vSolVectorFun1_Gradient3;
-            InitVecLaplace(mg, lset, rhs, vSol, pSol, Test_A_plus_M_xy_plane_RhsVectorFun1, extvsol, extpsol);
-        } else if( !testcase.compare("2")) {
-            std::cout << "Test case 2 with vSol = [sin(Pi/2*x)sin(Pi/2*y), sin(Pi/2*x)sin(Pi/2*y), 0]^T" << std::endl;
-            extvsol = &Test_A_plus_M_xy_plane_vSolVectorFun2;
-            extsol_grad1 = &Test_A_plus_M_xy_plane_vSolVectorFun2_Gradient1;
-            extsol_grad2 = &Test_A_plus_M_xy_plane_vSolVectorFun2_Gradient2;
-            extsol_grad3 = &Test_A_plus_M_xy_plane_vSolVectorFun2_Gradient3;
-            InitVecLaplace(mg, lset, rhs, vSol, pSol, Test_A_plus_M_xy_plane_RhsVectorFun2, extvsol, extpsol);
-        } else if( !testcase.compare("3")) {
-            std::cout << "Test case 3 with vSol = [sin(Pi/4*x)sin(Pi/4*y), sin(Pi/4*x)sin(Pi/4*y), 0]^T" << std::endl;
-            extvsol = &Test_A_plus_M_xy_plane_vSolVectorFun3;
-            extsol_grad1 = &Test_A_plus_M_xy_plane_vSolVectorFun3_Gradient1;
-            extsol_grad2 = &Test_A_plus_M_xy_plane_vSolVectorFun3_Gradient2;
-            extsol_grad3 = &Test_A_plus_M_xy_plane_vSolVectorFun3_Gradient3;
-            InitVecLaplace(mg, lset, rhs, vSol, pSol, Test_A_plus_M_xy_plane_RhsVectorFun3, extvsol, extpsol);
-        } else if( !testcase.compare("Zero")) {
-            extvsol = &ZeroVectorFun;
-            extsol_grad1 = &ZeroVectorFun;
-            extsol_grad2 = &ZeroVectorFun;
-            extsol_grad3 = &ZeroVectorFun;
-        } else if( !testcase.compare("4")) {
-            std::cout << "Test case 4 with vSol = [(x^2-4)*(y^2-4), (x^2-4)*(y^2-4), 0]^T" << std::endl;
-            extvsol = &Test_A_plus_M_xy_plane_vSolVectorFun4;
-            extsol_grad1 = &Test_A_plus_M_xy_plane_vSolVectorFun4_Gradient1;
-            extsol_grad2 = &Test_A_plus_M_xy_plane_vSolVectorFun4_Gradient2;
-            extsol_grad3 = &Test_A_plus_M_xy_plane_vSolVectorFun4_Gradient3;
-            InitVecLaplace(mg, lset, rhs, vSol, pSol, Test_A_plus_M_xy_plane_RhsVectorFun4, extvsol, extpsol);
-        }
-    } else if( !levelset_fun_str.compare("tilted_plane")) {
-        if( !testcase.compare("1")) {
-            std::cout << "Test case 1 with vSol = [4/5*sin(Pi*x)sin(Pi*z), 2/5*sin(Pi*x)sin(Pi*z), sin(Pi*x)sin(Pi*z)]^T" << std::endl;
-            extvsol = &Test_A_plus_M_tilted_plane_vSolVectorFun1;
-            extsol_grad1 = &Test_A_plus_M_tilted_plane_vSolVectorFun1_Gradient1;
-            extsol_grad2 = &Test_A_plus_M_tilted_plane_vSolVectorFun1_Gradient2;
-            extsol_grad3 = &Test_A_plus_M_tilted_plane_vSolVectorFun1_Gradient3;
-            InitVecLaplace(mg, lset, rhs, vSol, pSol, Test_A_plus_M_tilted_plane_RhsVectorFun1, extvsol, extpsol);
-        } else if( !testcase.compare("2")) {
-            std::cout << "Test case 2 with vSol = [4/5*(x^2-4)*(z^2-4), 2/5*(x^2-4)*(z^2-4), (x^2-4)*(z^2-4)]^T" << std::endl;
-            extvsol = &Test_A_plus_M_tilted_plane_vSolVectorFun2;
-            extsol_grad1 = &Test_A_plus_M_tilted_plane_vSolVectorFun2_Gradient1;
-            extsol_grad2 = &Test_A_plus_M_tilted_plane_vSolVectorFun2_Gradient2;
-            extsol_grad3 = &Test_A_plus_M_tilted_plane_vSolVectorFun2_Gradient3;
-            InitVecLaplace(mg, lset, rhs, vSol, pSol, Test_A_plus_M_tilted_plane_RhsVectorFun2, extvsol, extpsol);
-        }
-    } else if( !levelset_fun_str.compare("tilted_plane_xy")) {
-        if( !testcase.compare("1")) {
-            std::cout << "Test case 1 with vSol = [4/17*sin(Pi*y)*sin(Pi*z), sin(Pi*y)*sin(Pi*z), 16/17*sin(Pi*y)*sin(Pi*z)]^T" << std::endl;
-            extvsol = &Test_A_plus_M_tilted_plane_xy_vSolVectorFun1;
-            extsol_grad1 = &Test_A_plus_M_tilted_plane_xy_vSolVectorFun1_Gradient1;
-            extsol_grad2 = &Test_A_plus_M_tilted_plane_xy_vSolVectorFun1_Gradient2;
-            extsol_grad3 = &Test_A_plus_M_tilted_plane_xy_vSolVectorFun1_Gradient3;
-            InitVecLaplace(mg, lset, rhs, vSol, pSol, Test_A_plus_M_tilted_plane_xy_RhsVectorFun1, extvsol, extpsol);
-        } else if( !testcase.compare("Zero")) {
-            extvsol = &ZeroVectorFun;
-            extsol_grad1 = &ZeroVectorFun;
-            extsol_grad2 = &ZeroVectorFun;
-            extsol_grad3 = &ZeroVectorFun;
-        } else if( !testcase.compare("2")) {
-            std::cout << "Test case 2 with vSol = [4/17*(z^2-4)*(y^2-4), (z^2-4)*(y^2-4), 16/17*(z^2-4)*(y^2-4)]^T" << std::endl;
-            extvsol = &Test_A_plus_M_tilted_plane_xy_vSolVectorFun2;
-            extsol_grad1 = &Test_A_plus_M_tilted_plane_xy_vSolVectorFun2_Gradient1;
-            extsol_grad2 = &Test_A_plus_M_tilted_plane_xy_vSolVectorFun2_Gradient2;
-            extsol_grad3 = &Test_A_plus_M_tilted_plane_xy_vSolVectorFun2_Gradient3;
-            InitVecLaplace(mg, lset, rhs, vSol, pSol, Test_A_plus_M_tilted_plane_xy_RhsVectorFun2, extvsol, extpsol);
-        } else if( !testcase.compare("3")) {
-            std::cout << "Test case 3 with vSol = [4/17*(z^2-4)^2*(y^2-4)^2, (z^2-4)^2*(y^2-4)^2, 16/17*(z^2-4)^2*(y^2-4)^2]^T" << std::endl;
-            extvsol = &Test_A_plus_M_tilted_plane_xy_vSolVectorFun3;
-            extsol_grad1 = &Test_A_plus_M_tilted_plane_xy_vSolVectorFun3_Gradient1;
-            extsol_grad2 = &Test_A_plus_M_tilted_plane_xy_vSolVectorFun3_Gradient2;
-            extsol_grad3 = &Test_A_plus_M_tilted_plane_xy_vSolVectorFun3_Gradient3;
-            InitVecLaplace(mg, lset, rhs, vSol, pSol, Test_A_plus_M_tilted_plane_xy_RhsVectorFun3, extvsol, extpsol);
-        }
-    }
-    else if( !levelset_fun_str.compare("cube_madeof_edges")) {
-           if( !testcase.compare("1")) {
-               std::cout << "Test case 1 with nonzero divergence" << std::endl;
-               extrhs  = &Test_cube_madeof_edges_RhsVectorFun1;
-               extvsol 		= &Test_cube_madeof_edges_vSolVectorFun1;
-               extsol_grad1 = &Test_cube_madeof_edges_vSolVectorFun1_Gradient1;
-               extsol_grad2 = &Test_cube_madeof_edges_vSolVectorFun1_Gradient2;
-               extsol_grad3 = &Test_cube_madeof_edges_vSolVectorFun1_Gradient3;
-               extpsol		= &Test_cube_madeof_edges_pSolScalarFun1;
-               InitVecLaplace(mg, lset, rhs, vSol, pSol, extrhs, extvsol, extpsol);
-               SetupInterfaceRhsP1(mg, &rhs2, lset.Phi, lset.GetBndData(), Test_cube_madeof_edges_rhs2Fun1 );
-
-           }
-    } else  if( !levelset_fun_str.compare("torus")) {
-        if( !testcase.compare("1")) {
-            std::cout << "Test case 1 = Arnold example; " << std::endl;
-            ParameterNS::nu = P.get<double>("SurfNavStokes.kinematic_viscosity");
-            extvsol = &Torus_vSolVectorArnold;
-            extpsol = &ZeroScalarFun;
-            extrhs  = &ZeroVectorFun  ;
-            extrhs2  = &ZeroScalarFun;
-            extsol_grad1 = &ZeroVectorFun;
-            extsol_grad2 = &ZeroVectorFun;
-            extsol_grad3 = &ZeroVectorFun;
-            InitVector(mg, vInit, extvsol);
-            InitVecLaplace(mg, lset, rhs, vSol, pSol, extrhs, extvsol, extpsol);
-        }
-        if( !testcase.compare("2")) {
-            std::cout << "Test case 2 = linear combinations; " << std::endl;
-            ParameterNS::nu = P.get<double>("SurfNavStokes.kinematic_viscosity");
-            extvsol = &Torus_vSolVectorHarmonic;
-            extpsol = &ZeroScalarFun;
-            extrhs  = &ZeroVectorFun  ;
-            extrhs2  = &ZeroScalarFun;
-            extsol_grad1 = &ZeroVectorFun;
-            extsol_grad2 = &ZeroVectorFun;
-            extsol_grad3 = &ZeroVectorFun;
-            InitVector(mg, vInit, extvsol);
-            InitVecLaplace(mg, lset, rhs, vSol, pSol, extrhs, extvsol, extpsol);
-        }
-    } else  if( !levelset_fun_str.compare("torus_flower")) {
-        if( !testcase.compare("1")) {
-            std::cout << "Test case 1 = harmonic; " << std::endl;
-            ParameterNS::nu = P.get<double>("SurfNavStokes.kinematic_viscosity");
-            extvsol = &Torus_vSolVectorHarmonicPhi;
-            extpsol = &ZeroScalarFun;
-            extrhs  = &ZeroVectorFun  ;
-            extrhs2  = &ZeroScalarFun;
-            extsol_grad1 = &ZeroVectorFun;
-            extsol_grad2 = &ZeroVectorFun;
-            extsol_grad3 = &ZeroVectorFun;
-            InitVector(mg, vInit, extvsol);
-            InitVecLaplace(mg, lset, rhs, vSol, pSol, extrhs, extvsol, extpsol);
-        }
-    }
-
-/////////////////////////////////////// Navier-Stokes ///////////////////////////////////////
-
-	if( !model.compare("NavierStokes")) {
-
-		//set up discrete vectors and matrices
-    	VectorCL id, id2, random ;
-        id.resize(rhs.Data.size(), 1);
-
-        random.resize(rhs.Data.size(), 0);
-        for (int i=0; i<rhs.Data.size(); i++)
-        {
-        	random[i]=  - 5 + (rand() % 10)   ;
-        }
-
-        id2.resize(rhs2.Data.size(), 1);
-        MatrixCL Adyn, Ahat, Bhat, Chat, Mhat;
-        MatrixCL BTranspose, NTranspose;
-        DROPS::VecDescCL instantrhs;
-        DROPS::VecDescCL vxtent, pxtent;
-
-        //set up output
-        std::string filename = "test" + testcase + "_";
-       	std::string dirname  = P.get<std::string>("Output.Directory") + "/" + model + "_" + levelset_fun_str + "/" + "test" + testcase + "_h=" + std::to_string(float(h));
-
-       	std::cout << "dirname: " << dirname << std::endl;
-
-       	//set up VTK output
-       	VTKOutCL* vtkwriter = nullptr;
-       	vtkwriter = new VTKOutCL(mg, "DROPS data", (int)P.get<double>("Time.NumSteps")/P.get<int>("Output.every timestep"), dirname , filename, "none", 0);
-       	vtkwriter->Register(make_VTKScalar(lset.GetSolution(), "level-set"));
-       	vtkwriter->Register(make_VTKIfaceVector(mg, vSol, "velSol", velFE, vbnd));
-       	vtkwriter->Register(make_VTKIfaceVector(mg, rhs, "rhs", velFE, vbnd));
-       	vtkwriter->Register(make_VTKIfaceVector(mg, v, "velocity", velFE, vbnd));
-       	vtkwriter->Register(make_VTKIfaceScalar(mg, p, "pressure", /*prFE,*/ pbnd));
-       	vtkwriter->Register(make_VTKIfaceScalar(mg, curl, "vorticity", /*prFE,*/ pbnd));
-       	vtkwriter->Register(make_VTKIfaceScalar(mg, curlSol, "vortSol", /*prFE,*/ pbnd));
-       	vtkwriter->Register(make_VTKIfaceScalar(mg, rhs2, "rhs2", /*prFE,*/ pbnd));
-       	vtkwriter->Register(make_VTKIfaceScalar(mg, pSol, "pSol", /*prFE,*/ pbnd));
-
-        //set up a txt file for custom time output
-        std::ofstream log_solo( dirname +"/"
-        					  + "eta="+ std::to_string(float(eta))+ "_"
-        					  + "l="  + P.get<std::string>("Mesh.AdaptRef.FinestLevel")
-							  + "_nu=" + P.get<std::string>("SurfNavStokes.kinematic_viscosity")
-        					  + "_Plot_" + filename
-							  + P.get<std::string>("SurfNavStokes.nonlinear_term") + "_"
-							  + P.get<std::string>("SurfNavStokes.instationary") + "="
-							  + std::to_string(float(tau)) + ".txt");
-        log_solo << "Time" <<  "\tKinetic\t" << "\tMomentum\t" << "\tWork" <<  std::endl;
-
-        //set up a txt file for error time output
-        std::ofstream log_error( dirname +"/"
-        		+ "eta="+ std::to_string(float(eta))+ "_"
-        		+ "l="  + P.get<std::string>("Mesh.AdaptRef.FinestLevel")
-				+ "_nu=" + P.get<std::string>("SurfNavStokes.kinematic_viscosity")
-				+ "_Error_" + filename
-				+ P.get<std::string>("SurfNavStokes.nonlinear_term") + "_"
-				+ P.get<std::string>("SurfNavStokes.instationary") + "="
-				+ std::to_string(float(tau)) + ".txt");
-        log_error << "Time" << "\tL_2(uT-ext_uT)\t" <<  "\tadvH_1(u-ext_u)\t" <<  "\tsurfH_1(u-ext_u)\t" <<  "\tH_1(u-ext_u)\t" << "\tL_2(uN)\t" << "\tL_2(p-ext_p)" << std::endl;
-        double mu = P.get<double>("SurfNavStokes.kinematic_viscosity");
-        std::cout << "viscosity: " << mu << std::endl;
-        std::cout << "test is instationary: " << P.get<std::string>("SurfNavStokes.instationary") << '\n';
-
-        //NAVIER-STOKES starts here
-        if ( P.get<std::string>("SurfNavStokes.instationary") != "none" )
-        {
-
-        	//initial velocity for backward Euler formula
-        	v=vInit;
-        	v_old=vInit;
-
-        	Mhat.LinComb(1., Schur.Data, alpha, Schur_normal_stab.Data);
-        	//renormalization to fullfill \int rhs = 0 in discrete sence
-
-        	curl_proj.Data = Omega.Data*v.Data  - ( dot(Omega.Data*v.Data,id2) / dot(id2,id2) ) * id2;
-        	//GMResSolver_.Solve(Mhat, curl.Data,curl_proj.Data , rhs2.Data);
-            InitScalar(mg, p, extpsol);
-        	//output of initial data and exact solutions to vtk and custom
-        	vtkwriter->Write(0);//send v to vtk
-            vxtent.SetIdx( &vecP1idx);
-        	Extend(mg, vInit, vxtent);
-        	BndDataCL<Point3DCL> bndvec = vbnd;
-        	BndDataCL<double> bndscalar = pbnd;
-        	double l2norm = L2_Vector_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, bndvec, vxtent), &ZeroVectorFun);
-        	double mom = dot(M.Data * vInit.Data,id);
-        	double work = dot(M.Data * vInit.Data,rhs.Data);
-        	log_solo << std::to_string(0.0) << "\t" << std::to_string((float)(l2norm*l2norm*0.5)) << "\t" << std::to_string((float)(mom))<< "\t" << std::to_string((float)(work)) << std::endl;
-
-        	bool experimental=false;
-
-            std::ofstream log( dirname +"/"+ filename   + "_time="+std::to_string(0) + ".txt");
-            log_error <<  std::to_string((float)0) << "\t";
-
-            if ( !velFE.compare("P1")) {
-                vxtent.SetIdx(&vecP1idx);
-                Extend(mg, v, vxtent);
-                BndDataCL<Point3DCL> bndvec = vbnd;
-                double error_L2 = L2_Vector_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, bndvec, vxtent), extvsol, 0);
-                log << "The L2-Norm of v - vSol is: " << error_L2 << std::endl;
-                log_error << std::to_string((float) error_L2) << "\t";
-                double l2norm = L2_Vector_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, bndvec, vxtent),
-                                                &ZeroVectorFun, 0);
-                log << "The L2-Norm of v  is: " << l2norm << std::endl;
-
-                double H1(0.), surfH1(0.), advanced_surfH1(0.), normal_velocity(0.);
-                H1_Vector_error_P1(mg, lset.Phi, lset.GetBndData(), v, vbnd, extvsol, extsol_grad1, extsol_grad2,
-                                   extsol_grad3, eta, H1, surfH1, advanced_surfH1, normal_velocity, 0);
-                //        std::cout << "The H1-Norm of v - vSol is: " << H1 << std::endl;
-                //        std::cout << "The surfH1-Norm of v - vSol is: " << surfH1 << std::endl;
-                log << "The advanced surfH1-Norm of v - vSol is: " << advanced_surfH1 << std::endl;
-                log_error << std::to_string((float) advanced_surfH1) << "\t";
-                log_error << std::to_string((float) surfH1) << "\t";
-                log_error << std::to_string((float) H1) << "\t";
-                //log << "The U-Norm of v - vSol is: " << std::sqrt(advanced_surfH1*advanced_surfH1 + epsilon*dot(A_stab.Data*v.Data, v.Data)) << std::endl;
-                log << "The L2-Norm of v * n is: " << normal_velocity << std::endl;
-                log_error << std::to_string((float) normal_velocity) << "\t";
-            }
-            if ( !prFE.compare("P1")) {
-                pxtent.SetIdx( &P1FEidx);
-                Extend(mg, p, pxtent);
-                BndDataCL<double> bndscalar = pbnd;
-                double L2_Lagrange =L2_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, bndscalar, pxtent), extpsol, 0);
-                log << "The L2-Norm of p - pSol is: " << L2_Lagrange << std::endl;
-                log_error <<  std::to_string((float)L2_Lagrange) << std::endl;
-                log << "The L2-Norm of p  is: " << L2_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, bndscalar, pxtent), &ZeroScalarFun);
-                //log << "The M-Norm of p - pSol is: " << std::sqrt(L2_Lagrange*L2_Lagrange + alpha*dot(Schur_stab.Data*p.Data, p.Data)) << std::endl;
-            }
-
-        	for (int i = 0; i < P.get<double>("Time.NumSteps"); i++)
-        	{
-        		InitVector(mg, vSol, extvsol,(i+1)*tau);
-        		InitScalar(mg, curlSol, extcurlsol,(i+1)*tau);
-        		InitScalar(mg, pSol, extpsol,(i+1)*tau);
-
-        		//current timestep logfile
-        		std::ofstream log( dirname +"/"+ filename   + "_time="+std::to_string((i+1)*tau) + ".txt");
-
-        		//right constant for temporal BDF
-        		double c;
-        		if ( P.get<std::string>("SurfNavStokes.instationary") == "BDF1")
-        		{
-        			//leading time term mass coeff
-        			c=1.0;
-        			//interpolated from previous timesteps, "wind"
-        			v_aux.Data = 1.0*v.Data;
-        		}
-        		else if ( P.get<std::string>("SurfNavStokes.instationary") == "BDF2")
-        		{
-        			//leading time term mass coeff
-                    if (i!=0) {
-                        c = 3.0 / 2.0;
+                            }
+                        #else
+                            invA(x1, y1);
+                            invS(x2, y2);
+                        #endif
+                    }));
+                }
+                else {
+                    logger.log("using block-triangular preconditioner");
+                    belosPRE = rcp(new Epetra_OperatorApply([&](MV const & X, MV& Y) {
+                        double* view;
+                        X(0)->ExtractView(&view);
+                        Epetra_Vector x1(Epetra_DataAccess::View, mapVelocity, view);
+                        Epetra_Vector x2(Epetra_DataAccess::View, mapPressure, view + n);
+                        Y(0)->ExtractView(&view);
+                        Epetra_Vector y1(Epetra_DataAccess::View, mapVelocity, view);
+                        auto y1_tmp = y1;
+                        Epetra_Vector y2(Epetra_DataAccess::View, mapPressure, view + n);
+                        // y2
+                        invS(x2, y2);
+                        // y1
+                        B.Multiply(true, y2, y1_tmp);
+                        y1_tmp.Update(1., x1, -1.);
+                        invA(y1_tmp, y1);
+                    }));
+                }
+            logger.end();
+            logger.beg("linear solve");
+                if (inpJSON.get<bool>("Solver.UsePreviousFrameAsInitialGuess")) {
+                    for (size_t i = 0; i < n; ++i) belosLHS[i] = u.Data[i];
+                    for (size_t i = 0; i < m; ++i) belosLHS[n + i] = p.Data[i];
+                } else belosLHS.PutScalar(0.);
+                LinearProblem<ST, MV, OP> belosProblem(belosMTX, rcpFromRef(belosLHS), rcpFromRef(belosRHS));
+                if (inpJSON.get<bool>("Solver.Inner.Use")) belosProblem.setRightPrec(belosPRE);
+                belosProblem.setProblem();
+                belosSolver->setProblem(rcpFromRef(belosProblem));
+                std::cout << std::scientific;
+                auto belosSolverResult = belosSolver->solve();
+                if (myRank == 0) {
+                    if (belosSolverResult == Belos::Converged) logger.log("belos converged");
+                    else logger.wrn("belos did not converge");
+                }
+            auto solveTime = logger.end();
+            double solveWastedTime = 0.;
+            logger.beg("convert from Epetra");
+                for (size_t i = 0; i < n; ++i) u.Data[i] = belosLHS[i];
+                for (size_t i = 0; i < m; ++i) p.Data[i] = belosLHS[n + i];
+                p.Data -= dot(surfOseenSystem.M_p.Data * p.Data, I_p) / dot(surfOseenSystem.M_p.Data * I_p, I_p) * I_p;
+            logger.end();
+            logger.beg("project surface vorticity");
+                Q_times_u = surfOseenSystem.Q.Data * u.Data;
+                auto Q_times_u_view_1 = static_cast<Epetra_Vector>(Q_times_u);
+                surf_curl_u_epetra.PutScalar(0.);
+                belosProblemW = LinearProblem<ST, MV, OP>(rcpFromRef(M), rcpFromRef(surf_curl_u_epetra), rcpFromRef(Q_times_u_view_1));
+                belosProblemW.setProblem();
+                belosSolverW->setProblem(rcpFromRef(belosProblemW));
+                belosSolverResultW = belosSolverW->solve();
+                if (myRank == 0) {
+                    if (belosSolverResultW == Belos::Converged)
+                        logger.log("belos converged");
+                    else
+                        logger.wrn("belos did not converge");
+                }
+                for (size_t i = 0; i < m; ++i) surf_curl_u.Data[i] = surf_curl_u_epetra[i];
+            auto projectTime = logger.end();
+        auto stepTime = logger.end();
+        logger.beg("output");
+            MatrixCL B_T;
+            auto residual = [&](VectorCL const & u, VectorCL const & p) {
+                auto velResSq = norm_sq(surfOseenSystem.sumA.Data * u + B_T * p - surfOseenSystem.fRHS.Data);
+                auto preResSq = norm_sq(surfOseenSystem.B.Data * u + surfOseenSystem.C.Data * p - surfOseenSystem.gRHS.Data);
+                return std::tuple<double, double, double>(sqrt(velResSq), sqrt(preResSq), sqrt(velResSq + preResSq));
+            };
+            auto exportStats = [&](size_t i) {
+                std::ofstream stats(dirName + "/stats/t_" + std::to_string(i) + ".json");
+                ParamCL tJSON;
+                transpose(surfOseenSystem.B.Data, B_T);
+                auto res = residual(u.Data, p.Data);
+                tJSON.put("Solver.Outer.ResidualNorm.TrueAbsolute.Velocity", std::get<0>(res));
+                tJSON.put("Solver.Outer.ResidualNorm.TrueAbsolute.Pressure", std::get<1>(res));
+                tJSON.put("Solver.Outer.ResidualNorm.TrueAbsolute.Full", std::get<2>(res));
+                tJSON.put("Solver.Outer.ResidualNorm.SolverRelative", belosSolver->achievedTol());
+                tJSON.put("Solver.Outer.TotalIters", belosSolver->getNumIters());
+                tJSON.put("Solver.Outer.DOF", n + m);
+                tJSON.put("Solver.Outer.Converged", belosSolverResult == Belos::Converged);
+                tJSON.put("Solver.ProjectVorticity.TotalIters", belosSolverW->getNumIters());
+                tJSON.put("Solver.ProjectVorticity.Converged", belosSolverResultW == Belos::Converged);
+                tJSON.put("Solver.ProjectVorticity.ResidualNormRelative", belosSolverW->achievedTol());
+                tJSON.put("ElapsedTime.LinearSolve", solveTime);
+                tJSON.put("ElapsedTime.LinearSolveWasted", solveWastedTime);
+                tJSON.put("ElapsedTime.Assemble", assembleTime);
+                tJSON.put("ElapsedTime.ProjectVorticity", projectTime);
+                tJSON.put("ElapsedTime.Factorization", factorizationTime);
+                tJSON.put("ElapsedTime.TimeStep", stepTime);
+                tJSON.put("Solver.Inner.A.Factorize", factorize);
+                tJSON.put("Solver.Inner.A.TotalIters", numItersA);
+                tJSON.put("Solver.Inner.A.MeanIters", static_cast<double>(numItersA) / belosSolver->getNumIters());
+                tJSON.put("Solver.Inner.A.DOF", n);
+                tJSON.put("Solver.Inner.S.TotalIters.S_M", numItersS_M);
+                tJSON.put("Solver.Inner.S.TotalIters.S_L", numItersS_L);
+                tJSON.put("Solver.Inner.S.MeanIters.S_M", static_cast<double>(numItersS_M) / belosSolver->getNumIters());
+                tJSON.put("Solver.Inner.S.MeanIters.S_L", static_cast<double>(numItersS_L) / belosSolver->getNumIters());
+                tJSON.put("Solver.Inner.S.DOF", m);
+                auto t = i * stepSize;
+                tJSON.put("Time", t);
+                tJSON.put("h", h);
+                tJSON.put("Peclet", Pe);
+                tJSON.put("MeshDepParams.rho_p", rho_p);
+                tJSON.put("MeshDepParams.rho_u", rho_u);
+                tJSON.put("MeshDepParams.tau_u", tau_u);
+                auto velL2 = sqrt(dot(u.Data, surfOseenSystem.M.Data * u.Data));
+                auto preL2 = sqrt(dot(p.Data, surfOseenSystem.M_p.Data * p.Data));
+                tJSON.put("Integral.PressureL2", preL2);
+                tJSON.put("Integral.VelocityL2", velL2);
+                tJSON.put("Integral.VelocitySurfaceDivergenceL2", sqrt(dot(u.Data, surfOseenSystem.AL.Data * u.Data)));
+                tJSON.put("Integral.KineticEnergy", .5 * velL2 * velL2);
+                if (surfNavierStokesData.exactSoln) {
+                    InitVector(mg, u_star, surfNavierStokesData.u_T, t);
+                    InitScalar(mg, p_star, surfNavierStokesData.p, t);
+                    res = residual(u_star.Data, p_star.Data);
+                    tJSON.put("Solver.Outer.ResidualNorm.ExactSolnAbsolute.Velocity", std::get<0>(res));
+                    tJSON.put("Solver.Outer.ResidualNorm.ExactSolnAbsolute.Pressure", std::get<1>(res));
+                    tJSON.put("Solver.Outer.ResidualNorm.ExactSolnAbsolute.Full", std::get<2>(res));
+                    VectorCL u_star_minus_u = u_star.Data - u.Data, p_star_minus_p = p_star.Data - p.Data;
+                    auto velL2err = dot(u_star_minus_u, surfOseenSystem.M.Data * u_star_minus_u);
+                    auto velNormalL2 = dot(u.Data, surfOseenSystem.S.Data * u.Data);
+                    auto velTangenL2 = sqrt(velL2err - velNormalL2);
+                    velL2err = sqrt(velL2err);
+                    velNormalL2 = sqrt(velNormalL2);
+                    auto velH1err = sqrt(dot(u_star_minus_u, surfOseenSystem.A.Data * u_star_minus_u));
+                    auto preL2err = sqrt(dot(p_star_minus_p, surfOseenSystem.M_p.Data * p_star_minus_p));
+                    tJSON.put("Integral.Error.VelocityL2", velL2err);
+                    tJSON.put("Integral.Error.VelocityTangentialL2", velTangenL2);
+                    tJSON.put("Integral.Error.VelocityNormalL2", velNormalL2);
+                    tJSON.put("Integral.Error.VelocityH1", velH1err);
+                    tJSON.put("Integral.Error.PressureL2", preL2err);
+                }
+                if (inpJSON.get<bool>("SurfNavStokes.ExportMatrices")) {
+                    std::string format = inpJSON.get<std::string>("SurfNavStokes.ExportMatricesFormat") == "mtx" ? ".mtx" : ".mat";
+                    auto expFunc = format == ".mtx" ? &MatrixCL::exportMTX : &MatrixCL::exportMAT;
+                    auto expMat = [&](MatrixCL& A, std::string const a, std::string const & b) {
+                        logger.beg(a);
+                        (A.*expFunc)(dirName + "/matrices/" + b + format);
+                        tJSON.put("Matrices." + a, "../matrices/" + b + format);
+                        logger.end();
+                    };
+                    MatrixCL K;
+                    K.LinComb(1., surfOseenSystem.A.Data, tau_u, surfOseenSystem.S.Data, rho_u, surfOseenSystem.A_stab.Data);
+                    expMat(K, "VelocityKornMatrix", "A");
+                    expMat(surfOseenSystem.M.Data, "VelocityMassMatrix", "M");
+                    // expMat(surfOseenSystem.sumA.Data, "DiffusionConvectionReaction", "A");
+                    expMat(surfOseenSystem.B.Data, "Divergence", "B");
+                    expMat(surfOseenSystem.C.Data, "PressureVolumeStab", "C");
+                    logger.log();
+                }
+                if (everyStep > 0 && (i-1) % everyStep == 0) {
+                    logger.beg("write vtk");
+                        writeVTK(t);
+                    auto vtkTime = logger.end();
+                    tJSON.put("ElapsedTime.VTK", vtkTime);
+                }
+                stats << tJSON;
+                logger.buf << tJSON;
+                logger.log();
+            };
+            exportStats(1);
+        logger.end();
+        // no need to re-assemble these matrices:
+        surfOseenSystem.A.assemble = false;
+        surfOseenSystem.A_stab.assemble = false;
+        surfOseenSystem.B.assemble = false;
+        surfOseenSystem.M.assemble = false;
+        surfOseenSystem.S.assemble = false;
+        surfOseenSystem.M_p.assemble = false;
+        surfOseenSystem.C.assemble = false;
+        // surfOseenSystem.LB.assemble = false;
+        // surfOseenSystem.LB_stab.assemble = false;
+        for (size_t i = 2; i <= numbOfSteps; ++i) {
+            numItersA = 0;
+            numItersS_M = 0;
+            numItersS_L = 0;
+            std::stringstream header;
+            header << "t = t_" << i << " (" << (100. * i) / numbOfSteps << "%)";
+            logger.beg(header.str());
+                logger.beg("assemble");
+                    u_prev_prev = u_prev;
+                    u_prev = u;
+                    param.input.t = i * stepSize;
+                    auto wind_prev = wind;
+                    wind = u_prev.Data;
+                    wind *= 2.;
+                    wind -= u_prev_prev.Data;
+                    setWind(wind);
+                    Pe = supnorm(surfOseenSystem.w.Data) / nu;
+                    logger.buf << "Pe = " << Pe;
+                    logger.log();
+                    SetupSurfOseen_P2P1(mg, lset, &surfOseenSystem, &param);
+                    surfOseenSystem.gRHS.Data -= (dot(surfOseenSystem.gRHS.Data, I_p) / dot(I_p, I_p)) * I_p;
+                    surfOseenSystem.fRHS.Data += (2. / stepSize) * (surfOseenSystem.M.Data * u_prev.Data) - (.5 / stepSize) * (surfOseenSystem.M.Data * u_prev_prev.Data) - gamma * surfOseenSystem.alRHS.Data;
+                    alpha = 1.5 / stepSize;
+                    surfOseenSystem.sumA.Data.LinComb(alpha, surfOseenSystem.M.Data, gamma, surfOseenSystem.AL.Data, 1., surfOseenSystem.N.Data, nu, surfOseenSystem.A.Data, tau_u, surfOseenSystem.S.Data, rho_u, surfOseenSystem.A_stab.Data);
+                    surfOseenSystem.C.Data *= -rho_p;
+                    S_M_tmp.LinComb(1. / (gamma + nu), surfOseenSystem.M_p.Data, -1., surfOseenSystem.C.Data);
+                    S_L_tmp.LinComb(1. / alpha, surfOseenSystem.A_p.Data, -1., surfOseenSystem.C.Data);
+                assembleTime = logger.end();
+                logger.beg("convert to Epetra");
+                    logger.beg("cast matrices");
+                        A = static_cast<Epetra_CrsMatrix>(surfOseenSystem.sumA.Data);
+                        printStat("A", A);
+                        B = static_cast<Epetra_CrsMatrix>(surfOseenSystem.B.Data);
+                        printStat("B", B);
+                        C = static_cast<Epetra_CrsMatrix>(surfOseenSystem.C.Data);
+                        printStat("C := -rho_p (pressure volume stabilization mtx)", C);
+                        S_M = static_cast<Epetra_CrsMatrix>(S_M_tmp);
+                        printStat("S_M := (\\nu + \\gamma)^{-1} M_p - C", S_M);
+                        S_L = static_cast<Epetra_CrsMatrix>(S_L_tmp);
+                        printStat("S_L := \\alpha^{-1} L_p - C", S_L);
+                    logger.end();
+                    logger.beg("cast rhs vectors");
+                        fRHS = static_cast<Epetra_Vector>(surfOseenSystem.fRHS.Data);
+                        gRHS = static_cast<Epetra_Vector>(surfOseenSystem.gRHS.Data);
+                        joinEpetraVectors(fRHS, gRHS, belosRHS);
+                    logger.end();
+                logger.end();
+                factorizationTime = 0.;
+                factorize = "No";
+                if (useAmesos) {
+                    if (norm(wind - wind_prev) > reFactorizeTol * std::max(norm(wind), norm(wind_prev))) {
+                        factorize = "Yes";
+                        runFactorization();
                     }
-                    else c=1.0;
-        			//interpolated from previous timesteps, "wind"
-        			v_aux.Data = 2.0*v.Data-v_old.Data;
-        		}
-        		else
-        		{
-        			std::cout << "problem is instationary, pick BDF1 or BDF2" << std::endl;
-        			return 0;
-        		}
-
-                //set up current matrices based in previous timestep velocity and levelset
-                SetupNavierStokesIF_P1P1(mg, &A, &A_stab, &B, &Omega, &N, &NT, &M, &D, &S,  &L, &L_stab, &Schur, &Schur_stab, &Schur_normal_stab, lset.Phi, lset.GetBndData(), v_aux, vbnd, fullgrad);
-
-                //construct final matrices for a linear solver
-        		Ahat.LinComb(mu, A.Data, c/tau, M.Data, eta, S.Data, epsilon, A_stab.Data);
-        		Bhat.LinComb(1., B.Data, 0., B.Data);
-        		Chat.LinComb(0, Schur.Data, -alpha, Schur_stab.Data);
-        		transpose(B.Data, BTranspose);
-
-        		//pick the form of nonlinear term
-        		if ( P.get<std::string>("SurfNavStokes.nonlinear_term") == "convective" )
-        		{
-        			std::cout << "nonlinear_term: convective " << std::endl;
-        			Adyn.LinComb(1, Ahat, 1, N.Data);
-        		}
-        		else if (P.get<std::string>("SurfNavStokes.nonlinear_term") == "rotational")
-        		{
-        			std::cout << "nonlinear_term: rotational " << std::endl;
-
-        			Adyn.LinComb(1, Ahat, 1, N.Data, -1, NT.Data);
-        		}
-        		else if (P.get<std::string>("SurfNavStokes.nonlinear_term") == "strain")
-        		{
-        			std::cout << "nonlinear_term: strain " << std::endl;
-
-        			Adyn.LinComb(1, Ahat, 1, N.Data, 1, NT.Data);
-        		}
-        		else if (P.get<std::string>("SurfNavStokes.nonlinear_term") == "skew-symmetric")
-        		{
-        			std::cout << "nonlinear_term: skew-symmetric " << std::endl;
-
-        			Adyn.LinComb(1, Ahat, 1, N.Data, 0.5, D.Data);
-        		}
-        		else if (P.get<std::string>("SurfNavStokes.nonlinear_term") == "conservative")
-        		{
-        			std::cout << "nonlinear_term: conservative " << std::endl;
-
-        			Adyn.LinComb(1, Ahat, 1, N.Data, 1, D.Data);
-        		}
-        		else if (P.get<std::string>("SurfNavStokes.nonlinear_term") == "EMAC")
-        		{
-        			std::cout << "nonlinear_term: EMAC " << std::endl;
-
-        			Adyn.LinComb(1, Ahat, 1, N.Data, 1, NT.Data, 1, D.Data);
-        		}
-        		else
-        		{
-        			std::cout << "nonlinear_term: none" << std::endl;
-        			Adyn=Ahat;
-        		}
-
-        		//set up rhs from external forces
-        		SetupInterfaceVectorRhsP1(mg, &rhs, lset.Phi, lset.GetBndData(), extrhs, (i+1)*tau);
-        		rhs2.Data.resize(rhs2.Data.size(), 0.0);
-        		SetupInterfaceRhsP1(mg, &rhs2, lset.Phi, lset.GetBndData(), extrhs2, (i+1)*tau);
-
-        		//renormalization to fullfill \int rhs = 0 in discrete sence
-                //rhs.Data    -= ( dot(rhs.Data,id)   / dot(id,id)   ) * id;
-                rhs2.Data   -= ( dot(rhs2.Data,id2) / dot(id2,id2) ) * id2;
-
-        		//set actual external force to instant rhs
-        		instantrhs = rhs;
-
-        		// pick inertial term and reinitialise unknowns
-        		if ( P.get<std::string>("SurfNavStokes.instationary") == "BDF1")
-        		{
-        			std::cout << "inertial term: BDF1 " << std::endl;
-        			instantrhs.Data += ( 1.0/tau ) * ( M.Data * v.Data) ;
-        		}
-        		else if ( P.get<std::string>("SurfNavStokes.instationary") == "BDF2")
-        		{
-
-                    if (i!=0) {
-                        std::cout << "inertial term: BDF2 " << std::endl;
-                        instantrhs.Data += ( 2.0/tau ) * ( M.Data * v.Data) - ( 1.0/(2.0*tau)) * ( M.Data * v_old.Data) ;
-                    } else {
-                        std::cout << "inertial term: BDF1 " << std::endl;
-                        instantrhs.Data += ( 1.0/tau ) * ( M.Data * v.Data) ;
+                    else logger.log("using factorization from prev step");
+                }
+                logger.beg("linear solve");
+                    if (!inpJSON.get<bool>("Solver.UsePreviousFrameAsInitialGuess")) belosLHS.PutScalar(0.);
+                    belosProblem = LinearProblem<ST, MV, OP>(belosMTX, rcpFromRef(belosLHS), rcpFromRef(belosRHS));
+                    if (inpJSON.get<bool>("Solver.Inner.Use")) belosProblem.setRightPrec(belosPRE);
+                    belosProblem.setProblem();
+                    belosSolver->setProblem(rcpFromRef(belosProblem));
+                    std::cout << std::scientific;
+                    belosSolverResult = belosSolver->solve();
+                solveTime = logger.end();
+                if (belosSolverResult == Belos::Converged) {
+                    logger.log("belos converged");
+                    solveWastedTime = 0.;
+                }
+                else {
+                    logger.wrn("belos did not converge");
+                    solveWastedTime = solveTime;
+                    if (inpJSON.get<bool>("Solver.Inner.Use") && useAmesos && factorize == "No") {
+                        factorize = "NoThenYes";
+                        numItersA = numItersS_M = numItersS_L = 0;
+                        runFactorization();
+                        logger.beg("linear solve w/ new factorization");
+                            belosLHS.PutScalar(0.);
+                            belosSolverResult = belosSolver->solve();
+                            if (belosSolverResult == Belos::Converged) logger.log("belos converged");
+                            else logger.wrn("belos did not converge");
+                        solveTime = logger.end();
                     }
-        			//v_oldold=v_old;
-        			v_old=v;
-
-        		}
-        		else
-        		{
-        			std::cout << "problem is instationary, pick _BDF1_ or _BDF2_ or _none_" << std::endl;
-        			return 0;
-        		}
-
-        		/*std::cout << "REMOVE THIS!" << std::endl;
-        		MatrixCL Adyncopy=Adyn;
-        		Adyn.LinComb(1.0, Adyncopy, 1.0, M.Data);*/
-
-        		//solve linear system
-       			Solver->Solve(Adyn, Bhat, Chat, v.Data, p.Data, instantrhs.Data, rhs2.Data,v.RowIdx->GetEx(), p.RowIdx->GetEx() );
-
-       			//std::cout <<  (3./(2.*tau)) * v.Data  - (2./tau) * v_old.Data + (1./(2.*tau)) * v_oldold.Data;
-
-                //rhs.Data    -= ( dot(rhs.Data,id)   / dot(id,id)   ) * id;
-        		std::cout << "norm(Omega * v ) ist: " << norm(Omega.Data*v.Data) << std::endl;
-        		std::cout << "norm(M * v ) ist: " << norm(M.Data*v.Data) << std::endl;
-
-        		std::cout << "dot(Omega*v, M*id2)" << dot(Omega.Data*id,Schur.Data*id2) << std::endl;
-
-        		Mhat.LinComb(1., Schur.Data, alpha, Schur_normal_stab.Data);
-        		//renormalization to fullfill \int rhs = 0 in discrete sence
-
-        		curl_proj.Data = Omega.Data*v.Data  - ( dot(Omega.Data*v.Data,id2) / dot(id2,id2) ) * id2;
-        		//GMResSolver_.Solve(Mhat, curl.Data,curl_proj.Data , rhs2.Data);
-                //curl.Data = rhs2.Data;
-
-        		//postprocess output to normalize pressure
-        		p.Data -=  dot(Schur.Data * p.Data,id2) / dot(Schur.Data*id2,id2) * id2;
-
-                //check residuals
-        		std::cout << "norm( Adyn * v + B^T  * p  -  instantrhs) ist: " << norm(Adyn*v.Data + BTranspose*p.Data - instantrhs.Data) << std::endl;
-        	    std::cout << "norm( B    * v + Chat * p - rhs2) ist: " << norm(B.Data*v.Data + Chat * p.Data - rhs2.Data) << std::endl;
-
-        		//skip vtk output of needed
-        		if ((i+1) % P.get<int>("Output.every timestep")  == 0)
-        		{
-        			std::cout << "output # : " << i << std::endl;
-        			vtkwriter->Write((i+1)*tau);
-        		}
-
-        		//send to logfiles
-        		log_error <<  std::to_string((float)(i+1)*tau) << "\t";
-        		log_solo <<  std::to_string((float)(i+1)*tau) << "\t";
-        		log << "Time is: " << std::to_string((float)(i+1)*tau) << std::endl;
-        		log << "h is: " << h << std::endl;
-        		log << "alpha is: " << std::to_string((float) alpha*pow(h, -alpha_order) )<< std::endl;
-        		log << "epsilon is: " << std::to_string((float) epsilon*pow(h, -epsilon_order) )<< std::endl;
-        		log << "eta is: " << std::to_string((float) eta*pow(h, -eta_order) )<< std::endl;
-        		log << "Total iterations: " << nonsym_stokessolver->GetIter() << '\n';
-        		log	<< "Final residual: " << nonsym_stokessolver->GetResid() << '\n';
-        		if( !velFE.compare("P2")) {
-        			vxtent.SetIdx( &vecP2idx);
-        			Extend(mg, v, vxtent);
-        			BndDataCL<Point3DCL> bndvec = vbnd;
-        			log << "The L2-Norm of v - vSol is: " << L2_Vector_error(mg, lset.Phi, lset.GetBndData(), make_P2Eval(mg, bndvec, vxtent), extvsol) << std::endl;
-        			double H1( 0.), surfH1( 0.), advanced_surfH1( 0.), normal_velocity;
-        			H1_Vector_error_P2(mg, lset.Phi, lset.GetBndData(), v, vbnd, extvsol, extsol_grad1, extsol_grad2, extsol_grad3, eta, H1, surfH1, advanced_surfH1, normal_velocity);
-        			//        std::cout << "The H1-Norm of v - vSol is: " << H1 << std::endl;
-        			//        std::cout << "The surfH1-Norm of v - vSol is: " << surfH1 << std::endl;
-        			log << "The advanced surfH1-Norm of v - vSol is: " << advanced_surfH1 << std::endl;
-        			log << "The U-Norm of v - vSol is: " << std::sqrt(advanced_surfH1*advanced_surfH1 + epsilon*dot(A_stab.Data*v.Data, v.Data)) << std::endl;
-        			log << "The L2-Norm of v * n is: " << normal_velocity << std::endl;
-        			if ( !prFE.compare("P1")) {
-        				pxtent.SetIdx( &P1FEidx);
-        				Extend(mg, p, pxtent);
-        				BndDataCL<double> bndscalar = pbnd;
-        				double L2_Lagrange =L2_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, bndscalar, pxtent), extpsol);
-        				log << "The L2-Norm of p - pSol is: " << L2_Lagrange << std::endl;
-        				log << "The M-Norm of p - pSol is: " << std::sqrt(L2_Lagrange*L2_Lagrange + hat_epsilon*dot(Schur_stab.Data*p.Data, p.Data)) << std::endl;
-        			}
-        		} else if( !velFE.compare("P1")) {
-        			vxtent.SetIdx( &vecP1idx);
-        			Extend(mg, v, vxtent);
-           			BndDataCL<Point3DCL> bndvec = vbnd;
-           			double error_L2 = L2_Vector_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, bndvec, vxtent), extvsol, (i+1)*tau);
-        			log << "The L2-Norm of v - vSol is: " << error_L2 << std::endl;
-        			log_error <<  std::to_string((float)error_L2) << "\t";
-        			double l2norm = L2_Vector_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, bndvec, vxtent), &ZeroVectorFun, (i+1)*tau);
-        			log << "The L2-Norm of v  is: " << l2norm<< std::endl;
-         			log_solo << std::to_string((float)(l2norm*l2norm*0.5)) << "\t" << std::to_string((float) dot(M.Data * v.Data,id) ) << "\t" << dot(M.Data * v.Data,rhs.Data) << std::endl;
-        			double H1( 0.), surfH1( 0.), advanced_surfH1( 0.), normal_velocity( 0.);
-        			H1_Vector_error_P1(mg, lset.Phi, lset.GetBndData(), v, vbnd, extvsol, extsol_grad1, extsol_grad2, extsol_grad3, eta, H1, surfH1, advanced_surfH1, normal_velocity, (i+1)*tau);
-        			//        std::cout << "The H1-Norm of v - vSol is: " << H1 << std::endl;
-         			//        std::cout << "The surfH1-Norm of v - vSol is: " << surfH1 << std::endl;
-        			log << "The advanced surfH1-Norm of v - vSol is: " << advanced_surfH1 << std::endl;
-        			log_error <<  std::to_string((float)advanced_surfH1) << "\t";
-        			log_error <<  std::to_string((float)surfH1) << "\t";
-        			log_error <<  std::to_string((float)H1) << "\t";
-         	 		//log << "The U-Norm of v - vSol is: " << std::sqrt(advanced_surfH1*advanced_surfH1 + epsilon*dot(A_stab.Data*v.Data, v.Data)) << std::endl;
-        			log << "The L2-Norm of v * n is: " << normal_velocity << std::endl;
-        			log_error <<  std::to_string((float)normal_velocity) <<  "\t";
-
-        			if ( !prFE.compare("P1")) {
-        				pxtent.SetIdx( &P1FEidx);
-        				Extend(mg, p, pxtent);
-        				BndDataCL<double> bndscalar = pbnd;
-        				double L2_Lagrange =L2_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, bndscalar, pxtent), extpsol, (i+1)*tau);
-        				log << "The L2-Norm of p - pSol is: " << L2_Lagrange << std::endl;
-            			log_error <<  std::to_string((float)L2_Lagrange) << std::endl;
-        				log << "The L2-Norm of p  is: " << L2_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, bndscalar, pxtent), &ZeroScalarFun);
-        				//log << "The M-Norm of p - pSol is: " << std::sqrt(L2_Lagrange*L2_Lagrange + alpha*dot(Schur_stab.Data*p.Data, p.Data)) << std::endl;
-        			}
-        		}
-
-        		log.close();
-        	}//eng of time iteration
-
+                }
+                logger.beg("convert from Epetra");
+                    for (size_t i = 0; i < n; ++i) u.Data[i] = belosLHS[i];
+                    for (size_t i = 0; i < m; ++i) p.Data[i] = belosLHS[n + i];
+                    p.Data -= dot(surfOseenSystem.M_p.Data * p.Data, I_p) / dot(surfOseenSystem.M_p.Data * I_p, I_p) * I_p;
+                logger.end();
+                logger.beg("project surface vorticity");
+                    Q_times_u = surfOseenSystem.Q.Data * u.Data;
+                    auto Q_times_u_view_curr = static_cast<Epetra_Vector>(Q_times_u);
+                    surf_curl_u_epetra.PutScalar(0.);
+                    belosProblemW = LinearProblem<ST, MV, OP>(rcpFromRef(M), rcpFromRef(surf_curl_u_epetra), rcpFromRef(Q_times_u_view_curr));
+                    belosProblemW.setProblem();
+                    belosSolverW->setProblem(rcpFromRef(belosProblemW));
+                    belosSolverResultW = belosSolverW->solve();
+                    if (myRank == 0) {
+                        if (belosSolverResultW == Belos::Converged)
+                            logger.log("belos converged");
+                        else
+                            logger.wrn("belos did not converge");
+                    }
+                    for (size_t i = 0; i < m; ++i) surf_curl_u.Data[i] = surf_curl_u_epetra[i];
+                projectTime = logger.end();
+            stepTime = logger.end();
+            logger.beg("output");
+                exportStats(i);
+            logger.end();
         }
-        else if ( P.get<std::string>("SurfNavStokes.instationary") == "none" )
-        {
-        	//renormalization to fullfill \int rhs = 0 in discrete sence
-            rhs2.Data     -= ( dot(rhs2.Data,id2) / dot(id2,id2) ) * id2;
-
-        	//current timestep logfile
-        	std::ofstream log( dirname +"/"+ filename   + "time="+std::to_string(1) + ".txt");
-
-        	if (  ( P.get<std::string>("SurfNavStokes.nonlinear_term") == "convective" )
-        	   || ( P.get<std::string>("SurfNavStokes.nonlinear_term") == "rotational" )
-        	   || ( P.get<std::string>("SurfNavStokes.nonlinear_term") == "strain" )
-			   || ( P.get<std::string>("SurfNavStokes.nonlinear_term") == "skew-symmetric" )
-        	   || ( P.get<std::string>("SurfNavStokes.nonlinear_term") == "conservative" )
-        	   || ( P.get<std::string>("SurfNavStokes.nonlinear_term") == "EMAC" )
-			   )
-        	{
-        		log << "nonlinear_term term is: " << P.get<std::string>("SurfNavStokes.nonlinear_term") << std::endl;
-        		//nonlinear procedure parameters
-        		double omega=1.0;
-        		double max_iter=30;
-        		int iter = 0;
-
-        		std::cout<<"REMOVE IT!" << std::endl;
-        		//v=vInit;
-
-        		//fixed point iterations
-        		double res;
-        		do
-        		{
-        			iter++;
-        			v_old = v;
-        			p_old = p;
-
-        		    //setup matrices based on v_old
-        			SetupNavierStokesIF_P1P1(mg, &A, &A_stab, &B, &Omega, &N, &NT, &M, &D, &S, &L, &L_stab, &Schur, &Schur_stab, &Schur_normal_stab, lset.Phi, lset.GetBndData(), v_old, vbnd, fullgrad);
-
-        			Ahat.LinComb(mu, A.Data, 1.0, M.Data, eta, S.Data, epsilon, A_stab.Data);
-        			Bhat.LinComb(1., B.Data, 0.,B.Data);
-        			transpose(B.Data, BTranspose);
-        			Chat.LinComb(0, Schur.Data, -alpha, Schur_stab.Data);
-        			if ( P.get<std::string>("SurfNavStokes.nonlinear_term") == "convective" )
-        			{
-        				std::cout << "nonlinear_term: convective " << std::endl;
-        				Adyn.LinComb(1, Ahat, 1, N.Data);
-
-        			}
-        			else if (P.get<std::string>("SurfNavStokes.nonlinear_term") == "rotational")
-        			{
-        				std::cout << "nonlinear_term: rotational " << std::endl;
-        				//transpose(N.Data, NTranspose);
-        				Adyn.LinComb(1, Ahat, 1, N.Data, -1, NT.Data);
-        			}
-        			else if (P.get<std::string>("SurfNavStokes.nonlinear_term") == "strain")
-        			{
-        				std::cout << "nonlinear_term: strain " << std::endl;
-        				//transpose(N.Data, NTranspose);
-        				Adyn.LinComb(1, Ahat, 1, N.Data, 1, NT.Data);
-        			}else if (P.get<std::string>("SurfNavStokes.nonlinear_term") == "skew-symmetric")
-            		{
-            			std::cout << "nonlinear_term: skew-symmetric " << std::endl;
-
-            			Adyn.LinComb(1, Ahat, 1, N.Data, 0.5, D.Data);
-            		}
-            		else if (P.get<std::string>("SurfNavStokes.nonlinear_term") == "conservative")
-            		{
-            			std::cout << "nonlinear_term: conservative " << std::endl;
-
-            			Adyn.LinComb(1, Ahat, 1, N.Data, 1, D.Data);
-            		}
-            		else if (P.get<std::string>("SurfNavStokes.nonlinear_term") == "EMAC")
-            		{
-            			std::cout << "nonlinear_term: EMAC " << std::endl;
-
-            			Adyn.LinComb(1, Ahat, 1, N.Data, 1, NT.Data, 1, D.Data);
-            		}
-
-
-        			//solve for v_aux, p_aux
-        			nonsym_stokessolver->Solve(Adyn, Bhat, Chat, v_aux.Data, p_aux.Data, rhs.Data, rhs2.Data,v.RowIdx->GetEx(), p.RowIdx->GetEx() );
-
-        			p_aux.Data -=  dot(Schur.Data * p_aux.Data,id2) / dot(Schur.Data*id2,id2) * id2;
-
-        			//preconditioning
-        			v.Data = omega*v_aux.Data + (1-omega)*v_old.Data;
-        			p.Data = omega*p_aux.Data + (1-omega)*p_old.Data;
-
-                    std::cout << "norm( Adyn*v + BTranspose*p - rhs ): " << norm(Adyn*v.Data + BTranspose*p.Data - rhs.Data)<<std::endl;
-                    std::cout << "norm( B * v + Chat*p - rhs2       ): " << norm( B.Data*v.Data + Chat*p.Data -rhs2.Data ) << std::endl;
-
-                    res = pow( norm(Adyn*v.Data + BTranspose*p.Data - rhs.Data), 2.0) + pow( norm(B.Data*v.Data + Chat * p.Data - rhs2.Data), 2.0);
-        			std::cout << "residual^2 after nonlinear iteration #" << iter << ": " << res << std::endl;
-        		}
-        		while (  ( iter < max_iter)
-        			  && ( res > pow( P.get<double>("Solver.Tol"), 2.0) ) );
-
-        		std::cout << "# nonlinear iterations: " << iter << std::endl;
-        	}
-        	else //standart Stokes' case
-        	{
-        		Adyn.LinComb(1., A.Data, 1.0, M.Data, eta, S.Data, epsilon, A_stab.Data);
-        		Bhat.LinComb(1., B.Data, 0.,B.Data);
-        		Chat.LinComb(0, Schur.Data, -alpha, Schur_stab.Data);
-        		transpose(B.Data, BTranspose);
-        		stokessolver->Solve(Adyn, Bhat, Chat, v.Data, p.Data, rhs.Data, rhs2.Data,v.RowIdx->GetEx(), p.RowIdx->GetEx() );
-        	}
-
-        	//postprocess output pressure up to constant
-        	p.Data -=  dot(Schur.Data * p.Data,id2) / dot(Schur.Data*id2,id2) * id2;
-
-
-        	//check residuals
-        	log << "norm( Adyn * v + B^T  * p -  rhs) ist: " << norm(Adyn*v.Data + BTranspose*p.Data - rhs.Data) << std::endl;
-        	log << "norm( B    * v + Chat * p - rhs2) ist: " << norm(B.Data*v.Data + Chat * p.Data - rhs2.Data) << std::endl;
-
-        	//skip vtk output of needed
-        	if (P.get<int>("Output.every timestep") > 0)
-        	{
-        		vtkwriter->Write(1);
-        	}
-
-        	//send to logfiles
-        	log_solo <<  std::to_string((float)1) << "\t";
-        	log << "Time is: " << std::to_string((float)1) << std::endl;
-        	log << "h is: " << h << std::endl;
-        	log << "alpha is: " << std::to_string((float) alpha*pow(h, -alpha_order) )<< std::endl;
-        	log << "epsilon is: " << std::to_string((float) epsilon*pow(h, -epsilon_order) )<< std::endl;
-        	log << "eta is: " << std::to_string((float) eta*pow(h, -eta_order) )<< std::endl;
-        	log << "Total iterations: " << Solver->GetIter() << '\n';
-        	log	<< "Final residual: " << Solver->GetResid() << '\n';
-        	if( !velFE.compare("P2")) {
-        		vxtent.SetIdx( &vecP2idx);
-        		Extend(mg, v, vxtent);
-        		BndDataCL<Point3DCL> bndvec = vbnd;
-        		log << "The L2-Norm of v - vSol is: " << L2_Vector_error(mg, lset.Phi, lset.GetBndData(), make_P2Eval(mg, bndvec, vxtent), extvsol) << std::endl;
-        		double H1( 0.), surfH1( 0.), advanced_surfH1( 0.), normal_velocity;
-        		H1_Vector_error_P2(mg, lset.Phi, lset.GetBndData(), v, vbnd, extvsol, extsol_grad1, extsol_grad2, extsol_grad3, eta, H1, surfH1, advanced_surfH1, normal_velocity);
-        		//        std::cout << "The H1-Norm of v - vSol is: " << H1 << std::endl;
-        		//        std::cout << "The surfH1-Norm of v - vSol is: " << surfH1 << std::endl;
-        		log << "The advanced surfH1-Norm of v - vSol is: " << advanced_surfH1 << std::endl;
-        		log << "The U-Norm of v - vSol is: " << std::sqrt(advanced_surfH1*advanced_surfH1 + epsilon*dot(A_stab.Data*v.Data, v.Data)) << std::endl;
-        		log << "The L2-Norm of v * n is: " << normal_velocity << std::endl;
-        		if ( !prFE.compare("P1")) {
-        			pxtent.SetIdx( &P1FEidx);
-        			Extend(mg, p, pxtent);
-        			BndDataCL<double> bndscalar = pbnd;
-        			double L2_Lagrange =L2_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, bndscalar, pxtent), extpsol);
-        			log << "The L2-Norm of p - pSol is: " << L2_Lagrange << std::endl;
-        			log << "The M-Norm of p - pSol is: " << std::sqrt(L2_Lagrange*L2_Lagrange + hat_epsilon*dot(Schur_stab.Data*p.Data, p.Data)) << std::endl;
-        		}
-        	} else if( !velFE.compare("P1")) {
-        		vxtent.SetIdx( &vecP1idx);
-        		Extend(mg, v, vxtent);
-        		BndDataCL<Point3DCL> bndvec = vbnd; // !!!
-        		log << "The L2-Norm of v - vSol is: " << L2_Vector_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, bndvec, vxtent), extvsol) << std::endl;
-        		double l2norm = L2_Vector_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, bndvec, vxtent), &ZeroVectorFun);
-        		log << "The L2-Norm of v  is: " << l2norm<< std::endl;
-        		log_solo << std::to_string((float)(l2norm*l2norm*0.5)) << std::endl;
-        		double H1( 0.), surfH1( 0.), advanced_surfH1( 0.), normal_velocity( 0.);
-        		H1_Vector_error_P1(mg, lset.Phi, lset.GetBndData(), v, vbnd, extvsol, extsol_grad1, extsol_grad2, extsol_grad3, eta, H1, surfH1, advanced_surfH1, normal_velocity);
-        		//        std::cout << "The H1-Norm of v - vSol is: " << H1 << std::endl;
-        		//        std::cout << "The surfH1-Norm of v - vSol is: " << surfH1 << std::endl;
-        		log << "The advanced surfH1-Norm of v - vSol is: " << advanced_surfH1 << std::endl;
-        		//log << "The U-Norm of v - vSol is: " << std::sqrt(advanced_surfH1*advanced_surfH1 + epsilon*dot(A_stab.Data*v.Data, v.Data)) << std::endl;
-        		log << "The L2-Norm of v * n is: " << normal_velocity << std::endl;
-        		if ( !prFE.compare("P1")) {
-        			pxtent.SetIdx( &P1FEidx);
-        			Extend(mg, p, pxtent);
-        			BndDataCL<double> bndscalar = pbnd;
-        			double L2_Lagrange =L2_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, bndscalar, pxtent), extpsol);
-        			log << "The L2-Norm of p - pSol is: " << L2_Lagrange << std::endl;
-        			log << "The L2-Norm of p  is: " << L2_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, bndscalar, pxtent), &ZeroScalarFun);
-        			//log << "The M-Norm of p - pSol is: " << std::sqrt(L2_Lagrange*L2_Lagrange + alpha*dot(Schur_stab.Data*p.Data, p.Data)) << std::endl;
-        		}
-        	}
-        }
-
-        log_solo.close();
-        log_error.close();
-        std::cout << "Output is located: " << dirname << std::endl;
+        #ifdef HAVE_MPI
+            MPI_Finalize() ;
+        #endif
+        return 0;
+    } catch (std::exception const & e) {
+        logger.err(e.what());
+    } catch (DROPSErrCL const & e) {
+        e.what(logger.buf);
+        logger.err(logger.buf.str());
+    } catch (...) {
+        logger.err("unknown error");
     }
-
-/////////////////////////////////////// Error ///////////////////////////////////////
-
-    double Aaverage( 0.), Avariation( 0.), Schuraverage( 0.), Schurvariation( 0.);
-    double PCaverage( 0.), PCvariation( 0.);
-    std::stringstream Astreamcopy( Astream.str());
-    std::stringstream PCstreamcopy( PCstream.str());
-    std::stringstream Schurstreamcopy( Schurstream.str());
-
-    RightComputeAverageIterations(Astream, Aaverage);
-    ComputeAverageIterations(Schurstream, Schuraverage);
-    RightComputeAverageIterations(PCstream, PCaverage);
-    RightComputeVariationFromAverageIterations(Astreamcopy, Aaverage, Avariation);
-    RightComputeVariationFromAverageIterations(PCstreamcopy, PCaverage, PCvariation);
-    ComputeVariationFromAverageIterations(Schurstreamcopy, Schuraverage, Schurvariation);
-
-    std::cout << "The average iterationsnumber of the A-preconditioner is: " <<     Aaverage     << '\n' << " ...with a variation of: " << Avariation << std::endl;
-    std::cout << "The average iterationsnumber of the nonsymmetric A-preconditioner is: " <<     PCaverage     << '\n' << " ...with a variation of: " << PCvariation << std::endl;
-    std::cout << "The average iterationsnumber of the Schur-preconditioner is: " << Schuraverage << '\n' << " ...with a variation of: " << Schurvariation << std::endl;
-
-    delete &lset;
-    
-    return 0;
-  }
-  catch (DROPS::DROPSErrCL err) { err.handle(); }
-
+    return 1;
 }

@@ -332,7 +332,7 @@ MapleMGOutCL::put(std::ostream& os) const
 
 
 /// \brief Write finite element function, stored in \a v, in a file, named \a filename
-void WriteFEToFile( const VecDescCL& v, MultiGridCL& mg, std::string filename, bool binary, const VecDescCL* lsetp)
+void WriteFEToFile( const VecDescCL& v, MultiGridCL& mg, std::string filename, bool binary, const VecDescCL* lsetp, const BndDataCL<>* lsbnd)
 {
     if (!v.RowIdx->IsExtended()) {
 #ifdef _PAR
@@ -346,7 +346,7 @@ void WriteFEToFile( const VecDescCL& v, MultiGridCL& mg, std::string filename, b
         IdxDescCL p1( P1_FE);
         p1.CreateNumbering( v.RowIdx->TriangLevel(), mg, *v.RowIdx);
         VecDescCL vpos(&p1), vneg(&p1);
-        P1XtoP1 ( *v.RowIdx, v.Data, p1, vpos.Data, vneg.Data, *lsetp, mg);
+        P1XtoP1 ( *v.RowIdx, v.Data, p1, vpos.Data, vneg.Data, *lsetp, *lsbnd, mg);
         WriteFEToFile(vneg, mg, filename + "Neg", binary);
         WriteFEToFile(vpos, mg, filename + "Pos", binary);
         p1.DeleteNumbering(mg);
@@ -355,7 +355,7 @@ void WriteFEToFile( const VecDescCL& v, MultiGridCL& mg, std::string filename, b
 
 /// Read a serialized finite element function from a file
 /// \pre CreateNumbering of v.RowIdx must have been called before
-void ReadFEFromFile( VecDescCL& v, MultiGridCL& mg, std::string filename, bool binary, const VecDescCL* lsetp)
+void ReadFEFromFile( VecDescCL& v, MultiGridCL& mg, std::string filename, bool binary, const VecDescCL* lsetp, const BndDataCL<>* lsbnd)
 {
     if (!v.RowIdx->IsExtended()) {
 
@@ -373,7 +373,7 @@ void ReadFEFromFile( VecDescCL& v, MultiGridCL& mg, std::string filename, bool b
         VecDescCL vpos(&p1), vneg(&p1);
         ReadFEFromFile(vneg, mg, filename + "Neg", binary);
         ReadFEFromFile(vpos, mg, filename + "Pos", binary);
-        P1toP1X ( *v.RowIdx, v.Data, p1, vpos.Data, vneg.Data, *lsetp, mg);
+        P1toP1X ( *v.RowIdx, v.Data, p1, vpos.Data, vneg.Data, *lsetp, *lsbnd, mg);
         p1.DeleteNumbering(mg);
     }
 }

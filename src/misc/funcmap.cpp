@@ -27,10 +27,10 @@
 
 namespace DROPS
 {
-    template class SingletonMapCL<DROPS::instat_scalar_fun_ptr>;
-    template class SingletonMapCL<DROPS::instat_vector_fun_ptr>;
+    template class SingletonMapCL<DROPS::InstatScalarFunction>;
+    template class SingletonMapCL<DROPS::InstatVectorFunction>;
     template class SingletonMapCL<DROPS::scalar_tetra_function>;
     template class SingletonMapCL<DROPS::vector_tetra_function>;
-    template class SingletonMapCL<DROPS::instat_matrix_fun_ptr>;
-    template class SingletonMapCL<DROPS::match_fun>;
+    template class SingletonMapCL<DROPS::InstatMatrixFunction>;
+    template class SingletonMapCL<DROPS::MatchFunction>;
 } //end of namespace DROPS

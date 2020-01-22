@@ -82,32 +82,29 @@ void BndCondCL::StripDirichletBC()
             bc= Nat0BC;
 }
 
-double zeroScalarFunc(const Point3DCL&, double) {
-    return 0.;
+void BndCondCL::StripPeriodicBC()
+{
+    for (BndCondInfoCL& bc: BndCond_)
+        if (bc.IsPeriodic()) // found periodic bnd
+            bc= Nat0BC;
 }
 
-void assignZeroFunc( instat_scalar_fun_ptr& f)
-{
+void assignZeroFunc(InstatScalarFunction& f) {
     static auto called = false;
-    auto& map = SingletonMapCL<instat_scalar_fun_ptr>::getInstance();
-    if (!called) MapRegisterCL<instat_scalar_fun_ptr>("Zero", zeroScalarFunc);
+    auto& map = SingletonMapCL<InstatScalarFunction>::getInstance();
+    if (!called) MapRegisterCL<InstatScalarFunction>("Zero", [](Point3DCL const &, double) { return 0.; });
     called = true;
     f = map["Zero"];
 }
 
-Point3DCL zeroVectorFunc(const Point3DCL&, double) {
-    return Point3DCL(0., 0., 0.);
-}
-
-void assignZeroFunc( instat_vector_fun_ptr& f)
+void assignZeroFunc(InstatVectorFunction& f)
 {
     static auto called = false;
-    auto& map = SingletonMapCL<instat_vector_fun_ptr>::getInstance();
-    if (!called) MapRegisterCL<instat_vector_fun_ptr>("ZeroVel", zeroVectorFunc);
+    auto& map = SingletonMapCL<InstatVectorFunction>::getInstance();
+    if (!called) MapRegisterCL<InstatVectorFunction>("ZeroVel", [](Point3DCL const &, double) { return Point3DCL(0., 0., 0.); });
     called = true;
     f = map["ZeroVel"];
 }
-
 
 /// \brief Read an json-array with 1 or 2 members. The first is the BndCondT, the second possibly is a function-name.
 /// Implementation detail of read_BndData.

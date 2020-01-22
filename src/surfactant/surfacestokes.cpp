@@ -48,7 +48,7 @@ using namespace DROPS;
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void InitVecLaplace(const MultiGridCL& MG, LevelsetP2CL& lset, DROPS::VecDescCL& rhs, DROPS::VecDescCL& vSol, DROPS::VecDescCL& pSol,
-                   instat_vector_fun_ptr f_rhs, instat_vector_fun_ptr f_vsol, instat_scalar_fun_ptr f_psol)
+                    InstatVectorFunction f_rhs, InstatVectorFunction f_vsol, InstatScalarFunction f_psol)
 {
     if( vSol.RowIdx->NumUnknownsEdge()) {
         DROPS::SetupInterfaceVectorRhsP2(MG, &rhs, lset.Phi, lset.GetBndData(), f_rhs);
@@ -89,7 +89,7 @@ int main (int argc, char* argv[])
     DROPS::AdapTriangCL adap( mg );
 
     // choose level set
-    instat_scalar_fun_ptr levelset_fun;
+    InstatScalarFunction levelset_fun;
     std::string levelset_fun_str = P.get<std::string>("Levelset.case");
     if( !levelset_fun_str.compare("sphere_2")) {
         levelset_fun = &sphere_2;
@@ -114,7 +114,7 @@ int main (int argc, char* argv[])
     adap.set_marking_strategy( 0 );
 
     // create level set
-    instat_scalar_fun_ptr sigma (0);
+    InstatScalarFunction sigma (0);
     SurfaceTensionCL sf( sigma, 0);
 
     BndDataCL<double> lsbnd( 0);
@@ -144,7 +144,7 @@ int main (int argc, char* argv[])
     double eta = 0.; //Constant for penalty
     double epsilon = 1.0*std::pow(h,1.0); //Constant for A_stab
     double hat_epsilon = epsilon; //Constant for L_stab
-    double rho = hat_epsilon; //Constant for Schur complement preconditioner
+    double rho = hat_epsilon; //Constant for M_p complement preconditioner
     std::cout << "h is: " << h << std::endl;
 
 
@@ -209,7 +209,8 @@ int main (int argc, char* argv[])
         Schur.SetIdx(&ifaceP1idx, &ifaceP1idx);
         Schur_stab.SetIdx(&ifaceP1idx, &ifaceP1idx);
 
-        SetupStokesIF_P2P1(mg, &A, &A_stab, &B, &M, &S, &L, &L_stab, &Schur, &Schur_stab, lset.Phi, lset.GetBndData(), fullgrad);
+        SetupSurfOseen_P2P1(mg, &A, &A_stab, &B, &M, &S, &L, &L_stab, &Schur, &Schur_stab, lset.Phi, lset.GetBndData(),
+                            fullgrad);
 
         Schur_hat.LinComb(1., Schur.Data, rho, Schur_stab.Data);
     } else if( !FE.compare("P1P1")) {
@@ -275,7 +276,7 @@ int main (int argc, char* argv[])
     SchurPreBaseCL *spc_ = new SurfaceLaplacePreCL<PCGSolverT>( Schur_hat, SchurPCGSolver);
     
     //ExpensivePreBaseCL *apc_;
-//    SchurPreBaseCL  *spc_ = new DummyPreCL(1,1);  // no preconditioning for Schur
+//    SchurPreBaseCL  *spc_ = new DummyPreCL(1,1);  // no preconditioning for M_p
     typedef BlockPreCL<ExpensivePreBaseCL, SchurPreBaseCL, DiagSpdBlockPreCL>  DiagBlockPcT;
     typedef PLanczosONBCL<VectorCL, DiagBlockPcT> LanczosT;
     typedef PMResSolverCL<LanczosT> MinResT;
@@ -323,8 +324,8 @@ int main (int argc, char* argv[])
     }
 
     // set function pointers and rhs vectors for different test cases
-    DROPS::instat_vector_fun_ptr extvsol, extsol_grad1, extsol_grad2, extsol_grad3;
-    DROPS::instat_scalar_fun_ptr extpsol = &ZeroScalarFun;
+    DROPS::InstatVectorFunction extvsol, extsol_grad1, extsol_grad2, extsol_grad3;
+    DROPS::InstatScalarFunction extpsol = &ZeroScalarFun;
 
     if( !levelset_fun_str.compare("sphere_2")) {
         if( !testcase.compare("1")) {
@@ -626,7 +627,7 @@ int main (int argc, char* argv[])
     ComputeVariationFromAverageIterations(Schurstreamcopy, Schuraverage, Schurvariation);
 
     std::cout << "The average iterationsnumber of the A-preconditioner is " << Aaverage << " with a variation of " << Avariation << std::endl;
-    std::cout << "The average iterationsnumber of the Schur-preconditioner is: " << Schuraverage << " with a variation of " << Schurvariation << std::endl;
+    std::cout << "The average iterationsnumber of the M_p-preconditioner is: " << Schuraverage << " with a variation of " << Schurvariation << std::endl;
 
     //if( !testcase.compare("Zero")) {
 //        if( !levelset_fun_str.compare("xy_plane")) {

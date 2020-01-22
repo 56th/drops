@@ -45,14 +45,14 @@ typedef BndDataCL<> PoissonBndDataCL;
 
 class StripTimeCL
 // converts time dependent function to one, that is time independent.
-// i.e.:  scalar_instat_fun_ptr  -->  scalar_fun_ptr
+// i.e.:  scalar_instat_fun_ptr  -->  ScalarFunction
 // useful where one wants to use all the stuff written for the stationary problems
 {
   private:
-    static instat_scalar_fun_ptr func_;
+    static InstatScalarFunction func_;
     static double                t_;
   public:
-    StripTimeCL( instat_scalar_fun_ptr func, double t)
+    StripTimeCL( InstatScalarFunction func, double t)
       { func_= func; t_= t; }
     void SetTime( double t) { t_= t; }
 
@@ -212,18 +212,18 @@ class PoissonP1CL : public ProblemCL<Coeff, PoissonBndDataCL>
     /// the vector will contain the sum of the results after the call
     void SetupInstatRhs( VecDescCL& vA, VecDescCL& vM, double t, VecDescCL& vf, double tSUPG= 0.) const;
     /// \brief Setup special source term including the gradient of a given P1 function
-    void SetupGradSrc( VecDescCL& src, instat_scalar_fun_ptr T, instat_scalar_fun_ptr dalpha, double t= 0.) const;
+    void SetupGradSrc( VecDescCL& src, InstatScalarFunction T, InstatScalarFunction dalpha, double t= 0.) const;
 
     /// \brief Set initial value
-    void Init( VecDescCL&, instat_scalar_fun_ptr, double t0= 0.) const;
+    void Init( VecDescCL&, InstatScalarFunction, double t0= 0.) const;
 
     /// \brief check computed solution etc.
-    double CheckSolution( const VecDescCL&, instat_scalar_fun_ptr, double t=0.) const;
-    double CheckSolution( instat_scalar_fun_ptr Lsg, double t=0.) const { return CheckSolution(x, Lsg, t); }
+    double CheckSolution( const VecDescCL&, InstatScalarFunction, double t=0.) const;
+    double CheckSolution( InstatScalarFunction Lsg, double t=0.) const { return CheckSolution(x, Lsg, t); }
     double CheckSolution( const VecDescCL&, scalar_tetra_function, double t=0.) const;
     
-    void GetDiscError   ( const MLMatDescCL&, instat_scalar_fun_ptr, double =0.) const;
-    void GetDiscError   ( instat_scalar_fun_ptr Lsg, double t=0.) const { GetDiscError(A, Lsg, t); }
+    void GetDiscError   ( const MLMatDescCL&, InstatScalarFunction, double =0.) const;
+    void GetDiscError   ( InstatScalarFunction Lsg, double t=0.) const { GetDiscError(A, Lsg, t); }
 
     bool          EstimateError         ( const VecDescCL&, const double, double&, est_fun);
     static double ResidualErrEstimator  ( const TetraCL&, const VecDescCL&, const BndDataCL&);
@@ -292,11 +292,11 @@ class PoissonP2CL : public ProblemCL<Coeff, PoissonBndDataCL>
     void SetupConvection( MLMatDescCL&, VecDescCL&, double) const;
 
     //Set up initial value
-    void Init( VecDescCL&, instat_scalar_fun_ptr, double t0= 0.) const;
+    void Init( VecDescCL&, InstatScalarFunction, double t0= 0.) const;
 
     // check computed solution, etc.
-    double CheckSolution( const VecDescCL&, instat_scalar_fun_ptr, double t=0.) const;
-    double CheckSolution( instat_scalar_fun_ptr Lsg, double t=0.) const { return CheckSolution(x, Lsg, t); }
+    double CheckSolution( const VecDescCL&, InstatScalarFunction, double t=0.) const;
+    double CheckSolution( InstatScalarFunction Lsg, double t=0.) const { return CheckSolution(x, Lsg, t); }
     double CheckSolution( const VecDescCL&, scalar_tetra_function, double t=0.) const;
 
     DiscSolCL GetSolution()
