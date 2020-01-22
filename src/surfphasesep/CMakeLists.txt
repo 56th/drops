@@ -10,10 +10,12 @@ exec_ser(${HOME2} geom-boundary geom-builder geom-simplex geom-multigrid geom-de
 # logger
 add_library(${HOME1}-logger STATIC ${LOGGER_PATH}/SingletonLogger.cpp)
 target_link_libraries(${HOME1} ${HOME1}-logger)
+target_link_libraries(${HOME2} ${HOME1}-logger)
 
 # vtk
 if (VTK_FOUND)
     target_link_libraries(${HOME1} ${VTK_LIBRARIES})
+    target_link_libraries(${HOME2} ${VTK_LIBRARIES})
     #vtk_module_autoinit(
     #    TARGETS ${HOME1}
     #    MODULES ${VTK_LIBRARIES}
@@ -25,7 +27,11 @@ if (Trilinos_FOUND)
     target_link_libraries(${HOME1}
             ${Trilinos_LIBRARIES}
             ${Trilinos_TPL_LIBRARIES}
-            )
+    )
+    target_link_libraries(${HOME2}
+            ${Trilinos_LIBRARIES}
+            ${Trilinos_TPL_LIBRARIES}
+    )
 endif()
 
 # matlab for sparse mtx .mat binary output
@@ -41,6 +47,7 @@ if(Matlab_FOUND)
             INTERFACE_INCLUDE_DIRECTORIES "${Matlab_ROOT_DIR}/extern/include"
             )
     target_link_libraries(${HOME1} -lpthread ${HOME1}-matlab1 ${HOME1}-matlab2)
+    target_link_libraries(${HOME2} -lpthread ${HOME1}-matlab1 ${HOME1}-matlab2)
 endif()
 
 if(NOT MPI)
