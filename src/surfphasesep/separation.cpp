@@ -1381,23 +1381,24 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
                                                   the_zero_fun);
             log_global << cur_time << "\t" << Lyapunov_energy << "\t" << perimeter_estimator << "\t" << timedisc.GetSolver().GetIter() << "\n" << std::endl;
 
-            if (
-                    (((substep) % 20) == 0)
-                    //(step<100)
-                    ||
-                    (vtkwriter.get() != 0 && ((step) % P.get<int>("VTK.Freq")) == 0)) {
-                LSInit(mg, the_conc_sol_vd, the_conc_sol_fun, /*t*/ cur_time);
-                LSInit(mg, the_poten_sol_vd, the_poten_sol_fun, /*t*/ cur_time);
+            if (P.get<int>("SurfSeparation.SolutionOutput.Freq") > 0) {
+                if (
+                        (((substep) % 20) == 0)
+                        //(step<100)
+                        ||
+                        (vtkwriter.get() != 0 && ((step) % P.get<int>("VTK.Freq")) == 0)) {
+                    LSInit(mg, the_conc_sol_vd, the_conc_sol_fun, /*t*/ cur_time);
+                    LSInit(mg, the_poten_sol_vd, the_poten_sol_fun, /*t*/ cur_time);
 
-                vtkwriter->Write(cur_time);
-            }
-            if (P.get<int>("SurfSeparation.SolutionOutput.Freq") > 0 &&
-                step % P.get<int>("SurfSeparation.SolutionOutput.Freq") == 0) {
-                std::ostringstream os1,
-                        os2;
-                os1 << P.get<int>("Time.NumSteps");
-                os2 << P.get<std::string>("SurfSeparation.SolutionOutput.Path") << std::setw(os1.str().size()) << step;
-                DROPS::WriteFEToFile(timedisc.ic, mg, os2.str(), P.get<bool>("SurfSeparation.SolutionOutput.Binary"));
+                    vtkwriter->Write(cur_time);
+                }
+                if (step % P.get<int>("SurfSeparation.SolutionOutput.Freq") == 0) {
+                    std::ostringstream os1, os2;
+                    os1 << P.get<int>("Time.NumSteps");
+                    os2 << P.get<std::string>("SurfSeparation.SolutionOutput.Path") << std::setw(os1.str().size())
+                        << step;
+                    DROPS::WriteFEToFile(timedisc.ic, mg, os2.str(),P.get<bool>("SurfSeparation.SolutionOutput.Binary"));
+                }
             }
 //        lset2.DoStep();
 //        VectorCL rhs( lset2.Phi.Data.size());
