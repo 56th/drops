@@ -1,6 +1,8 @@
 {
     "Output": {
-        "Directory":  "../../output/ch6_30to70"
+        "Directory":  "../../output/ch6_30to70",
+        "EveryStep":  3,
+        "Binary":     true
     },
 
     "General": {
@@ -108,18 +110,5 @@
         "MaxDampingSteps":   8,
         "TrustRegion":       1.0,
         "DeformationMethod": "map_zero_level_sets" 
-    },
-
-    "VTK": {
-        "Freq":           0,
-        "VTKDir":         "../../output/",
-        "VTKName":        "separation",
-        "TimeFileName":   "separation",
-        "Binary":         1,
-        "UseOnlyP1":      false,
-        "ReUseTimeFile":  false,
-        "UseDeformation": "0",
-        "AddP1XPressure": "0",
-        "AddDGOutput":    "0"
     }
 }

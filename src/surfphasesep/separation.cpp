@@ -30,7 +30,6 @@
 #include "levelset/surfacetension.h"
 #include "levelset/levelsetmapper.h"
 #include "out/output.h"
-#include "out/vtkOut.h"
 #include "misc/dynamicload.h"
 #include "misc/funcmap.h"
 #include "misc/omp_variable.h"
@@ -43,6 +42,8 @@
 #include <tr1/unordered_set>
 //#include <stokes/instatstokes2phase.h>
 
+// vtk output
+#include "surfnavierstokes/VTKWriter.hpp"
 // logger
 #include "SingletonLogger.hpp"
 
@@ -50,7 +51,7 @@ using namespace DROPS;
 
 DROPS::ParamCL P;
 
-std::unique_ptr<VTKOutCL> vtkwriter;
+// std::unique_ptr<VTKOutCL> vtkwriter;
 
 DROPS::InVecMap& invecmap= DROPS::InVecMap::getInstance();
 DROPS::InScaMap& inscamap= DROPS::InScaMap::getInstance();
@@ -1027,7 +1028,7 @@ double L2_error (const DROPS::VecDescCL& ls, const BndDataCL<>& lsbnd,
 /// The nodal interpolant of extsol on the interface-FE-space ist computed first.
 /// The H1-error is then computed between the interpolant and the numerical solution.
 template<class DiscP1FunType>
-double H1_error (const DROPS::VecDescCL& ls, const BndDataCL<>& lsbnd,
+double H1_error_sq (const DROPS::VecDescCL& ls, const BndDataCL<>& lsbnd,
     const DiscP1FunType& discsol, DROPS::InstatScalarFunction extsol)
 {
     IdxDescCL* idx= const_cast<IdxDescCL*>( discsol.GetSolution()->RowIdx);
@@ -1038,7 +1039,13 @@ double H1_error (const DROPS::VecDescCL& ls, const BndDataCL<>& lsbnd,
     // sol_vec.t= discsol.GetTime();
     // SetupInterfaceRhsP1( discsol.GetMG(), &sol_vec, ls, lsbnd, extsol);
     const VectorCL diff( discsol.GetSolution()->Data - sol_vec.Data);
-    return std::sqrt( dot(A.Data*diff, diff));
+    return dot(A.Data*diff, diff);
+}
+
+template<class DiscP1FunType>
+double H1_error (const DROPS::VecDescCL& ls, const BndDataCL<>& lsbnd,
+                 const DiscP1FunType& discsol, DROPS::InstatScalarFunction extsol) {
+    return sqrt(H1_error_sq(ls, lsbnd, discsol, extsol));
 }
 
 double L2_norm (const DROPS::MultiGridCL& mg, const DROPS::VecDescCL& ls, const BndDataCL<>& lsbnd,
@@ -1157,6 +1164,7 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
         system((
             "mkdir " + dirName + "/matrices ; "
             "mkdir " + dirName + "/vtk ; "
+            "mkdir " + dirName + "/tmp ; "
             "mkdir " + dirName + "/stats"
         ).c_str());
         {
@@ -1260,19 +1268,40 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
     VecDescCL the_species_sol_vd( &lset.idx);
     LSInit( mg, the_species_sol_vd, the_species_sol_fun, /*t*/ 0.);
 
-    if (vtkwriter.get() != 0) {
-        vtkwriter->Register( make_VTKScalar(      lset.GetSolution(),              "Levelset") );
-        vtkwriter->Register( make_VTKIfaceScalar( mg, timedisc.iface,                 "interface_mesh"));
-        vtkwriter->Register( make_VTKIfaceScalar( mg, timedisc.ic,                 "concentration"));
-        vtkwriter->Register( make_VTKIfaceScalar( mg, timedisc.imu,                 "chem_potential"));
-        vtkwriter->Register( make_VTKIfaceScalar( mg, timedisc.is,                 "species"));
-        vtkwriter->Register( make_VTKVector(      make_P2Eval( mg, Bnd_v, v),      "Velocity"));
-        //vtkwriter->Register( make_VTKScalar(      lset2.GetSolution(),             "Levelset2"));
-        vtkwriter->Register( make_VTKScalar(      make_P2Eval( mg, nobnd, the_conc_sol_vd),  "concentration_exact"));
-        vtkwriter->Register( make_VTKScalar(      make_P2Eval( mg, nobnd, the_poten_sol_vd),  "chem_potential_exact"));
+    auto& cDOF = *(timedisc.GetConcentr().GetSolution());
+    VecDescCL cDOF_ext;
+    IdxDescCL P1FEidx(P1_FE);
+    P1FEidx.CreateNumbering(mg.GetLastLevel(), mg);
+    cDOF_ext.SetIdx(&P1FEidx);
+    logger.buf << "num unknowns for bulk c: " << P1FEidx.NumUnknowns() << '\n';
 
-        vtkwriter->Write( 0.);
+    logger.log();
+
+    VTKWriter vtkWriter(dirName + "/vtk/separation", mg, inpJSON.get<bool>("Output.Binary"));
+    auto everyStep = inpJSON.get<int>("Output.EveryStep");
+    auto writeVTK = [&](double t) {
+        Extend(mg, cDOF, cDOF_ext);
+        vtkWriter.write(t);
+    };
+    if (everyStep > 0) {
+        vtkWriter
+            .add(VTKWriter::VTKVar({"level-set", &lset.Phi.Data, VTKWriter::VTKVar::Type::P2}))
+            .add(VTKWriter::VTKVar({"c_h", &cDOF_ext.Data, VTKWriter::VTKVar::Type::P1}));
+        writeVTK(0.);
     }
+//    if (vtkwriter.get() != 0) {
+//        vtkwriter->Register( make_VTKScalar(      lset.GetSolution(),              "Levelset") );
+//        vtkwriter->Register( make_VTKIfaceScalar( mg, timedisc.iface,                 "interface_mesh"));
+//        vtkwriter->Register( make_VTKIfaceScalar( mg, timedisc.ic,                 "concentration"));
+//        vtkwriter->Register( make_VTKIfaceScalar( mg, timedisc.imu,                 "chem_potential"));
+//        vtkwriter->Register( make_VTKIfaceScalar( mg, timedisc.is,                 "species"));
+//        vtkwriter->Register( make_VTKVector(      make_P2Eval( mg, Bnd_v, v),      "Velocity"));
+//        //vtkwriter->Register( make_VTKScalar(      lset2.GetSolution(),             "Levelset2"));
+//        vtkwriter->Register( make_VTKScalar(      make_P2Eval( mg, nobnd, the_conc_sol_vd),  "concentration_exact"));
+//        vtkwriter->Register( make_VTKScalar(      make_P2Eval( mg, nobnd, the_poten_sol_vd),  "chem_potential_exact"));
+//
+//        vtkwriter->Write( 0.);
+//    }
     //if (P.get<int>( "SurfSeparation.SolutionOutput.Freq") > 0)
     //    DROPS::WriteFEToFile( timedisc.ic, mg, P.get<std::string>( "SurfSeparation.SolutionOutput.Path"), P.get<bool>( "SolutionOutput.Binary"));
 
@@ -1304,10 +1333,6 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
 
     dynamic_cast<DistMarkingStrategyCL*>( adap.get_marking_strategy())->SetDistFct( lset);
 
-    InstatScalarFunction unityFunc = [](Point3DCL const &, double) {
-        return 1.;
-    };
-
     //subdivide first timesteps into substeps
     int total_subs=1;
     int sub_ratio=100;
@@ -1327,8 +1352,12 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
             InitVel(mg, &v, Bnd_v, the_wind_fun, cur_time);
 
             timedisc.DoStep0(cur_time);
-            auto surfaceArea = Integral_Gamma(mg, lset.Phi, lset.GetBndData(), unityFunc);
-            auto raftFraction = Integral_Gamma(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, ifbnd, timedisc.ic)) / surfaceArea;
+
+            VectorCL unityVector(1., timedisc.Mass.Data.num_rows());
+            auto surfaceArea = dot(timedisc.Mass.Data * unityVector, unityVector);
+            auto raftFraction = dot(timedisc.Mass.Data * timedisc.ic.Data, unityVector) / surfaceArea;
+            // auto surfaceArea = Integral_Gamma(mg, lset.Phi, lset.GetBndData(), unityFunc);
+            // auto raftFraction = Integral_Gamma(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, ifbnd, timedisc.ic)) / surfaceArea;
 
             std::cout << "% of raft area: " << 100. * raftFraction << '\n';
             std::cout << "chemical potential on \\Gamma: "
@@ -1377,28 +1406,25 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
                                      + (1. / ParameterNS::eps) * Integral_Gamma(mg, lset.Phi, lset.GetBndData(),
                                                                                 make_P1Eval(mg, ifbnd,
                                                                                             timedisc.ienergy));
-            double perimeter_estimator = ParameterNS::eps * H1_error(lset.Phi, lset.GetBndData(), timedisc.GetConcentr(),
-                                                  the_zero_fun);
+
+            double perimeter_estimator = ParameterNS::eps * dot(timedisc.Laplace.Data * cDOF.Data, cDOF.Data);
             log_global << cur_time << "\t" << Lyapunov_energy << "\t" << perimeter_estimator << "\t" << timedisc.GetSolver().GetIter() << "\n" << std::endl;
 
-            if (P.get<int>("SurfSeparation.SolutionOutput.Freq") > 0) {
-                if (
-                        (((substep) % 20) == 0)
-                        //(step<100)
-                        ||
-                        (vtkwriter.get() != 0 && ((step) % P.get<int>("VTK.Freq")) == 0)) {
-                    LSInit(mg, the_conc_sol_vd, the_conc_sol_fun, /*t*/ cur_time);
-                    LSInit(mg, the_poten_sol_vd, the_poten_sol_fun, /*t*/ cur_time);
+            if (everyStep > 0 && STEP % everyStep == 0) {
+                logger.beg("write vtk");
+                    writeVTK(cur_time);
+                logger.end();
+//                if (
+//                        (((substep) % 20) == 0)
+//                        //(step<100)
+//                        ||
+//                        (vtkwriter.get() != 0 && ((step) % P.get<int>("VTK.Freq")) == 0)) {
+//                    LSInit(mg, the_conc_sol_vd, the_conc_sol_fun, /*t*/ cur_time);
+//                    LSInit(mg, the_poten_sol_vd, the_poten_sol_fun, /*t*/ cur_time);
+//
+//                    vtkwriter->Write(cur_time);
+//                }
 
-                    vtkwriter->Write(cur_time);
-                }
-                if (step % P.get<int>("SurfSeparation.SolutionOutput.Freq") == 0) {
-                    std::ostringstream os1, os2;
-                    os1 << P.get<int>("Time.NumSteps");
-                    os2 << P.get<std::string>("SurfSeparation.SolutionOutput.Path") << std::setw(os1.str().size())
-                        << step;
-                    DROPS::WriteFEToFile(timedisc.ic, mg, os2.str(),P.get<bool>("SurfSeparation.SolutionOutput.Binary"));
-                }
             }
 //        lset2.DoStep();
 //        VectorCL rhs( lset2.Phi.Data.size());
@@ -1529,11 +1555,11 @@ void StationaryStrategyP1 (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DR
     DROPS::VecDescCL xext( &ifacefullidx);
     DROPS::Extend( mg, x, xext);
     DROPS::NoBndDataCL<> nobnd;
-    if (vtkwriter.get() != 0) {
-        vtkwriter->Register( make_VTKScalar( lset.GetSolution(), "Levelset") );
-        vtkwriter->Register( make_VTKIfaceScalar( mg, x, "InterfaceSol"));
-        vtkwriter->Write( 0.);
-    }
+//    if (vtkwriter.get() != 0) {
+//        vtkwriter->Register( make_VTKScalar( lset.GetSolution(), "Levelset") );
+//        vtkwriter->Register( make_VTKIfaceScalar( mg, x, "InterfaceSol"));
+//        vtkwriter->Write( 0.);
+//    }
 
     double L2_err( L2_error( lset.Phi, lset.GetBndData(), make_P1Eval( mg, nobnd, xext), the_conc_sol_fun));
     std::cout << "L_2-error: " << L2_err << std::endl;
@@ -2163,14 +2189,14 @@ void StationaryStrategyP2 (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DR
     DROPS::NoBndDataCL<Point3DCL> nobnd_vec;
     VecDescCL the_sol_vd( &lset.idx);
     LSInit( mg, the_sol_vd, the_conc_sol_fun, /*t*/ 0.);
-    if (vtkwriter.get() != 0) {
-        vtkwriter->Register( make_VTKScalar( lset.GetSolution(), "Levelset") );
-        vtkwriter->Register( make_VTKIfaceScalar( mg, xp2, "InterfaceSolP2"));
-        vtkwriter->Register( make_VTKScalar(      make_P2Eval( mg, nobnd, the_sol_vd),  "TrueSol"));
-        vtkwriter->Register( make_VTKVector( make_P2Eval( mg, nobnd_vec, lsgradrec), "LSGradRec") );
-        vtkwriter->Register( make_VTKVector( make_P2Eval( mg, nobnd_vec, to_iface), "to_iface") );
-        vtkwriter->Write( 0.);
-    }
+//    if (vtkwriter.get() != 0) {
+//        vtkwriter->Register( make_VTKScalar( lset.GetSolution(), "Levelset") );
+//        vtkwriter->Register( make_VTKIfaceScalar( mg, xp2, "InterfaceSolP2"));
+//        vtkwriter->Register( make_VTKScalar(      make_P2Eval( mg, nobnd, the_sol_vd),  "TrueSol"));
+//        vtkwriter->Register( make_VTKVector( make_P2Eval( mg, nobnd_vec, lsgradrec), "LSGradRec") );
+//        vtkwriter->Register( make_VTKVector( make_P2Eval( mg, nobnd_vec, to_iface), "to_iface") );
+//        vtkwriter->Write( 0.);
+//    }
 }
 
 void StationaryStrategyDeformationP2 (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::LevelsetP2CL& lset)
@@ -2298,16 +2324,16 @@ void StationaryStrategyDeformationP2 (DROPS::MultiGridCL& mg, DROPS::AdapTriangC
     DROPS::NoBndDataCL<Point3DCL> nobnd_vec;
     VecDescCL the_sol_vd( &lset.idx);
     LSInit( mg, the_sol_vd, the_conc_sol_fun, /*t*/ 0.);
-    if (vtkwriter.get() != 0) {
-        vtkwriter->Register( make_VTKScalar( lset.GetSolution(), "Levelset") );
-        vtkwriter->Register( make_VTKIfaceScalar( mg, xp2, "InterfaceSolP2"));
-        vtkwriter->Register( make_VTKScalar(      make_P2Eval( mg, nobnd, the_sol_vd),  "TrueSol"));
-        vtkwriter->Register( make_VTKVector( make_P2Eval( mg, nobnd_vec, deformation), "deformation") );
-//         vtkwriter->Register( make_VTKVector( make_P2Eval( mg, nobnd_vec, to_iface), "to_iface") );
-        vtkwriter->Register( make_VTKScalar( make_P1Eval( mg, nobnd, d_iface_vd), "d_iface") );
-        vtkwriter->Register( make_VTKScalar( make_P2Eval( mg, nobnd, locdist_vd), "locdist") );
-        vtkwriter->Write( 0.);
-    }
+//    if (vtkwriter.get() != 0) {
+//        vtkwriter->Register( make_VTKScalar( lset.GetSolution(), "Levelset") );
+//        vtkwriter->Register( make_VTKIfaceScalar( mg, xp2, "InterfaceSolP2"));
+//        vtkwriter->Register( make_VTKScalar(      make_P2Eval( mg, nobnd, the_sol_vd),  "TrueSol"));
+//        vtkwriter->Register( make_VTKVector( make_P2Eval( mg, nobnd_vec, deformation), "deformation") );
+////         vtkwriter->Register( make_VTKVector( make_P2Eval( mg, nobnd_vec, to_iface), "to_iface") );
+//        vtkwriter->Register( make_VTKScalar( make_P1Eval( mg, nobnd, d_iface_vd), "d_iface") );
+//        vtkwriter->Register( make_VTKScalar( make_P2Eval( mg, nobnd, locdist_vd), "locdist") );
+//        vtkwriter->Write( 0.);
+//    }
 }
 
 int  main (int argc, char* argv[]) {
@@ -2321,7 +2347,8 @@ int  main (int argc, char* argv[]) {
 
         DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
 
-        dirname  = P.get<std::string>("VTK.VTKDir")  + "CahnHilliard" + "_" + P.get<std::string>("SurfSeparation.Exp.Levelset")  + "/"   "l=" + std::to_string(int(P.get<int>("Mesh.AdaptRef.FinestLevel")))  + "_N=" + std::to_string(int(P.get<double>("Time.NumSteps")));
+        // dirname  = P.get<std::string>("VTK.VTKDir")  + "CahnHilliard" + "_" + P.get<std::string>("SurfSeparation.Exp.Levelset")  + "/"   "l=" + std::to_string(int(P.get<int>("Mesh.AdaptRef.FinestLevel")))  + "_N=" + std::to_string(int(P.get<double>("Time.NumSteps")));
+        dirname = P.get<std::string>("Output.Directory") + "/tmp";
         std::cout << "Setting up interface-PDE.\n";
         WindVelocity= P.get<DROPS::Point3DCL>("SurfSeparation.Exp.Velocity");
         AngularVelocity= P.get<DROPS::Point3DCL>("SurfSeparation.Exp.Angular");
@@ -2375,19 +2402,20 @@ int  main (int argc, char* argv[]) {
         // DROPS::LevelsetP2CL lset( mg, lsbnd, sf);
         DROPS::LevelsetP2CL& lset( *LevelsetP2CL::Create( mg, lsbnd, sf, P.get_child("Levelset")) );
 
-        if (P.get<int>("VTK.Freq",0))
-            vtkwriter= std::unique_ptr<VTKOutCL>( new VTKOutCL(
-                adap.GetMG(),
-                "DROPS data",
-                P.get<int>("Time.NumSteps")/P.get<int>("VTK.Freq") + 1,
-                dirname,
-                P.get<std::string>("VTK.VTKName"),
-                P.get<std::string>("VTK.TimeFileName"),
-                P.get<int>("VTK.Binary"),
-                P.get<bool>("VTK.UseOnlyP1"),
-                false, /* <- P2DG */
-                -1,    /* <- level */
-                P.get<bool>("VTK.ReUseTimeFile")));
+//        if (P.get<int>("VTK.Freq",0))
+//            vtkwriter= std::unique_ptr<VTKOutCL>( new VTKOutCL(
+//                adap.GetMG(),
+//                "DROPS data",
+//                P.get<int>("Time.NumSteps")/P.get<int>("VTK.Freq") + 1,
+//                dirname,
+//                P.get<std::string>("VTK.VTKName"),
+//                P.get<std::string>("VTK.TimeFileName"),
+//                P.get<int>("VTK.Binary"),
+//                P.get<bool>("VTK.UseOnlyP1"),
+//                false, /* <- P2DG */
+//                -1,    /* <- level */
+//                P.get<bool>("VTK.ReUseTimeFile")));
+
         if (P.get<bool>( "SurfSeparation.Exp.StationaryPDE")) {
     //        if (P.get<std::string>("LevelsetMapper.DeformationMethod") != "")
     //            StationaryStrategyDeformationP2( mg, adap, lset);

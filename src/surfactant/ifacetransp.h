@@ -2144,6 +2144,16 @@ class SurfacePDEP1BaseCL
 class CahnHilliardP1BaseCL: public SurfacePDEP1BaseCL
     {
     public:
+    MatDescCL
+            Laplace,  ///< diffusion matrix div_Gamma( grad_Gamma)
+            LaplaceM,  ///< diffusion matrix with mobility div_Gamma(M grad_Gamma)
+            Volume_stab, ///< stabilization matrix, tetra integral over normal gradients
+            Ident,
+            Mass,  ///< mass matrix
+            Conv,  ///< convection matrix
+            Massd, ///< mass matrix with interface-divergence of velocity
+            Mass2; ///< mass matrix: new trial- and test- functions on old interface
+
         typedef P1EvalCL<double, const BndDataT, VecDescCL>       DiscSolCL;
         typedef P1EvalCL<double, const BndDataT, const VecDescCL> const_DiscSolCL;
 
@@ -2254,19 +2264,11 @@ protected:
 
 };
 
-class CahnHilliardcGP1CL : public CahnHilliardP1BaseCL
-    {
+class CahnHilliardcGP1CL : public CahnHilliardP1BaseCL {
     public:
-        MatDescCL Laplace,  ///< diffusion matrix div_Gamma( grad_Gamma)
-                  LaplaceM,  ///< diffusion matrix with mobility div_Gamma(M grad_Gamma)
-
-                Volume_stab, ///< stabilization matrix, tetra integral over normal gradients
-
-                Ident,
-                Mass,  ///< mass matrix
-                Conv,  ///< convection matrix
-                Massd, ///< mass matrix with interface-divergence of velocity
-                Mass2; ///< mass matrix: new trial- and test- functions on old interface
+        MatDescCL
+            LaplaceNon,  ///< nonlinear diffusion matrix with div_Gamma(f grad_Gamma)
+            Massrho;  ///< mass matrix
 
     const double& width_;///< we extend only a band near the zero leve set with a width
     const double rho_;///<stabilization parameter for Volume_stab
@@ -2309,20 +2311,12 @@ class CahnHilliardcGP1CL : public CahnHilliardP1BaseCL
     };
 
 ///The class is based on a stablized term in a narrow band near the interface
-    class    CahnHilliardNarrowBandStblP1CL: public CahnHilliardP1BaseCL
-    {
+class    CahnHilliardNarrowBandStblP1CL: public CahnHilliardP1BaseCL {
     public:
         IdxDescCL full_idx;
-        MatDescCL Laplace,  ///< diffusion matrix,
-                LaplaceM,  ///< diffusion matrix with mobility div_Gamma(M grad_Gamma)
-                LaplaceNon,  ///< nonlinear diffusion matrix with div_Gamma(f grad_Gamma)
-                Volume_stab, ///< stabilization matrix,
-                Ident,
-                Mass,  ///< mass matrix
-                Massrho,  ///< mass matrix
-                Conv,  ///< convection matrix
-                Massd, ///< mass matrix with interface-divergence of velocity
-                Mass2; ///< mass matrix: new trial- and test- functions on old interface
+        MatDescCL
+            LaplaceNon,  ///< nonlinear diffusion matrix with div_Gamma(f grad_Gamma)
+            Massrho;  ///< mass matrix
 
         const double S_;//stabilization parameter for time derivative;
 
