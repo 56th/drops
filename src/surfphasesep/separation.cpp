@@ -43,6 +43,9 @@
 #include <tr1/unordered_set>
 //#include <stokes/instatstokes2phase.h>
 
+// logger
+#include "SingletonLogger.hpp"
+
 using namespace DROPS;
 
 DROPS::ParamCL P;
@@ -1143,6 +1146,27 @@ CahnHilliardP1BaseCL* make_cahnhilliard_timedisc( MultiGridCL& mg, LevelsetP2CL&
 void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::LevelsetP2CL& lset)
 {
     using namespace DROPS;
+    auto& logger = SingletonLogger::instance();
+    logger.beg("read input .json");
+        auto& inpJSON = P;
+        // read_parameter_file_from_cmdline(inpJSON, argc, argv, "../../param/surfnavierstokes/No_Bnd_Condition.json");
+        // dynamicLoad(inpJSON.get<std::string>("General.DynamicLibsPrefix"), inpJSON.get<std::vector<std::string>>("General.DynamicLibs"));
+        auto dirName = inpJSON.get<std::string>("Output.Directory");
+        system(("mkdir -p " + dirName).c_str());
+        system(("rm -r -f " + dirName + "/*").c_str());
+        system((
+            "mkdir " + dirName + "/matrices ; "
+            "mkdir " + dirName + "/vtk ; "
+            "mkdir " + dirName + "/stats"
+        ).c_str());
+        {
+            std::ofstream input(dirName + "/input.json");
+            input << inpJSON;
+            logger.buf << inpJSON;
+            logger.log();
+        }
+    logger.end();
+
     //set up output
     //dirname  = P.get<std::string>("VTK.VTKDir")  + "CahnHilliard" + "_" + P.get<std::string>("SurfSeparation.Exp.Levelset")  + "/"  "l=" + std::to_string(int(P.get<int>("Mesh.AdaptRef.FinestLevel")))  + "_N=" + std::to_string(int(P.get<double>("Time.NumSteps")));
 
@@ -1280,16 +1304,18 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
 
     dynamic_cast<DistMarkingStrategyCL*>( adap.get_marking_strategy())->SetDistFct( lset);
 
+    InstatScalarFunction unityFunc = [](Point3DCL const &, double) {
+        return 1.;
+    };
+
     //subdivide first timesteps into substeps
     int total_subs=1;
     int sub_ratio=100;
-    for (int step= 1; step <= P.get<int>("Time.NumSteps"); ++step) {
+    for (int step= 1, STEP = 1; step <= P.get<int>("Time.NumSteps"); ++step) {
         if (step>total_subs) sub_ratio=1;
 
         for (int substep= 1; substep <= sub_ratio; ++substep) {
-
-
-            std::cout << "======================================================== step " << step-1+((double)substep/(double)sub_ratio)  << ":\n";
+            std::cout << "======================================================== step " << STEP  << ":\n";
             ScopeTimerCL timer("Strategy: Time-loop");
             const double cur_time = (step-1 + (double)substep/(double)sub_ratio) * dt;
             double cur_dt=(1./(double)sub_ratio) * dt;
@@ -1301,9 +1327,10 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
             InitVel(mg, &v, Bnd_v, the_wind_fun, cur_time);
 
             timedisc.DoStep0(cur_time);
+            auto surfaceArea = Integral_Gamma(mg, lset.Phi, lset.GetBndData(), unityFunc);
+            auto raftFraction = Integral_Gamma(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, ifbnd, timedisc.ic)) / surfaceArea;
 
-            std::cout << "concentration on \\Gamma: "
-                      << Integral_Gamma(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, ifbnd, timedisc.ic)) << '\n';
+            std::cout << "% of raft area: " << 100. * raftFraction << '\n';
             std::cout << "chemical potential on \\Gamma: "
                       << Integral_Gamma(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, ifbnd, timedisc.imu)) << '\n';
 
@@ -1394,6 +1421,19 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
             const bool doGridMod = freq && step % freq == 0;
             const bool gridChanged = doGridMod ? adap.UpdateTriang() : false;
 
+            // output
+            std::ofstream stats(dirName + "/stats/t_" + std::to_string(STEP) + ".json");
+            ParamCL tJSON;
+            tJSON.put("t", cur_time);
+            tJSON.put("dt", cur_dt);
+            tJSON.put("Integral.PerimeterEstimate", perimeter_estimator);
+            tJSON.put("Integral.LyapunovEnergy", Lyapunov_energy);
+            tJSON.put("Integral.SurfaceArea", surfaceArea);
+            tJSON.put("Integral.RaftFraction", raftFraction);
+            stats << tJSON;
+            logger.buf << tJSON;
+            logger.log();
+
             if (gridChanged) {
 
                 std::cout << "Triangulation changed.\n";
@@ -1418,6 +1458,7 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
                 //vtkwriter->Write( cur_time+dt/2.);
 
             }
+            ++STEP;
         }
     }
     std::cout << std::endl;
@@ -2268,96 +2309,111 @@ void StationaryStrategyDeformationP2 (DROPS::MultiGridCL& mg, DROPS::AdapTriangC
     }
 }
 
-int  main (int argc, char* argv[])
-{
+int  main (int argc, char* argv[]) {
     srand(time(NULL));
-
+    auto& logger = SingletonLogger::instance();
     try {
-    ScopeTimerCL timer( "main");
+        ScopeTimerCL timer( "main");
 
-    DROPS::read_parameter_file_from_cmdline( P, argc, argv, "../../param/surfphasesep/separation.json");
-    std::cout << P << std::endl;
+        DROPS::read_parameter_file_from_cmdline( P, argc, argv, "../../param/surfphasesep/separation.json");
+        std::cout << P << std::endl;
 
-    DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
+        DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
 
-    dirname  = P.get<std::string>("VTK.VTKDir")  + "CahnHilliard" + "_" + P.get<std::string>("SurfSeparation.Exp.Levelset")  + "/"   "l=" + std::to_string(int(P.get<int>("Mesh.AdaptRef.FinestLevel")))  + "_N=" + std::to_string(int(P.get<double>("Time.NumSteps")));
-    std::cout << "Setting up interface-PDE.\n";
-    WindVelocity= P.get<DROPS::Point3DCL>("SurfSeparation.Exp.Velocity");
-    AngularVelocity= P.get<DROPS::Point3DCL>("SurfSeparation.Exp.Angular");
-    RadDrop=      P.get<DROPS::Point3DCL>("SurfSeparation.Exp.RadDrop");
-    PosDrop=      P.get<DROPS::Point3DCL>("SurfSeparation.Exp.PosDrop");
-    RadTorus=     P.get<DROPS::Point2DCL>("SurfSeparation.Exp.RadTorus");
-    the_wind_fun= invecmap[P.get<std::string>("SurfSeparation.Exp.Wind")];
-    the_normal_fun= invecmap[P.get<std::string>("SurfSeparation.Exp.Normal")];
-    the_lset_fun= inscamap[P.get<std::string>("SurfSeparation.Exp.Levelset")];
-    the_rhs_fun=  inscamap[P.get<std::string>("SurfSeparation.Exp.Rhs")];
-    the_conc_sol_fun=  inscamap[P.get<std::string>("SurfSeparation.Exp.ConcentrationSolution")];
-    the_poten_sol_fun=  inscamap[P.get<std::string>("SurfSeparation.Exp.ChemicalPotentialSolution")];
-        the_species_sol_fun=  inscamap[P.get<std::string>("SurfSeparation.Exp.SpeciesSolution")];
+        dirname  = P.get<std::string>("VTK.VTKDir")  + "CahnHilliard" + "_" + P.get<std::string>("SurfSeparation.Exp.Levelset")  + "/"   "l=" + std::to_string(int(P.get<int>("Mesh.AdaptRef.FinestLevel")))  + "_N=" + std::to_string(int(P.get<double>("Time.NumSteps")));
+        std::cout << "Setting up interface-PDE.\n";
+        WindVelocity= P.get<DROPS::Point3DCL>("SurfSeparation.Exp.Velocity");
+        AngularVelocity= P.get<DROPS::Point3DCL>("SurfSeparation.Exp.Angular");
+        RadDrop=      P.get<DROPS::Point3DCL>("SurfSeparation.Exp.RadDrop");
+        PosDrop=      P.get<DROPS::Point3DCL>("SurfSeparation.Exp.PosDrop");
+        RadTorus=     P.get<DROPS::Point2DCL>("SurfSeparation.Exp.RadTorus");
+        the_wind_fun= invecmap[P.get<std::string>("SurfSeparation.Exp.Wind")];
+        the_normal_fun= invecmap[P.get<std::string>("SurfSeparation.Exp.Normal")];
+        the_lset_fun= inscamap[P.get<std::string>("SurfSeparation.Exp.Levelset")];
+        the_rhs_fun=  inscamap[P.get<std::string>("SurfSeparation.Exp.Rhs")];
+        the_conc_sol_fun=  inscamap[P.get<std::string>("SurfSeparation.Exp.ConcentrationSolution")];
+        auto raftRatio = P.get<double>("SurfSeparation.Exp.RaftRatio");
+        the_conc_sol_fun = [=](Point3DCL const &, double) {
+            auto random = (double) rand() / RAND_MAX;
+            auto k = .5;
+            auto ampl = .1;
+            if (random < .5) return raftRatio + ampl*(2*k*random - 0.5);
+            return raftRatio + ampl*(2*(1-k)*random + 2*k-1- 0.5);
+        };
+        logger.wrn("concentration soln set to RaftRatio");
+        the_poten_sol_fun=  inscamap[P.get<std::string>("SurfSeparation.Exp.ChemicalPotentialSolution")];
+            the_species_sol_fun=  inscamap[P.get<std::string>("SurfSeparation.Exp.SpeciesSolution")];
 
-        the_zero_fun= inscamap["ZeroScalarFun"];
-    double sigm = P.get<double>("SurfSeparation.Mobility");
-    double eps = P.get<double>("SurfSeparation.Epsilon");
-    ParameterNS::sigma = sigm;
-    ParameterNS::eps = eps;
-    if (P.get<std::string>("SurfSeparation.Exp.ConcentrationSolution") == "LaplaceBeltrami0Sol")
-        the_sol_grad_fun=  &laplace_beltrami_0_sol_grad;
-    for (Uint i= 0; i < 6; ++i)
-        bf_wind[i]= the_wind_fun;
+            the_zero_fun= inscamap["ZeroScalarFun"];
+        double sigm = P.get<double>("SurfSeparation.Mobility");
+        double eps = P.get<double>("SurfSeparation.Epsilon");
+        ParameterNS::sigma = sigm;
+        ParameterNS::eps = eps;
+        if (P.get<std::string>("SurfSeparation.Exp.ConcentrationSolution") == "LaplaceBeltrami0Sol")
+            the_sol_grad_fun=  &laplace_beltrami_0_sol_grad;
+        for (Uint i= 0; i < 6; ++i)
+            bf_wind[i]= the_wind_fun;
 
-    std::cout << "Setting up domain:\n";
-    std::unique_ptr<MGBuilderCL> builder( make_MGBuilder( P));
-    DROPS::MultiGridCL mg( *builder);
-    typedef DistMarkingStrategyCL MarkerT;
-    double dist=3*(2.0*P.get<DROPS::Point3DCL>("SurfSeparation.Exp.Velocity").norm()*P.get<double>("Time.FinalTime")/P.get<double>("Time.NumSteps")
-                +P.get<DROPS::Point3DCL>("Mesh.E1")[0]/P.get<double>("Mesh.N1")/pow(2,P.get<int>("Mesh.AdaptRef.FinestLevel")));
+        std::cout << "Setting up domain:\n";
+        std::unique_ptr<MGBuilderCL> builder( make_MGBuilder( P));
+        DROPS::MultiGridCL mg( *builder);
+        typedef DistMarkingStrategyCL MarkerT;
+        double dist=3*(2.0*P.get<DROPS::Point3DCL>("SurfSeparation.Exp.Velocity").norm()*P.get<double>("Time.FinalTime")/P.get<double>("Time.NumSteps")
+                    +P.get<DROPS::Point3DCL>("Mesh.E1")[0]/P.get<double>("Mesh.N1")/pow(2,P.get<int>("Mesh.AdaptRef.FinestLevel")));
 
-    MarkerT marker( the_lset_fun,
-            dist,
-           // P.get<double>( "Mesh.AdaptRef.Width"),
-                    P.get<int>( "Mesh.AdaptRef.CoarsestLevel"), P.get<int>( "Mesh.AdaptRef.FinestLevel"));
+        MarkerT marker( the_lset_fun,
+                dist,
+               // P.get<double>( "Mesh.AdaptRef.Width"),
+                        P.get<int>( "Mesh.AdaptRef.CoarsestLevel"), P.get<int>( "Mesh.AdaptRef.FinestLevel"));
 
-    DROPS::AdapTriangCL adap( mg, &marker);
-    //Yushutin
-    adap.MakeInitialTriang();
-    //
+        DROPS::AdapTriangCL adap( mg, &marker);
+        //Yushutin
+        adap.MakeInitialTriang();
+        //
 
-    // DROPS::LevelsetP2CL lset( mg, lsbnd, sf);
-    DROPS::LevelsetP2CL& lset( *LevelsetP2CL::Create( mg, lsbnd, sf, P.get_child("Levelset")) );
+        // DROPS::LevelsetP2CL lset( mg, lsbnd, sf);
+        DROPS::LevelsetP2CL& lset( *LevelsetP2CL::Create( mg, lsbnd, sf, P.get_child("Levelset")) );
 
-    if (P.get<int>("VTK.Freq",0))
-        vtkwriter= std::unique_ptr<VTKOutCL>( new VTKOutCL(
-            adap.GetMG(),
-            "DROPS data",
-            P.get<int>("Time.NumSteps")/P.get<int>("VTK.Freq") + 1,
-            dirname,
-            P.get<std::string>("VTK.VTKName"),
-            P.get<std::string>("VTK.TimeFileName"),
-            P.get<int>("VTK.Binary"), 
-            P.get<bool>("VTK.UseOnlyP1"),
-            false, /* <- P2DG */
-            -1,    /* <- level */
-            P.get<bool>("VTK.ReUseTimeFile")));
-    if (P.get<bool>( "SurfSeparation.Exp.StationaryPDE")) {
-//        if (P.get<std::string>("LevelsetMapper.DeformationMethod") != "")
-//            StationaryStrategyDeformationP2( mg, adap, lset);
-//        else {
-//            if (P.get<int>( "SurfSeparation.FEDegree") == 1)
-//                StationaryStrategyP1( mg, adap, lset);
-//            else
-//                StationaryStrategyP2( mg, adap, lset);
-//        }
+        if (P.get<int>("VTK.Freq",0))
+            vtkwriter= std::unique_ptr<VTKOutCL>( new VTKOutCL(
+                adap.GetMG(),
+                "DROPS data",
+                P.get<int>("Time.NumSteps")/P.get<int>("VTK.Freq") + 1,
+                dirname,
+                P.get<std::string>("VTK.VTKName"),
+                P.get<std::string>("VTK.TimeFileName"),
+                P.get<int>("VTK.Binary"),
+                P.get<bool>("VTK.UseOnlyP1"),
+                false, /* <- P2DG */
+                -1,    /* <- level */
+                P.get<bool>("VTK.ReUseTimeFile")));
+        if (P.get<bool>( "SurfSeparation.Exp.StationaryPDE")) {
+    //        if (P.get<std::string>("LevelsetMapper.DeformationMethod") != "")
+    //            StationaryStrategyDeformationP2( mg, adap, lset);
+    //        else {
+    //            if (P.get<int>( "SurfSeparation.FEDegree") == 1)
+    //                StationaryStrategyP1( mg, adap, lset);
+    //            else
+    //                StationaryStrategyP2( mg, adap, lset);
+    //        }
+        }
+        else
+            Strategy( mg, adap, lset);
+
+        delete &lset;
+        rusage usage;
+        getrusage( RUSAGE_SELF, &usage);
+        std::cout << "ru_maxrss: " << usage.ru_maxrss << " kB.\n";
+        std::cout<<"output: " << dirname ;
+
+        return 0;
+    } catch (std::exception const & e) {
+        logger.err(e.what());
+    } catch (DROPSErrCL const & e) {
+        e.what(logger.buf);
+        logger.err(logger.buf.str());
+    } catch (...) {
+        logger.err("unknown error");
     }
-    else
-        Strategy( mg, adap, lset);
-
-    delete &lset;
-    rusage usage;
-    getrusage( RUSAGE_SELF, &usage);
-    std::cout << "ru_maxrss: " << usage.ru_maxrss << " kB.\n";
-    std::cout<<"output: " << dirname ;
-
-      return 0;
-  }
-  catch (DROPS::DROPSErrCL err) { err.handle(); }
+    return 1;
 }

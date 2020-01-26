@@ -1,4 +1,8 @@
 {
+    "Output": {
+        "Directory":  "../../output/ch6_30to70"
+    },
+
     "General": {
         "ProgressBar":  1, 
         "DynamicLibsPrefix": "../", 
@@ -57,7 +61,8 @@
             "Rhs":      "ZeroScalarFun",
             "ConcentrationSolution": "MergeDropSol",
             "ChemicalPotentialSolution": "ZeroScalarFun",
-            "SpeciesSolution": "ConstantSolution"
+            "SpeciesSolution": "ConstantSolution",
+            "RaftRatio" : 0.42857142857142855
         },
         "Method":     "NarrowBandStabilization",
         "UseMassDiv": true, 
@@ -106,7 +111,7 @@
     },
 
     "VTK": {
-        "Freq":           20,
+        "Freq":           0,
         "VTKDir":         "../../output/",
         "VTKName":        "separation",
         "TimeFileName":   "separation",

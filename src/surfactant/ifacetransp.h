@@ -1874,6 +1874,23 @@ make_CompositeQuad5Domain2D (QuadDomain2DCL& qdom, const TetraCL& t, const Princ
 }
 
 /// \brief Short-hand for integral on the interface.
+template <typename T>
+double Integral_Gamma (const DROPS::MultiGridCL& mg, const DROPS::VecDescCL& ls, const DROPS::BndDataCL<>& bnd,
+        const InstatFunction<T>& discsol, Uint lattice_num_intervals= 2){
+    const DROPS::Uint lvl = ls.GetLevel();
+    const PrincipalLatticeCL& lat= PrincipalLatticeCL::instance( lattice_num_intervals);
+
+    std::valarray<double> q;
+    QuadDomain2DCL qdom;
+    double d( 0.);
+    DROPS_FOR_TRIANG_CONST_TETRA( mg, lvl, it) {
+        make_CompositeQuad5Domain2D( qdom, *it, lat, ls, bnd);
+        resize_and_evaluate_on_vertexes( discsol, *it, qdom, 0., q);
+        d+= quad_2D( q, qdom);
+    }
+    return d;
+}
+
 template <typename DiscP1FunT>
 double Integral_Gamma (const DROPS::MultiGridCL& mg, const DROPS::VecDescCL& ls, const DROPS::BndDataCL<>& bnd,
     const DiscP1FunT& discsol, Uint lattice_num_intervals= 2)
