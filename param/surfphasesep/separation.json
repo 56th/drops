@@ -42,7 +42,8 @@
         "Read" : 0,
         "Write": "yes",
         "NumSteps": 100,
-        "FinalTime":    100
+        "FinalTime":    100,
+        "SubRatio" : 101
     },
 
     "SurfSeparation": {

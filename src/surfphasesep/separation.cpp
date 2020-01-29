@@ -1335,7 +1335,7 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
 
     //subdivide first timesteps into substeps
     int total_subs=1;
-    int sub_ratio=100;
+    auto sub_ratio = P.get<int>("Time.SubRatio");
     for (int step= 1, STEP = 1; step <= P.get<int>("Time.NumSteps"); ++step) {
         if (step>total_subs) sub_ratio=1;
 
