@@ -380,6 +380,18 @@ int main(int argc, char* argv[]) {
                 S_M_tmp.LinComb(1. / (gamma + nu), surfOseenSystem.M_p.Data, -1., surfOseenSystem.C.Data);
                 S_L_tmp.LinComb(1. / alpha, surfOseenSystem.A_p.Data, -1., surfOseenSystem.C.Data);
             auto assembleTime = logger.end();
+            logger.beg("estimate perimeter");
+                auto eps = 0.1;
+                InstatScalarFunction perEstFun = [=](Point3DCL const & p, double) {
+                    return .5 * (1. + std::tanh((1./(2*std::sqrt(2)*eps))*p[1]/pow(pow(p[0], 2.) + pow(p[1], 2.) + pow(p[2], 2.), 0.5)));
+                };
+                VecDescCL cDOF;
+                cDOF.SetIdx(&ifaceP1idx);
+                InitScalar(mg, cDOF, perEstFun, 0.);
+                auto perimeterEstimate = eps * dot(surfOseenSystem.A_p.Data * cDOF.Data, cDOF.Data);
+                logger.buf << "perimeter estimate = " << perimeterEstimate;
+                logger.log();
+            logger.end();
             logger.beg("t_0: project surface vorticity and export initial data to vtk");
                 // mtx
                 MatrixCL M_tmp;
@@ -734,17 +746,20 @@ int main(int argc, char* argv[]) {
                     auto expFunc = format == ".mtx" ? &MatrixCL::exportMTX : &MatrixCL::exportMAT;
                     auto expMat = [&](MatrixCL& A, std::string const a, std::string const & b) {
                         logger.beg(a);
-                        (A.*expFunc)(dirName + "/matrices/" + b + format);
-                        tJSON.put("Matrices." + a, "../matrices/" + b + format);
+                            logger.buf << "size: " << A.num_rows() << "x" << A.num_cols();
+                            logger.log();
+                            (A.*expFunc)(dirName + "/matrices/" + b + format);
+                            tJSON.put("Matrices." + a, "../matrices/" + b + format);
                         logger.end();
                     };
-                    MatrixCL K;
-                    K.LinComb(1., surfOseenSystem.A.Data, tau_u, surfOseenSystem.S.Data, rho_u, surfOseenSystem.A_stab.Data);
-                    expMat(K, "VelocityKornMatrix", "A");
-                    expMat(surfOseenSystem.M.Data, "VelocityMassMatrix", "M");
+                    // MatrixCL K;
+                    // K.LinComb(1., surfOseenSystem.A.Data, tau_u, surfOseenSystem.S.Data, rho_u, surfOseenSystem.A_stab.Data);
+                    // expMat(K, "VelocityKornMatrix", "A");
+                    // expMat(surfOseenSystem.M.Data, "VelocityMassMatrix", "M");
                     // expMat(surfOseenSystem.sumA.Data, "DiffusionConvectionReaction", "A");
-                    expMat(surfOseenSystem.B.Data, "Divergence", "B");
-                    expMat(surfOseenSystem.C.Data, "PressureVolumeStab", "C");
+                    // expMat(surfOseenSystem.B.Data, "Divergence", "B");
+                    // expMat(surfOseenSystem.C.Data, "PressureVolumeStab", "C");
+                    expMat(surfOseenSystem.A_p.Data, "PressureStiffness", "A_p");
                     logger.log();
                 }
                 if (everyStep > 0 && (i-1) % everyStep == 0) {

@@ -1,7 +1,7 @@
 {
     "Output": {
-        "Directory":  "../../output/ch6_30to70",
-        "EveryStep":  3,
+        "Directory":  "../../output/per_0.05",
+        "EveryStep":  1,
         "Binary":     true
     },
 
@@ -16,10 +16,10 @@
 
     "Mesh": {
         "Type":        "BrickBuilder",
-        "Origin":      [-1.4, -1.4, -1.5],
-        "E1":          [ 3.3,  0,  0],
-        "E2":          [ 0,  3.3,  0],
-        "E3":          [ 0,  0,  3.3],
+        "Origin": [-1.66666,-1.66666,-1.66666],
+        "E1": [3.33333, 0,0],
+        "E2": [0,3.33333,0],
+        "E3": [0,0,3.33333],
         "N1":          2,
         "N2":          2,
         "N3":          2,
@@ -41,13 +41,14 @@
     {
         "Read" : 0,
         "Write": "yes",
-        "NumSteps": 100,
-        "FinalTime":    100,
-        "SubRatio" : 101
+        "NumSteps": 1,
+        "FinalTime":    1,
+        "SubRatio" : 1
     },
 
     "SurfSeparation": {
-
+        "ExportMatrices" : false,
+        "ExportMatricesFormat": "mat",
         "Exp": {
             "RadDrop":  [1, 0, 0],
             "PosDrop":  [0, 0, 0],
@@ -62,10 +63,10 @@
 
 
             "Rhs":      "ZeroScalarFun",
-            "ConcentrationSolution": "MergeDropSol",
+            "ConcentrationSolution": "SteadyPhases",
             "ChemicalPotentialSolution": "ZeroScalarFun",
             "SpeciesSolution": "ConstantSolution",
-            "RaftRatio" : 0.42857142857142855
+            "RaftRatio" : 0.3
         },
         "Method":     "NarrowBandStabilization",
         "UseMassDiv": true, 
@@ -80,7 +81,7 @@
         },
         "XFEMReduced":             -1,
         "Mobility":                    1,
-        "Epsilon":                   0.01,
+        "Epsilon":                   0.05,
         "FEDegree":                1,
         "NormalLaplaceCoefficient": 1.0,
         "SolutionOutput": { 

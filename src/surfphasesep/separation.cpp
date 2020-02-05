@@ -864,7 +864,8 @@ double TestStationary_chiSol (const DROPS::Point3DCL& pp, double t)
     DROPS::Point3DCL p=Rotate(pp  - t*constant_wind(pp,t), t) - PosDrop;
     double shift=0;
 
-   return((std::tanh(shift+(1./(2*std::sqrt(2)*ParameterNS::eps))*p[1]/pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1), 0.5))  + 0.1e1) / 0.2e1);
+   return .5 * (1. + std::tanh(shift+(1./(2*std::sqrt(2)*ParameterNS::eps))*p[1]/pow(pow(p[0], 0.2e1) +
+           pow(p[1], 0.2e1) + pow(p[2], 0.2e1), 0.5)));
 }
 
 static RegisterScalarFunction regsca_stationary_harmonic( "SteadyPhases", TestStationary_chiSol);
@@ -1451,15 +1452,40 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
             // output
             std::ofstream stats(dirName + "/stats/t_" + std::to_string(STEP) + ".json");
             ParamCL tJSON;
+            // tJSON.put("h", ParameterNS::h);
             tJSON.put("t", cur_time);
             tJSON.put("dt", cur_dt);
             tJSON.put("Integral.PerimeterEstimate", perimeter_estimator);
+
+            tJSON.put("Integral.PerimeterEstimate_H1_error", ParameterNS::eps * H1_error(lset.Phi, lset.GetBndData(), timedisc.GetConcentr(), the_zero_fun));
+            tJSON.put("Integral.PerimeterEstimate_H1_error_sq", ParameterNS::eps * H1_error_sq(lset.Phi, lset.GetBndData(), timedisc.GetConcentr(), the_zero_fun));
+
             tJSON.put("Integral.LyapunovEnergy", Lyapunov_energy);
             tJSON.put("Integral.SurfaceArea", surfaceArea);
             tJSON.put("Integral.RaftFraction", raftFraction);
             stats << tJSON;
             logger.buf << tJSON;
             logger.log();
+
+            if (inpJSON.get<bool>("SurfSeparation.ExportMatrices")) {
+                std::string format = inpJSON.get<std::string>("SurfSeparation.ExportMatricesFormat") == "mtx" ? ".mtx" : ".mat";
+                auto expFunc = format == ".mtx" ? &MatrixCL::exportMTX : &MatrixCL::exportMAT;
+                auto expMat = [&](MatrixCL& A, std::string const a, std::string const & b) {
+                    logger.beg(a);
+                        logger.buf << "size: " << A.num_rows() << "x" << A.num_cols();
+                        logger.log();
+                        (A.*expFunc)(dirName + "/matrices/" + b + format);
+                        tJSON.put("Matrices." + a, "../matrices/" + b + format);
+                    logger.end();
+                };
+                expMat(timedisc.Laplace.Data, "StiffnessMatrix", "A");
+
+                // tmp
+                std::ofstream cOut(dirName + "/matrices/c.txt");
+                cDOF.Write(cOut, false);
+
+                logger.log();
+            }
 
             if (gridChanged) {
 
@@ -2361,18 +2387,19 @@ int  main (int argc, char* argv[]) {
         the_rhs_fun=  inscamap[P.get<std::string>("SurfSeparation.Exp.Rhs")];
         the_conc_sol_fun=  inscamap[P.get<std::string>("SurfSeparation.Exp.ConcentrationSolution")];
         auto raftRatio = P.get<double>("SurfSeparation.Exp.RaftRatio");
-        the_conc_sol_fun = [=](Point3DCL const &, double) {
-            auto random = (double) rand() / RAND_MAX;
-            auto k = .5;
-            auto ampl = .1;
-            if (random < .5) return raftRatio + ampl*(2*k*random - 0.5);
-            return raftRatio + ampl*(2*(1-k)*random + 2*k-1- 0.5);
-        };
-        logger.wrn("concentration soln set to RaftRatio");
-        the_poten_sol_fun=  inscamap[P.get<std::string>("SurfSeparation.Exp.ChemicalPotentialSolution")];
-            the_species_sol_fun=  inscamap[P.get<std::string>("SurfSeparation.Exp.SpeciesSolution")];
 
-            the_zero_fun= inscamap["ZeroScalarFun"];
+//        the_conc_sol_fun = [=](Point3DCL const &, double) {
+//            auto random = (double) rand() / RAND_MAX;
+//            auto k = .5;
+//            auto ampl = .1;
+//            if (random < .5) return raftRatio + ampl*(2*k*random - 0.5);
+//            return raftRatio + ampl*(2*(1-k)*random + 2*k-1- 0.5);
+//        };
+//        logger.wrn("concentration soln set to RaftRatio");
+
+        the_poten_sol_fun =  inscamap[P.get<std::string>("SurfSeparation.Exp.ChemicalPotentialSolution")];
+        the_species_sol_fun = inscamap[P.get<std::string>("SurfSeparation.Exp.SpeciesSolution")];
+        the_zero_fun = inscamap["ZeroScalarFun"];
         double sigm = P.get<double>("SurfSeparation.Mobility");
         double eps = P.get<double>("SurfSeparation.Epsilon");
         ParameterNS::sigma = sigm;
