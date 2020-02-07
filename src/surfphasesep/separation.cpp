@@ -1457,8 +1457,8 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
             tJSON.put("dt", cur_dt);
             tJSON.put("Integral.PerimeterEstimate", perimeter_estimator);
 
-            tJSON.put("Integral.PerimeterEstimate_H1_error", ParameterNS::eps * H1_error(lset.Phi, lset.GetBndData(), timedisc.GetConcentr(), the_zero_fun));
-            tJSON.put("Integral.PerimeterEstimate_H1_error_sq", ParameterNS::eps * H1_error_sq(lset.Phi, lset.GetBndData(), timedisc.GetConcentr(), the_zero_fun));
+            // tJSON.put("Integral.PerimeterEstimate_H1_error", ParameterNS::eps * H1_error(lset.Phi, lset.GetBndData(), timedisc.GetConcentr(), the_zero_fun));
+            // tJSON.put("Integral.PerimeterEstimate_H1_error_sq", ParameterNS::eps * H1_error_sq(lset.Phi, lset.GetBndData(), timedisc.GetConcentr(), the_zero_fun));
 
             tJSON.put("Integral.LyapunovEnergy", Lyapunov_energy);
             tJSON.put("Integral.SurfaceArea", surfaceArea);
@@ -2388,14 +2388,14 @@ int  main (int argc, char* argv[]) {
         the_conc_sol_fun=  inscamap[P.get<std::string>("SurfSeparation.Exp.ConcentrationSolution")];
         auto raftRatio = P.get<double>("SurfSeparation.Exp.RaftRatio");
 
-//        the_conc_sol_fun = [=](Point3DCL const &, double) {
-//            auto random = (double) rand() / RAND_MAX;
-//            auto k = .5;
-//            auto ampl = .1;
-//            if (random < .5) return raftRatio + ampl*(2*k*random - 0.5);
-//            return raftRatio + ampl*(2*(1-k)*random + 2*k-1- 0.5);
-//        };
-//        logger.wrn("concentration soln set to RaftRatio");
+        the_conc_sol_fun = [=](Point3DCL const &, double) {
+            auto random = (double) rand() / RAND_MAX;
+            auto k = .5;
+            auto ampl = .1;
+            if (random < .5) return raftRatio + ampl*(2*k*random - 0.5);
+            return raftRatio + ampl*(2*(1-k)*random + 2*k-1- 0.5);
+        };
+        logger.wrn("concentration soln set to RaftRatio");
 
         the_poten_sol_fun =  inscamap[P.get<std::string>("SurfSeparation.Exp.ChemicalPotentialSolution")];
         the_species_sol_fun = inscamap[P.get<std::string>("SurfSeparation.Exp.SpeciesSolution")];
