@@ -2392,12 +2392,12 @@ int  main (int argc, char* argv[]) {
         std::uniform_real_distribution<> dis(raftRatio - raftRatioNoisePercent * raftRatio, raftRatio + raftRatioNoisePercent * raftRatio);
 
         the_conc_sol_fun = [&](Point3DCL const &, double) {
-            // return dis(gen);
-            auto random = (double) rand() / RAND_MAX;
-            auto k = .5;
-            auto ampl = .1;
-            if (random < .5) return raftRatio + ampl*(2*k*random - 0.5);
-            return raftRatio + ampl*(2*(1-k)*random + 2*k-1- 0.5);
+            return dis(gen);
+//            auto random = (double) rand() / RAND_MAX;
+//            auto k = .5;
+//            auto ampl = .1;
+//            if (random < .5) return raftRatio + ampl*(2*k*random - 0.5);
+//            return raftRatio + ampl*(2*(1-k)*random + 2*k-1- 0.5);
         };
         logger.wrn("concentration soln set to RaftRatio");
 
