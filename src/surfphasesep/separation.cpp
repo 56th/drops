@@ -38,6 +38,7 @@
 #include <cmath>
 #include <fstream>
 #include <string>
+#include <random>
 #include <tr1/unordered_map>
 #include <tr1/unordered_set>
 //#include <stokes/instatstokes2phase.h>
@@ -1452,17 +1453,15 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
             // output
             std::ofstream stats(dirName + "/stats/t_" + std::to_string(STEP) + ".json");
             ParamCL tJSON;
-            // tJSON.put("h", ParameterNS::h);
             tJSON.put("t", cur_time);
             tJSON.put("dt", cur_dt);
             tJSON.put("Integral.PerimeterEstimate", perimeter_estimator);
-
-            // tJSON.put("Integral.PerimeterEstimate_H1_error", ParameterNS::eps * H1_error(lset.Phi, lset.GetBndData(), timedisc.GetConcentr(), the_zero_fun));
-            // tJSON.put("Integral.PerimeterEstimate_H1_error_sq", ParameterNS::eps * H1_error_sq(lset.Phi, lset.GetBndData(), timedisc.GetConcentr(), the_zero_fun));
-
             tJSON.put("Integral.LyapunovEnergy", Lyapunov_energy);
             tJSON.put("Integral.SurfaceArea", surfaceArea);
             tJSON.put("Integral.RaftFraction", raftFraction);
+            tJSON.put("Integral.Solver.Outer.TotalIters", timedisc.block_gm_.GetIter());
+            tJSON.put("Integral.Solver.Outer.Residual", timedisc.block_gm_.GetResid());
+            tJSON.put("Integral.Solver.Outer.Converged", timedisc.block_gm_.GetResid() <= inpJSON.get<double>("SurfSeparation.Solver.Tol"));
             stats << tJSON;
             logger.buf << tJSON;
             logger.log();
@@ -2387,8 +2386,13 @@ int  main (int argc, char* argv[]) {
         the_rhs_fun=  inscamap[P.get<std::string>("SurfSeparation.Exp.Rhs")];
         the_conc_sol_fun=  inscamap[P.get<std::string>("SurfSeparation.Exp.ConcentrationSolution")];
         auto raftRatio = P.get<double>("SurfSeparation.Exp.RaftRatio");
+        auto raftRatioNoisePercent = P.get<double>("SurfSeparation.Exp.RaftRatioNoisePercent");
+        std::random_device rd;
+        std::mt19937 gen(rd());
+        std::uniform_real_distribution<> dis(raftRatio - raftRatioNoisePercent * raftRatio, raftRatio + raftRatioNoisePercent * raftRatio);
 
-        the_conc_sol_fun = [=](Point3DCL const &, double) {
+        the_conc_sol_fun = [&](Point3DCL const &, double) {
+            // return dis(gen);
             auto random = (double) rand() / RAND_MAX;
             auto k = .5;
             auto ampl = .1;

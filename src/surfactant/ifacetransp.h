@@ -2206,12 +2206,13 @@ protected:
         SurfaceLaplacePreCL<PCGSolverT> spc3_, spc4_;
         DiagBlockPcT block_pc_;
         GMResBlockT GMRes_;
-        GMResBlockSolver block_gm_;
-
         double omit_bound_; ///< not used atm
 
     public:
-        CahnHilliardP1BaseCL (MultiGridCL& mg,
+
+    GMResBlockSolver block_gm_;
+
+    CahnHilliardP1BaseCL (MultiGridCL& mg,
                               double theta, double sigma, double epsilon, VecDescCL* v, const VelBndDataT& Bnd_v, VecDescCL& lset_vd, const BndDataCL<>& lsetbnd,
                               //MatrixCL Precond3 , MatrixCL Precond4,
                               int iter= 1000, double tol= 1e-7, double iterA=500, double tolA=1e-3, double iterB=500, double tolB=1e-3, double omit_bound= -1.)

@@ -3781,6 +3781,7 @@ void SurfactantP1BaseCL::InitTimeStep ()
         //WriteToFile( L_, "Matrix.txt", "system");
         //A_.LinComb(theta_, Mass.Data, dt_ * theta_, Laplace.Data, dt_ * theta_, Massd.Data, dt_ * theta_, Conv.Data);
         //D_.LinComb(1.0, A_, 0.0, Mass.Data);
+        std::cout << std::scientific;
         std::cout << "      Before solve: res3 = " << norm(A_ * imu.Data  +B_ * ic.Data- rhs3) << std::endl;
         std::cout << "      Before solve: res4 = " << norm(C_ * imu.Data  +D_ * ic.Data- rhs4) << std::endl;
         {
