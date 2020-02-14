@@ -1151,389 +1151,6 @@ CahnHilliardP1BaseCL* make_cahnhilliard_timedisc( MultiGridCL& mg, LevelsetP2CL&
     return ret;
 }
 
-//phase separation, Cahn-Hilliard
-void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::LevelsetP2CL& lset)
-{
-    using namespace DROPS;
-    auto& logger = SingletonLogger::instance();
-    logger.beg("read input .json");
-        auto& inpJSON = P;
-        // read_parameter_file_from_cmdline(inpJSON, argc, argv, "../../param/surfnavierstokes/No_Bnd_Condition.json");
-        // dynamicLoad(inpJSON.get<std::string>("General.DynamicLibsPrefix"), inpJSON.get<std::vector<std::string>>("General.DynamicLibs"));
-        auto dirName = inpJSON.get<std::string>("Output.Directory");
-        system(("mkdir -p " + dirName).c_str());
-        system(("rm -r -f " + dirName + "/*").c_str());
-        system((
-            "mkdir " + dirName + "/matrices ; "
-            "mkdir " + dirName + "/vtk ; "
-            "mkdir " + dirName + "/tmp ; "
-            "mkdir " + dirName + "/stats"
-        ).c_str());
-        {
-            std::ofstream input(dirName + "/input.json");
-            input << inpJSON;
-            logger.buf << inpJSON;
-            logger.log();
-        }
-    logger.end();
-
-    //set up output
-    //dirname  = P.get<std::string>("VTK.VTKDir")  + "CahnHilliard" + "_" + P.get<std::string>("SurfSeparation.Exp.Levelset")  + "/"  "l=" + std::to_string(int(P.get<int>("Mesh.AdaptRef.FinestLevel")))  + "_N=" + std::to_string(int(P.get<double>("Time.NumSteps")));
-
-    std::cout << "dirname: " << dirname << std::endl;
-
-    std::ofstream log_errors;
-    log_errors.open( dirname +"/"
-                     + "Errors.txt");
-    log_errors.close();
-
-    if (!log_errors.is_open()) {
-        log_errors.open( dirname +"/"
-                         + "Errors.txt");}
-
-    std::ofstream log_global;
-    log_global.open( dirname +"/"
-                         + "Global.txt");
-    log_global.close();
-
-    if (!log_global.is_open()) {
-            log_global.open( dirname +"/"
-                             + "Global.txt");
-
-        //std::cout<< "can't open file with computed errors in: " << dirname << std::endl;
-        //return;
-    }
-
-    log_global << "Time " << "\t" << "Lyapunov_energy " << "H1_energy " << "\t" << "Number_iterations " << std::endl;
-
-    if (P.get<std::string>("SurfSeparation.Exp.Levelset") == std::string( "AxisScalingLset"))
-        dynamic_cast<DistMarkingStrategyCL*>( adap.get_marking_strategy())->SetDistFct( axis_scaling_lset_ini);
-    lset.CreateNumbering( mg.GetLastLevel(), &lset.idx);
-    lset.Phi.SetIdx( &lset.idx);
-    // LinearLSInit( mg, lset.Phi, the_lset_fun, 0.);
-    LSInit( mg, lset.Phi, the_lset_fun, 0.);
-
-    //DROPS::LevelsetP2CL& lset2( *LevelsetP2CL::Create( mg, lsbnd, sf, P.get_child("Levelset")) );
-    //lset2.idx.CreateNumbering( mg.GetLastLevel(), mg);
-    //lset2.Phi.SetIdx( &lset2.idx);
-    //LSInit( mg, lset2.Phi, the_lset_fun, 0.);
-
-    const double Vol= lset.GetVolume();
-    lset.InitVolume( Vol);
-    std::cout << "droplet volume: " << Vol << std::endl;
-
-    BndDataCL<Point3DCL> Bnd_v( 6, bc_wind, bf_wind);
-    IdxDescCL vidx( vecP2_FE);
-    vidx.CreateNumbering( mg.GetLastLevel(), mg, Bnd_v);
-    VecDescCL v( &vidx);
-    InitVel( mg, &v, Bnd_v, the_wind_fun, 0.);
-
-    //lset2.SetupSystem( make_P2Eval( mg, Bnd_v, v), P.get<double>("Time.FinalTime")/P.get<double>("Time.NumSteps"));
-    double dist= 1*(2.0*P.get<DROPS::Point3DCL>("SurfSeparation.Exp.Velocity").norm()*P.get<double>("Time.FinalTime")/P.get<double>("Time.NumSteps")
-                +P.get<DROPS::Point3DCL>("Mesh.E1")[0]/P.get<double>("Mesh.N1")/pow(2,P.get<int>("Mesh.AdaptRef.FinestLevel")));
-
-    std::unique_ptr<CahnHilliardP1BaseCL> timediscp( make_cahnhilliard_timedisc( mg, lset, v, Bnd_v, P, dist));
-    CahnHilliardP1BaseCL& timedisc= *timediscp;
-    timedisc.SetRhs( the_rhs_fun, the_zero_fun);
-
-    LevelsetRepairCL lsetrepair( lset);
-    adap.push_back( &lsetrepair);
-
-    InterfaceP1RepairCL ic_repair( mg, lset.Phi, lset.GetBndData(), timedisc.ic, dist);//dist should be nonzero only for NarrowBand!
-    adap.push_back( &ic_repair);
-
-    InterfaceP1RepairCL imu_repair( mg, lset.Phi, lset.GetBndData(), timedisc.imu, dist);
-    adap.push_back( &imu_repair);
-
-
-    InterfaceP1RepairCL is_repair( mg, lset.Phi, lset.GetBndData(), timedisc.is, dist);
-    adap.push_back( &is_repair);
-
-    //LevelsetRepairCL lset2repair( lset2);
-    //adap.push_back( &lset2repair);
-
-    // Init concentration     // Init chemical potential
-    timedisc.idx.CreateNumbering( mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData(), dist);//WARNING
-    std::cout << "Concentration NumUnknowns: " << timedisc.idx.NumUnknowns() << std::endl;
-    timedisc.ic.SetIdx( &timedisc.idx);
-    timedisc.imu.SetIdx( &timedisc.idx);
-    timedisc.is.SetIdx( &timedisc.idx);
-    timedisc.iface.SetIdx( &timedisc.idx);
-
-    timedisc.SetInitialValue( the_poten_sol_fun, the_conc_sol_fun, the_species_sol_fun, 0.);
-
-    BndDataCL<> nobnd( 0);
-    VecDescCL the_conc_sol_vd( &lset.idx);
-    LSInit( mg, the_conc_sol_vd, the_conc_sol_fun, /*t*/ 0.);
-    VecDescCL the_poten_sol_vd( &lset.idx);
-    LSInit( mg, the_poten_sol_vd, the_poten_sol_fun, /*t*/ 0.);
-    VecDescCL the_species_sol_vd( &lset.idx);
-    LSInit( mg, the_species_sol_vd, the_species_sol_fun, /*t*/ 0.);
-
-    auto& cDOF = *(timedisc.GetConcentr().GetSolution());
-    VecDescCL cDOF_ext;
-    IdxDescCL P1FEidx(P1_FE);
-    P1FEidx.CreateNumbering(mg.GetLastLevel(), mg);
-    cDOF_ext.SetIdx(&P1FEidx);
-    logger.buf << "num unknowns for bulk c: " << P1FEidx.NumUnknowns() << '\n';
-
-    logger.log();
-
-    VTKWriter vtkWriter(dirName + "/vtk/separation", mg, inpJSON.get<bool>("Output.Binary"));
-    auto everyStep = inpJSON.get<int>("Output.EveryStep");
-    auto writeVTK = [&](double t) {
-        Extend(mg, cDOF, cDOF_ext);
-        vtkWriter.write(t);
-    };
-    if (everyStep > 0) {
-        vtkWriter
-            .add(VTKWriter::VTKVar({"level-set", &lset.Phi.Data, VTKWriter::VTKVar::Type::P2}))
-            .add(VTKWriter::VTKVar({"c_h", &cDOF_ext.Data, VTKWriter::VTKVar::Type::P1}));
-        writeVTK(0.);
-    }
-//    if (vtkwriter.get() != 0) {
-//        vtkwriter->Register( make_VTKScalar(      lset.GetSolution(),              "Levelset") );
-//        vtkwriter->Register( make_VTKIfaceScalar( mg, timedisc.iface,                 "interface_mesh"));
-//        vtkwriter->Register( make_VTKIfaceScalar( mg, timedisc.ic,                 "concentration"));
-//        vtkwriter->Register( make_VTKIfaceScalar( mg, timedisc.imu,                 "chem_potential"));
-//        vtkwriter->Register( make_VTKIfaceScalar( mg, timedisc.is,                 "species"));
-//        vtkwriter->Register( make_VTKVector(      make_P2Eval( mg, Bnd_v, v),      "Velocity"));
-//        //vtkwriter->Register( make_VTKScalar(      lset2.GetSolution(),             "Levelset2"));
-//        vtkwriter->Register( make_VTKScalar(      make_P2Eval( mg, nobnd, the_conc_sol_vd),  "concentration_exact"));
-//        vtkwriter->Register( make_VTKScalar(      make_P2Eval( mg, nobnd, the_poten_sol_vd),  "chem_potential_exact"));
-//
-//        vtkwriter->Write( 0.);
-//    }
-    //if (P.get<int>( "SurfSeparation.SolutionOutput.Freq") > 0)
-    //    DROPS::WriteFEToFile( timedisc.ic, mg, P.get<std::string>( "SurfSeparation.SolutionOutput.Path"), P.get<bool>( "SolutionOutput.Binary"));
-
-    const double dt= P.get<double>("Time.FinalTime")/P.get<double>("Time.NumSteps");
-    double L_2x_chi_err= L2_error( lset.Phi, lset.GetBndData(), timedisc.GetConcentr(), the_conc_sol_fun);
-    double L_2x_omega_err= L2_error( lset.Phi, lset.GetBndData(), timedisc.GetPotential(), the_poten_sol_fun);
-
-    std::cout << "L_2x-3-error: " << L_2x_chi_err
-              << "\nnorm of true solution: " << L2_norm( mg, lset.Phi, lset.GetBndData(), the_conc_sol_fun)
-              << std::endl;
-    double L_inftL_2x_chi_err= L_2x_chi_err;
-    double L_inftL_2x_omega_err= L_2x_omega_err;
-
-    std::cout << "L_inftL_2x-chi_error: " <<  L_inftL_2x_chi_err << std::endl;
-    std::cout << "L_inftL_2x-omega_error: " <<  L_inftL_2x_omega_err << std::endl;
-
-    double H_1x_chi_err= H1_error( lset.Phi, lset.GetBndData(), timedisc.GetConcentr(), the_conc_sol_fun);
-    std::cout << "H_1x-chi_error: " << H_1x_chi_err << std::endl;
-    double H_1x_omega_err= H1_error( lset.Phi, lset.GetBndData(), timedisc.GetPotential(), the_poten_sol_fun);
-    std::cout << "H_1x-omega_error: " << H_1x_omega_err << std::endl;
-    double L_2tH_1x_chi_err_sq= 0.5*dt*std::pow( H_1x_chi_err, 2);
-    double L_2tH_1x_omega_err_sq= 0.5*dt*std::pow( H_1x_omega_err, 2);
-    double L_2tL_2x_chi_err_sq= 0.5*dt*std::pow( L_2x_chi_err, 2);
-    double L_2tL_2x_omega_err_sq= 0.5*dt*std::pow( L_2x_omega_err, 2);
-
-    BndDataCL<> ifbnd( 0);
-    std::cout << "initial concentration on \\Gamma: " << Integral_Gamma( mg, lset.Phi, lset.GetBndData(), make_P1Eval(  mg, ifbnd, timedisc.ic)) << '\n';
-    std::cout << "initial chemical potential on \\Gamma: " << Integral_Gamma( mg, lset.Phi, lset.GetBndData(), make_P1Eval(  mg, ifbnd, timedisc.imu)) << '\n';
-
-    dynamic_cast<DistMarkingStrategyCL*>( adap.get_marking_strategy())->SetDistFct( lset);
-
-    //subdivide first timesteps into substeps
-    int total_subs=1;
-    auto sub_ratio = P.get<int>("Time.SubRatio");
-    for (int step= 1, STEP = 1; step <= P.get<int>("Time.NumSteps"); ++step) {
-        if (step>total_subs) sub_ratio=1;
-
-        for (int substep= 1; substep <= sub_ratio; ++substep) {
-            std::cout << "======================================================== step " << STEP  << ":\n";
-            ScopeTimerCL timer("Strategy: Time-loop");
-            const double cur_time = (step-1 + (double)substep/(double)sub_ratio) * dt;
-            double cur_dt=(1./(double)sub_ratio) * dt;
-            // Assumes (as the rest of Drops), that the current triangulation is acceptable to perform the time-step.
-            // If dt is large and AdapRef.Width is small, this may not be true.
-            // Watch for large differences in numbers of old and new dof.
-            timedisc.InitTimeStep();
-            LSInit(mg, lset.Phi, the_lset_fun, cur_time);
-            InitVel(mg, &v, Bnd_v, the_wind_fun, cur_time);
-
-            timedisc.DoStep0(cur_time);
-
-            VectorCL unityVector(1., timedisc.Mass.Data.num_rows());
-            auto surfaceArea = dot(timedisc.Mass.Data * unityVector, unityVector);
-            auto raftFraction = dot(timedisc.Mass.Data * timedisc.ic.Data, unityVector) / surfaceArea;
-            // auto surfaceArea = Integral_Gamma(mg, lset.Phi, lset.GetBndData(), unityFunc);
-            // auto raftFraction = Integral_Gamma(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, ifbnd, timedisc.ic)) / surfaceArea;
-
-            std::cout << "% of raft area: " << 100. * raftFraction << '\n';
-            std::cout << "chemical potential on \\Gamma: "
-                      << Integral_Gamma(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, ifbnd, timedisc.imu)) << '\n';
-
-            L_2x_chi_err = L2_error(lset.Phi, lset.GetBndData(), timedisc.GetConcentr(), the_conc_sol_fun);
-            std::cout << "L_2x-chi_error: " << L_2x_chi_err
-                      << "\nnorm of concentration solution: "
-                      << L2_norm(mg, lset.Phi, lset.GetBndData(), the_conc_sol_fun)
-                      << std::endl;
-
-            L_2x_omega_err = L2_error(lset.Phi, lset.GetBndData(), timedisc.GetPotential(), the_poten_sol_fun);
-            std::cout << "L_2x-omega_error: " << L_2x_omega_err
-                      << "\nnorm of omega solution: " << L2_norm(mg, lset.Phi, lset.GetBndData(), the_poten_sol_fun)
-                      << std::endl;
-
-            L_inftL_2x_chi_err = std::max(L_inftL_2x_chi_err, L_2x_chi_err);
-            std::cout << "L_inftL_2x-chi_error: " << L_inftL_2x_chi_err << std::endl;
-
-            L_inftL_2x_omega_err = std::max(L_inftL_2x_omega_err, L_2x_omega_err);
-            std::cout << "L_inftL_2x-omega_error: " << L_inftL_2x_omega_err << std::endl;
-
-            //L_2tH_1x_chi_err_sq+= (step > 1 ? 0.5 : 0.)*dt*std::pow( H_1x_chi_err, 2);
-            H_1x_chi_err = H1_error(lset.Phi, lset.GetBndData(), timedisc.GetConcentr(), the_conc_sol_fun);
-            std::cout << "H_1x-chi_error: " << H_1x_chi_err << std::endl;
-
-            L_2tH_1x_chi_err_sq += 0.5 * cur_dt * std::pow(H_1x_chi_err, 2);
-            std::cout << "L_2tH_1x-chi_error: " << std::sqrt(L_2tH_1x_chi_err_sq) << std::endl;
-
-            //L_2tH_1x_omega_err_sq+= (step > 1 ? 0.5 : 0.)*dt*std::pow( H_1x_omega_err, 2);
-            H_1x_omega_err = H1_error(lset.Phi, lset.GetBndData(), timedisc.GetPotential(), the_poten_sol_fun);
-            std::cout << "H_1x-omega_error: " << H_1x_omega_err << std::endl;
-
-            L_2tH_1x_omega_err_sq += 0.5 * cur_dt * std::pow(H_1x_omega_err, 2);
-            std::cout << "L_2tH_1x-omega_error: " << std::sqrt(L_2tH_1x_omega_err_sq) << std::endl;
-
-            L_2tL_2x_omega_err_sq += 0.5 * cur_dt * std::pow(L_2x_omega_err, 2);
-            std::cout << "L_2tL_2x-omega_error: " << std::sqrt(L_2tL_2x_omega_err_sq) << std::endl;
-
-            L_2tL_2x_chi_err_sq += 0.5 * cur_dt * std::pow(L_2x_chi_err, 2);
-            std::cout << "L_2tL2x-chi_error: " << std::sqrt(L_2tL_2x_chi_err_sq) << std::endl;
-
-            double Lyapunov_energy = (ParameterNS::eps / 2.) *
-                                     H1_error(lset.Phi, lset.GetBndData(), timedisc.GetConcentr(),
-                                              the_zero_fun)//dot(Laplace.Data*chi.Data,chi.Data)
-                                     + (1. / ParameterNS::eps) * Integral_Gamma(mg, lset.Phi, lset.GetBndData(),
-                                                                                make_P1Eval(mg, ifbnd,
-                                                                                            timedisc.ienergy));
-
-            double perimeter_estimator = ParameterNS::eps * dot(timedisc.Laplace.Data * cDOF.Data, cDOF.Data);
-            log_global << cur_time << "\t" << Lyapunov_energy << "\t" << perimeter_estimator << "\t" << timedisc.GetSolver().GetIter() << "\n" << std::endl;
-
-            if (everyStep > 0 && STEP % everyStep == 0) {
-                logger.beg("write vtk");
-                    writeVTK(cur_time);
-                logger.end();
-//                if (
-//                        (((substep) % 20) == 0)
-//                        //(step<100)
-//                        ||
-//                        (vtkwriter.get() != 0 && ((step) % P.get<int>("VTK.Freq")) == 0)) {
-//                    LSInit(mg, the_conc_sol_vd, the_conc_sol_fun, /*t*/ cur_time);
-//                    LSInit(mg, the_poten_sol_vd, the_poten_sol_fun, /*t*/ cur_time);
-//
-//                    vtkwriter->Write(cur_time);
-//                }
-
-            }
-//        lset2.DoStep();
-//        VectorCL rhs( lset2.Phi.Data.size());
-//        lset2.ComputeRhs( rhs);
-//        lset2.SetupSystem( make_P2Eval( mg, Bnd_v, v, cur_time));
-//        lset2.SetTimeStep( dt);
-//        lset2.DoStep( rhs);
-
-//         std::cout << "rel. Volume: " << lset.GetVolume()/Vol << std::endl;
-//         if (P.get("Levelset.VolCorr", 0)) {
-//             double dphi= lset.AdjustVolume( Vol, 1e-9);
-//             std::cout << "volume correction is " << dphi << std::endl;
-//             lset.Phi.Data+= dphi;
-//             std::cout << "new rel. Volume: " << lset.GetVolume()/Vol << std::endl;
-//         }
-            //if (C.rpm_Freq && step%C.rpm_Freq==0) { // reparam levelset function
-            // lset.ReparamFastMarching( C.rpm_Method);
-            /*int freq = (int) (0.5 * (dist / P.get<DROPS::Point3DCL>("SurfSeparation.Exp.Velocity").norm()) /
-                    ((1./(double)sub_ratio)*P.get<double>("Time.FinalTime") / P.get<double>("Time.NumSteps")));*/
-            int freq=P.get<int>("Mesh.AdaptRef.Freq");
-            const bool doGridMod = freq && step % freq == 0;
-            const bool gridChanged = doGridMod ? adap.UpdateTriang() : false;
-
-            // output
-            std::ofstream stats(dirName + "/stats/t_" + std::to_string(STEP) + ".json");
-            ParamCL tJSON;
-            tJSON.put("t", cur_time);
-            tJSON.put("dt", cur_dt);
-            tJSON.put("Integral.PerimeterEstimate", perimeter_estimator);
-            tJSON.put("Integral.LyapunovEnergy", Lyapunov_energy);
-            tJSON.put("Integral.SurfaceArea", surfaceArea);
-            tJSON.put("Integral.RaftFraction", raftFraction);
-            tJSON.put("Integral.Solver.Outer.TotalIters", timedisc.block_gm_.GetIter());
-            tJSON.put("Integral.Solver.Outer.Residual", timedisc.block_gm_.GetResid());
-            tJSON.put("Integral.Solver.Outer.Converged", timedisc.block_gm_.GetResid() <= inpJSON.get<double>("SurfSeparation.Solver.Tol"));
-            stats << tJSON;
-            logger.buf << tJSON;
-            logger.log();
-
-            if (inpJSON.get<bool>("SurfSeparation.ExportMatrices")) {
-                std::string format = inpJSON.get<std::string>("SurfSeparation.ExportMatricesFormat") == "mtx" ? ".mtx" : ".mat";
-                auto expFunc = format == ".mtx" ? &MatrixCL::exportMTX : &MatrixCL::exportMAT;
-                auto expMat = [&](MatrixCL& A, std::string const a, std::string const & b) {
-                    logger.beg(a);
-                        logger.buf << "size: " << A.num_rows() << "x" << A.num_cols();
-                        logger.log();
-                        (A.*expFunc)(dirName + "/matrices/" + b + format);
-                        tJSON.put("Matrices." + a, "../matrices/" + b + format);
-                    logger.end();
-                };
-                expMat(timedisc.Laplace.Data, "StiffnessMatrix", "A");
-
-                // tmp
-                std::ofstream cOut(dirName + "/matrices/c.txt");
-                cDOF.Write(cOut, false);
-
-                logger.log();
-            }
-
-            if (gridChanged) {
-
-                std::cout << "Triangulation changed.\n";
-                vidx.DeleteNumbering(mg);
-                vidx.CreateNumbering(mg.GetLastLevel(), mg, Bnd_v);
-                v.SetIdx(&vidx);
-                InitVel(mg, &v, Bnd_v, the_wind_fun, cur_time);
-                LSInit(mg, lset.Phi, the_lset_fun, cur_time);
-                the_conc_sol_vd.SetIdx(&lset.idx);
-                LSInit(mg, the_conc_sol_vd, the_conc_sol_fun, /*t*/ cur_time);
-                the_poten_sol_vd.SetIdx(&lset.idx);
-                LSInit(mg, the_poten_sol_vd, the_poten_sol_fun, /*t*/ cur_time);
-                the_species_sol_vd.SetIdx(&lset.idx);
-                LSInit(mg, the_species_sol_vd, the_species_sol_fun, /*t*/ cur_time);
-                // timedisc.Update(); // Called unconditionally in DoStep.
-
-                //lset2.SetupSystem( make_P2Eval( mg, Bnd_v, v), dt);
-
-                std::cout << "rel. Volume: " << lset.GetVolume() / Vol << std::endl;
-                lset.AdjustVolume();
-                lset.GetVolumeAdjuster()->DebugOutput(std::cout);
-                //vtkwriter->Write( cur_time+dt/2.);
-
-            }
-            ++STEP;
-        }
-    }
-    std::cout << std::endl;
-    std::cout << "L2t_L2x_omega L2t_L2x_chi L2t_H1x_omega L2t_H1x_chi Linft_L2x_omega Linft_L2x_chi  H1x_omega(T) H1x_chi(T) L2x_omega(T) L2x_chi(T)\t" <<std::endl
-        << std::sqrt(L_2tL_2x_omega_err_sq) <<"\t" << std::sqrt( L_2tL_2x_chi_err_sq)<<"\t"
-        << std::sqrt(L_2tH_1x_omega_err_sq) <<"\t" << std::sqrt(L_2tH_1x_chi_err_sq)<<"\t"
-        << L_inftL_2x_omega_err<<"\t" << L_inftL_2x_chi_err << "\t"
-        << H_1x_omega_err <<"\t" <<  H_1x_chi_err <<"\t"
-        << L_2x_omega_err <<"\t" << L_2x_chi_err << "\t"
-        <<std::endl;
-    log_errors << "L2t_L2x_omega L2t_L2x_chi L2t_H1x_omega L2t_H1x_chi Linft_L2x_omega Linft_L2x_chi  H1x_omega(T) H1x_chi(T) L2x_omega(T) L2x_chi(T)\t" <<std::endl
-        << std::sqrt(L_2tL_2x_omega_err_sq) <<"\t" << std::sqrt( L_2tL_2x_chi_err_sq)<<"\t"
-        << std::sqrt(L_2tH_1x_omega_err_sq) <<"\t" << std::sqrt(L_2tH_1x_chi_err_sq)<<"\t"
-        << L_inftL_2x_omega_err<<"\t" << L_inftL_2x_chi_err << "\t"
-        << H_1x_omega_err <<"\t" <<  H_1x_chi_err <<"\t"
-        << L_2x_omega_err <<"\t" << L_2x_chi_err << "\t"
-        <<std::endl;
-    //delete &lset2;
-    log_global.close();
-        log_errors.close();
-
-    }
-
 void StationaryStrategyP1 (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::LevelsetP2CL& lset)
 {
     adap.MakeInitialTriang();
@@ -2362,42 +1979,53 @@ void StationaryStrategyDeformationP2 (DROPS::MultiGridCL& mg, DROPS::AdapTriangC
 }
 
 int  main (int argc, char* argv[]) {
+    using namespace DROPS;
     srand(time(NULL));
     auto& logger = SingletonLogger::instance();
     try {
         ScopeTimerCL timer( "main");
-
-        DROPS::read_parameter_file_from_cmdline( P, argc, argv, "../../param/surfphasesep/separation.json");
-        std::cout << P << std::endl;
-
-        DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
-
-        // dirname  = P.get<std::string>("VTK.VTKDir")  + "CahnHilliard" + "_" + P.get<std::string>("SurfSeparation.Exp.Levelset")  + "/"   "l=" + std::to_string(int(P.get<int>("Mesh.AdaptRef.FinestLevel")))  + "_N=" + std::to_string(int(P.get<double>("Time.NumSteps")));
+        logger.beg("read input .json");
+            auto& inpJSON = P;
+            read_parameter_file_from_cmdline( inpJSON, argc, argv, "../../param/surfphasesep/separation.json");
+            dynamicLoad(inpJSON.get<std::string>("General.DynamicLibsPrefix"), inpJSON.get<std::vector<std::string>>("General.DynamicLibs"));
+            auto dirName = inpJSON.get<std::string>("Output.Directory");
+            system(("mkdir -p " + dirName).c_str());
+            system(("rm -r -f " + dirName + "/*").c_str());
+            system((
+                "mkdir " + dirName + "/matrices ; "
+                "mkdir " + dirName + "/vtk ; "
+                "mkdir " + dirName + "/tmp ; "
+                "mkdir " + dirName + "/stats"
+            ).c_str());
+            {
+                std::ofstream input(dirName + "/input.json");
+                input << inpJSON;
+                logger.buf << inpJSON;
+                logger.log();
+            }
+        logger.end();
         dirname = P.get<std::string>("Output.Directory") + "/tmp";
         std::cout << "Setting up interface-PDE.\n";
-        WindVelocity= P.get<DROPS::Point3DCL>("SurfSeparation.Exp.Velocity");
-        AngularVelocity= P.get<DROPS::Point3DCL>("SurfSeparation.Exp.Angular");
-        RadDrop=      P.get<DROPS::Point3DCL>("SurfSeparation.Exp.RadDrop");
-        PosDrop=      P.get<DROPS::Point3DCL>("SurfSeparation.Exp.PosDrop");
-        RadTorus=     P.get<DROPS::Point2DCL>("SurfSeparation.Exp.RadTorus");
+        WindVelocity= P.get<Point3DCL>("SurfSeparation.Exp.Velocity");
+        AngularVelocity= P.get<Point3DCL>("SurfSeparation.Exp.Angular");
+        RadDrop=      P.get<Point3DCL>("SurfSeparation.Exp.RadDrop");
+        PosDrop=      P.get<Point3DCL>("SurfSeparation.Exp.PosDrop");
+        RadTorus=     P.get<Point2DCL>("SurfSeparation.Exp.RadTorus");
         the_wind_fun= invecmap[P.get<std::string>("SurfSeparation.Exp.Wind")];
         the_normal_fun= invecmap[P.get<std::string>("SurfSeparation.Exp.Normal")];
         the_lset_fun= inscamap[P.get<std::string>("SurfSeparation.Exp.Levelset")];
         the_rhs_fun=  inscamap[P.get<std::string>("SurfSeparation.Exp.Rhs")];
         the_conc_sol_fun=  inscamap[P.get<std::string>("SurfSeparation.Exp.ConcentrationSolution")];
+        auto h = inpJSON.get<Point3DCL>("Mesh.E1")[0] / P.get<double>("Mesh.N1") * std::pow(2., -P.get<double>("Mesh.AdaptRef.FinestLevel"));
+        auto rho = inpJSON.get<double>("SurfSeparation.VolumeStab.Factor") * pow(h, inpJSON.get<double>("SurfSeparation.VolumeStab.Power"));
         auto raftRatio = P.get<double>("SurfSeparation.Exp.RaftRatio");
         auto raftRatioNoisePercent = P.get<double>("SurfSeparation.Exp.RaftRatioNoisePercent");
+
         std::random_device rd;
         std::mt19937 gen(rd());
         std::uniform_real_distribution<> dis(raftRatio - raftRatioNoisePercent * raftRatio, raftRatio + raftRatioNoisePercent * raftRatio);
-
         the_conc_sol_fun = [&](Point3DCL const &, double) {
             return dis(gen);
-//            auto random = (double) rand() / RAND_MAX;
-//            auto k = .5;
-//            auto ampl = .1;
-//            if (random < .5) return raftRatio + ampl*(2*k*random - 0.5);
-//            return raftRatio + ampl*(2*(1-k)*random + 2*k-1- 0.5);
         };
         logger.wrn("concentration soln set to RaftRatio");
 
@@ -2415,23 +2043,24 @@ int  main (int argc, char* argv[]) {
 
         std::cout << "Setting up domain:\n";
         std::unique_ptr<MGBuilderCL> builder( make_MGBuilder( P));
-        DROPS::MultiGridCL mg( *builder);
+        MultiGridCL mg( *builder);
         typedef DistMarkingStrategyCL MarkerT;
-        double dist=3*(2.0*P.get<DROPS::Point3DCL>("SurfSeparation.Exp.Velocity").norm()*P.get<double>("Time.FinalTime")/P.get<double>("Time.NumSteps")
-                    +P.get<DROPS::Point3DCL>("Mesh.E1")[0]/P.get<double>("Mesh.N1")/pow(2,P.get<int>("Mesh.AdaptRef.FinestLevel")));
+
+        double dist=3*(2.0*P.get<Point3DCL>("SurfSeparation.Exp.Velocity").norm()*P.get<double>("Time.FinalTime")/P.get<double>("Time.NumSteps")
+                    +P.get<Point3DCL>("Mesh.E1")[0]/P.get<double>("Mesh.N1")/pow(2,P.get<int>("Mesh.AdaptRef.FinestLevel")));
 
         MarkerT marker( the_lset_fun,
                 dist,
                // P.get<double>( "Mesh.AdaptRef.Width"),
                         P.get<int>( "Mesh.AdaptRef.CoarsestLevel"), P.get<int>( "Mesh.AdaptRef.FinestLevel"));
 
-        DROPS::AdapTriangCL adap( mg, &marker);
+        AdapTriangCL adap( mg, &marker);
         //Yushutin
         adap.MakeInitialTriang();
         //
 
-        // DROPS::LevelsetP2CL lset( mg, lsbnd, sf);
-        DROPS::LevelsetP2CL& lset( *LevelsetP2CL::Create( mg, lsbnd, sf, P.get_child("Levelset")) );
+        // LevelsetP2CL lset( mg, lsbnd, sf);
+        LevelsetP2CL& lset( *LevelsetP2CL::Create( mg, lsbnd, sf, P.get_child("Levelset")) );
 
 //        if (P.get<int>("VTK.Freq",0))
 //            vtkwriter= std::unique_ptr<VTKOutCL>( new VTKOutCL(
@@ -2447,18 +2076,368 @@ int  main (int argc, char* argv[]) {
 //                -1,    /* <- level */
 //                P.get<bool>("VTK.ReUseTimeFile")));
 
-        if (P.get<bool>( "SurfSeparation.Exp.StationaryPDE")) {
-    //        if (P.get<std::string>("LevelsetMapper.DeformationMethod") != "")
-    //            StationaryStrategyDeformationP2( mg, adap, lset);
-    //        else {
-    //            if (P.get<int>( "SurfSeparation.FEDegree") == 1)
-    //                StationaryStrategyP1( mg, adap, lset);
-    //            else
-    //                StationaryStrategyP2( mg, adap, lset);
-    //        }
+        //set up output
+        //dirname  = P.get<std::string>("VTK.VTKDir")  + "CahnHilliard" + "_" + P.get<std::string>("SurfSeparation.Exp.Levelset")  + "/"  "l=" + std::to_string(int(P.get<int>("Mesh.AdaptRef.FinestLevel")))  + "_N=" + std::to_string(int(P.get<double>("Time.NumSteps")));
+
+        std::cout << "dirname: " << dirname << std::endl;
+
+        std::ofstream log_errors;
+        log_errors.open( dirname +"/"
+                         + "Errors.txt");
+        log_errors.close();
+
+        if (!log_errors.is_open()) {
+            log_errors.open( dirname +"/"
+                             + "Errors.txt");}
+
+        std::ofstream log_global;
+        log_global.open( dirname +"/"
+                         + "Global.txt");
+        log_global.close();
+
+        if (!log_global.is_open()) {
+            log_global.open( dirname +"/"
+                             + "Global.txt");
+
+            //std::cout<< "can't open file with computed errors in: " << dirname << std::endl;
+            //return;
         }
-        else
-            Strategy( mg, adap, lset);
+
+        log_global << "Time " << "\t" << "Lyapunov_energy " << "H1_energy " << "\t" << "Number_iterations " << std::endl;
+
+        if (P.get<std::string>("SurfSeparation.Exp.Levelset") == std::string( "AxisScalingLset"))
+            dynamic_cast<DistMarkingStrategyCL*>( adap.get_marking_strategy())->SetDistFct( axis_scaling_lset_ini);
+        lset.CreateNumbering( mg.GetLastLevel(), &lset.idx);
+        lset.Phi.SetIdx( &lset.idx);
+        // LinearLSInit( mg, lset.Phi, the_lset_fun, 0.);
+        LSInit( mg, lset.Phi, the_lset_fun, 0.);
+
+        //LevelsetP2CL& lset2( *LevelsetP2CL::Create( mg, lsbnd, sf, P.get_child("Levelset")) );
+        //lset2.idx.CreateNumbering( mg.GetLastLevel(), mg);
+        //lset2.Phi.SetIdx( &lset2.idx);
+        //LSInit( mg, lset2.Phi, the_lset_fun, 0.);
+
+        const double Vol= lset.GetVolume();
+        lset.InitVolume( Vol);
+        std::cout << "droplet volume: " << Vol << std::endl;
+
+        BndDataCL<Point3DCL> Bnd_v( 6, bc_wind, bf_wind);
+        IdxDescCL vidx( vecP2_FE);
+        vidx.CreateNumbering( mg.GetLastLevel(), mg, Bnd_v);
+        VecDescCL v( &vidx);
+        InitVel( mg, &v, Bnd_v, the_wind_fun, 0.);
+
+        //lset2.SetupSystem( make_P2Eval( mg, Bnd_v, v), P.get<double>("Time.FinalTime")/P.get<double>("Time.NumSteps"));
+        dist /= 3.; // tmp
+        CahnHilliardNarrowBandStblP1CL timedisc(
+                mg,
+                P.get<double>("SurfSeparation.Theta"), P.get<double>("SurfSeparation.Mobility"),
+                P.get<double>("SurfSeparation.Epsilon"),
+                &v, Bnd_v, lset.Phi, lset.GetBndData(), the_normal_fun, dist,
+                rho, inpJSON.get<double>("SurfSeparation.Beta_s"),
+                P.get<int>("SurfSeparation.Solver.Iter"), P.get<double>("SurfSeparation.Solver.Tol"),
+                P.get<int>("SurfSeparation.Solver.PcAIter"), P.get<double>("SurfSeparation.Solver.PcATol"),
+                P.get<int>("SurfSeparation.Solver.PcBIter"), P.get<double>("SurfSeparation.Solver.PcBTol"),
+                P.get<double>("SurfSeparation.XFEMReduced")
+        );
+        timedisc.SetRhs( the_rhs_fun, the_zero_fun);
+
+        LevelsetRepairCL lsetrepair( lset);
+        adap.push_back( &lsetrepair);
+
+        InterfaceP1RepairCL ic_repair( mg, lset.Phi, lset.GetBndData(), timedisc.ic, dist);//dist should be nonzero only for NarrowBand!
+        adap.push_back( &ic_repair);
+
+        InterfaceP1RepairCL imu_repair( mg, lset.Phi, lset.GetBndData(), timedisc.imu, dist);
+        adap.push_back( &imu_repair);
+
+
+        InterfaceP1RepairCL is_repair( mg, lset.Phi, lset.GetBndData(), timedisc.is, dist);
+        adap.push_back( &is_repair);
+
+        //LevelsetRepairCL lset2repair( lset2);
+        //adap.push_back( &lset2repair);
+
+        // Init concentration     // Init chemical potential
+        timedisc.idx.CreateNumbering( mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData(), dist);//WARNING
+        std::cout << "Concentration NumUnknowns: " << timedisc.idx.NumUnknowns() << std::endl;
+        timedisc.ic.SetIdx( &timedisc.idx);
+        timedisc.imu.SetIdx( &timedisc.idx);
+        timedisc.is.SetIdx( &timedisc.idx);
+        timedisc.iface.SetIdx( &timedisc.idx);
+
+        timedisc.SetInitialValue( the_poten_sol_fun, the_conc_sol_fun, the_species_sol_fun, 0.);
+
+        BndDataCL<> nobnd( 0);
+        VecDescCL the_conc_sol_vd( &lset.idx);
+        LSInit( mg, the_conc_sol_vd, the_conc_sol_fun, /*t*/ 0.);
+        VecDescCL the_poten_sol_vd( &lset.idx);
+        LSInit( mg, the_poten_sol_vd, the_poten_sol_fun, /*t*/ 0.);
+        VecDescCL the_species_sol_vd( &lset.idx);
+        LSInit( mg, the_species_sol_vd, the_species_sol_fun, /*t*/ 0.);
+
+        auto& cDOF = *(timedisc.GetConcentr().GetSolution());
+        VecDescCL cDOF_ext;
+        IdxDescCL P1FEidx(P1_FE);
+        P1FEidx.CreateNumbering(mg.GetLastLevel(), mg);
+        cDOF_ext.SetIdx(&P1FEidx);
+        logger.buf << "num unknowns for bulk c: " << P1FEidx.NumUnknowns() << '\n';
+
+        logger.log();
+
+        VTKWriter vtkWriter(dirName + "/vtk/separation", mg, inpJSON.get<bool>("Output.Binary"));
+        auto everyStep = inpJSON.get<int>("Output.EveryStep");
+        auto writeVTK = [&](double t) {
+            Extend(mg, cDOF, cDOF_ext);
+            vtkWriter.write(t);
+        };
+        if (everyStep > 0) {
+            vtkWriter
+                    .add(VTKWriter::VTKVar({"level-set", &lset.Phi.Data, VTKWriter::VTKVar::Type::P2}))
+                    .add(VTKWriter::VTKVar({"c_h", &cDOF_ext.Data, VTKWriter::VTKVar::Type::P1}));
+            writeVTK(0.);
+        }
+//    if (vtkwriter.get() != 0) {
+//        vtkwriter->Register( make_VTKScalar(      lset.GetSolution(),              "Levelset") );
+//        vtkwriter->Register( make_VTKIfaceScalar( mg, timedisc.iface,                 "interface_mesh"));
+//        vtkwriter->Register( make_VTKIfaceScalar( mg, timedisc.ic,                 "concentration"));
+//        vtkwriter->Register( make_VTKIfaceScalar( mg, timedisc.imu,                 "chem_potential"));
+//        vtkwriter->Register( make_VTKIfaceScalar( mg, timedisc.is,                 "species"));
+//        vtkwriter->Register( make_VTKVector(      make_P2Eval( mg, Bnd_v, v),      "Velocity"));
+//        //vtkwriter->Register( make_VTKScalar(      lset2.GetSolution(),             "Levelset2"));
+//        vtkwriter->Register( make_VTKScalar(      make_P2Eval( mg, nobnd, the_conc_sol_vd),  "concentration_exact"));
+//        vtkwriter->Register( make_VTKScalar(      make_P2Eval( mg, nobnd, the_poten_sol_vd),  "chem_potential_exact"));
+//
+//        vtkwriter->Write( 0.);
+//    }
+        //if (P.get<int>( "SurfSeparation.SolutionOutput.Freq") > 0)
+        //    WriteFEToFile( timedisc.ic, mg, P.get<std::string>( "SurfSeparation.SolutionOutput.Path"), P.get<bool>( "SolutionOutput.Binary"));
+
+        const double dt= P.get<double>("Time.FinalTime")/P.get<double>("Time.NumSteps");
+        double L_2x_chi_err= L2_error( lset.Phi, lset.GetBndData(), timedisc.GetConcentr(), the_conc_sol_fun);
+        double L_2x_omega_err= L2_error( lset.Phi, lset.GetBndData(), timedisc.GetPotential(), the_poten_sol_fun);
+
+        std::cout << "L_2x-3-error: " << L_2x_chi_err
+                  << "\nnorm of true solution: " << L2_norm( mg, lset.Phi, lset.GetBndData(), the_conc_sol_fun)
+                  << std::endl;
+        double L_inftL_2x_chi_err= L_2x_chi_err;
+        double L_inftL_2x_omega_err= L_2x_omega_err;
+
+        std::cout << "L_inftL_2x-chi_error: " <<  L_inftL_2x_chi_err << std::endl;
+        std::cout << "L_inftL_2x-omega_error: " <<  L_inftL_2x_omega_err << std::endl;
+
+        double H_1x_chi_err= H1_error( lset.Phi, lset.GetBndData(), timedisc.GetConcentr(), the_conc_sol_fun);
+        std::cout << "H_1x-chi_error: " << H_1x_chi_err << std::endl;
+        double H_1x_omega_err= H1_error( lset.Phi, lset.GetBndData(), timedisc.GetPotential(), the_poten_sol_fun);
+        std::cout << "H_1x-omega_error: " << H_1x_omega_err << std::endl;
+        double L_2tH_1x_chi_err_sq= 0.5*dt*std::pow( H_1x_chi_err, 2);
+        double L_2tH_1x_omega_err_sq= 0.5*dt*std::pow( H_1x_omega_err, 2);
+        double L_2tL_2x_chi_err_sq= 0.5*dt*std::pow( L_2x_chi_err, 2);
+        double L_2tL_2x_omega_err_sq= 0.5*dt*std::pow( L_2x_omega_err, 2);
+
+        BndDataCL<> ifbnd( 0);
+        std::cout << "initial concentration on \\Gamma: " << Integral_Gamma( mg, lset.Phi, lset.GetBndData(), make_P1Eval(  mg, ifbnd, timedisc.ic)) << '\n';
+        std::cout << "initial chemical potential on \\Gamma: " << Integral_Gamma( mg, lset.Phi, lset.GetBndData(), make_P1Eval(  mg, ifbnd, timedisc.imu)) << '\n';
+
+        dynamic_cast<DistMarkingStrategyCL*>( adap.get_marking_strategy())->SetDistFct( lset);
+
+        //subdivide first timesteps into substeps
+        int total_subs=1;
+        auto sub_ratio = P.get<int>("Time.SubRatio");
+        for (int step= 1, STEP = 1; step <= P.get<int>("Time.NumSteps"); ++step) {
+            if (step>total_subs) sub_ratio=1;
+
+            for (int substep= 1; substep <= sub_ratio; ++substep) {
+                std::cout << "======================================================== step " << STEP  << ":\n";
+                ScopeTimerCL timer("Strategy: Time-loop");
+                const double cur_time = (step-1 + (double)substep/(double)sub_ratio) * dt;
+                double cur_dt=(1./(double)sub_ratio) * dt;
+                // Assumes (as the rest of Drops), that the current triangulation is acceptable to perform the time-step.
+                // If dt is large and AdapRef.Width is small, this may not be true.
+                // Watch for large differences in numbers of old and new dof.
+                timedisc.InitTimeStep();
+                LSInit(mg, lset.Phi, the_lset_fun, cur_time);
+                InitVel(mg, &v, Bnd_v, the_wind_fun, cur_time);
+
+                timedisc.DoStep0(cur_time);
+
+                VectorCL unityVector(1., timedisc.Mass.Data.num_rows());
+                auto surfaceArea = dot(timedisc.Mass.Data * unityVector, unityVector);
+                auto raftFraction = dot(timedisc.Mass.Data * timedisc.ic.Data, unityVector) / surfaceArea;
+                // auto surfaceArea = Integral_Gamma(mg, lset.Phi, lset.GetBndData(), unityFunc);
+                // auto raftFraction = Integral_Gamma(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, ifbnd, timedisc.ic)) / surfaceArea;
+
+                std::cout << "% of raft area: " << 100. * raftFraction << '\n';
+                std::cout << "chemical potential on \\Gamma: "
+                          << Integral_Gamma(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, ifbnd, timedisc.imu)) << '\n';
+
+                L_2x_chi_err = L2_error(lset.Phi, lset.GetBndData(), timedisc.GetConcentr(), the_conc_sol_fun);
+                std::cout << "L_2x-chi_error: " << L_2x_chi_err
+                          << "\nnorm of concentration solution: "
+                          << L2_norm(mg, lset.Phi, lset.GetBndData(), the_conc_sol_fun)
+                          << std::endl;
+
+                L_2x_omega_err = L2_error(lset.Phi, lset.GetBndData(), timedisc.GetPotential(), the_poten_sol_fun);
+                std::cout << "L_2x-omega_error: " << L_2x_omega_err
+                          << "\nnorm of omega solution: " << L2_norm(mg, lset.Phi, lset.GetBndData(), the_poten_sol_fun)
+                          << std::endl;
+
+                L_inftL_2x_chi_err = std::max(L_inftL_2x_chi_err, L_2x_chi_err);
+                std::cout << "L_inftL_2x-chi_error: " << L_inftL_2x_chi_err << std::endl;
+
+                L_inftL_2x_omega_err = std::max(L_inftL_2x_omega_err, L_2x_omega_err);
+                std::cout << "L_inftL_2x-omega_error: " << L_inftL_2x_omega_err << std::endl;
+
+                //L_2tH_1x_chi_err_sq+= (step > 1 ? 0.5 : 0.)*dt*std::pow( H_1x_chi_err, 2);
+                H_1x_chi_err = H1_error(lset.Phi, lset.GetBndData(), timedisc.GetConcentr(), the_conc_sol_fun);
+                std::cout << "H_1x-chi_error: " << H_1x_chi_err << std::endl;
+
+                L_2tH_1x_chi_err_sq += 0.5 * cur_dt * std::pow(H_1x_chi_err, 2);
+                std::cout << "L_2tH_1x-chi_error: " << std::sqrt(L_2tH_1x_chi_err_sq) << std::endl;
+
+                //L_2tH_1x_omega_err_sq+= (step > 1 ? 0.5 : 0.)*dt*std::pow( H_1x_omega_err, 2);
+                H_1x_omega_err = H1_error(lset.Phi, lset.GetBndData(), timedisc.GetPotential(), the_poten_sol_fun);
+                std::cout << "H_1x-omega_error: " << H_1x_omega_err << std::endl;
+
+                L_2tH_1x_omega_err_sq += 0.5 * cur_dt * std::pow(H_1x_omega_err, 2);
+                std::cout << "L_2tH_1x-omega_error: " << std::sqrt(L_2tH_1x_omega_err_sq) << std::endl;
+
+                L_2tL_2x_omega_err_sq += 0.5 * cur_dt * std::pow(L_2x_omega_err, 2);
+                std::cout << "L_2tL_2x-omega_error: " << std::sqrt(L_2tL_2x_omega_err_sq) << std::endl;
+
+                L_2tL_2x_chi_err_sq += 0.5 * cur_dt * std::pow(L_2x_chi_err, 2);
+                std::cout << "L_2tL2x-chi_error: " << std::sqrt(L_2tL_2x_chi_err_sq) << std::endl;
+
+                double Lyapunov_energy = (ParameterNS::eps / 2.) *
+                                         H1_error(lset.Phi, lset.GetBndData(), timedisc.GetConcentr(),
+                                                  the_zero_fun)//dot(Laplace.Data*chi.Data,chi.Data)
+                                         + (1. / ParameterNS::eps) * Integral_Gamma(mg, lset.Phi, lset.GetBndData(),
+                                                                                    make_P1Eval(mg, ifbnd,
+                                                                                                timedisc.ienergy));
+
+                double perimeter_estimator = ParameterNS::eps * dot(timedisc.Laplace.Data * cDOF.Data, cDOF.Data);
+                log_global << cur_time << "\t" << Lyapunov_energy << "\t" << perimeter_estimator << "\t" << timedisc.GetSolver().GetIter() << "\n" << std::endl;
+
+                if (everyStep > 0 && STEP % everyStep == 0) {
+                    logger.beg("write vtk");
+                    writeVTK(cur_time);
+                    logger.end();
+//                if (
+//                        (((substep) % 20) == 0)
+//                        //(step<100)
+//                        ||
+//                        (vtkwriter.get() != 0 && ((step) % P.get<int>("VTK.Freq")) == 0)) {
+//                    LSInit(mg, the_conc_sol_vd, the_conc_sol_fun, /*t*/ cur_time);
+//                    LSInit(mg, the_poten_sol_vd, the_poten_sol_fun, /*t*/ cur_time);
+//
+//                    vtkwriter->Write(cur_time);
+//                }
+
+                }
+//        lset2.DoStep();
+//        VectorCL rhs( lset2.Phi.Data.size());
+//        lset2.ComputeRhs( rhs);
+//        lset2.SetupSystem( make_P2Eval( mg, Bnd_v, v, cur_time));
+//        lset2.SetTimeStep( dt);
+//        lset2.DoStep( rhs);
+
+//         std::cout << "rel. Volume: " << lset.GetVolume()/Vol << std::endl;
+//         if (P.get("Levelset.VolCorr", 0)) {
+//             double dphi= lset.AdjustVolume( Vol, 1e-9);
+//             std::cout << "volume correction is " << dphi << std::endl;
+//             lset.Phi.Data+= dphi;
+//             std::cout << "new rel. Volume: " << lset.GetVolume()/Vol << std::endl;
+//         }
+                //if (C.rpm_Freq && step%C.rpm_Freq==0) { // reparam levelset function
+                // lset.ReparamFastMarching( C.rpm_Method);
+                /*int freq = (int) (0.5 * (dist / P.get<Point3DCL>("SurfSeparation.Exp.Velocity").norm()) /
+                        ((1./(double)sub_ratio)*P.get<double>("Time.FinalTime") / P.get<double>("Time.NumSteps")));*/
+                int freq=P.get<int>("Mesh.AdaptRef.Freq");
+                const bool doGridMod = freq && step % freq == 0;
+                const bool gridChanged = doGridMod ? adap.UpdateTriang() : false;
+
+                // output
+                std::ofstream stats(dirName + "/stats/t_" + std::to_string(STEP) + ".json");
+                ParamCL tJSON;
+                tJSON.put("h", h);
+                tJSON.put("rho", rho);
+                tJSON.put("t", cur_time);
+                tJSON.put("dt", cur_dt);
+                tJSON.put("Integral.PerimeterEstimate", perimeter_estimator);
+                tJSON.put("Integral.LyapunovEnergy", Lyapunov_energy);
+                tJSON.put("Integral.SurfaceArea", surfaceArea);
+                tJSON.put("Integral.RaftFraction", raftFraction);
+                tJSON.put("Integral.Solver.Outer.TotalIters", timedisc.block_gm_.GetIter());
+                tJSON.put("Integral.Solver.Outer.Residual", timedisc.block_gm_.GetResid());
+                tJSON.put("Integral.Solver.Outer.Converged", timedisc.block_gm_.GetResid() <= inpJSON.get<double>("SurfSeparation.Solver.Tol"));
+                stats << tJSON;
+                logger.buf << tJSON;
+                logger.log();
+
+                if (inpJSON.get<bool>("SurfSeparation.ExportMatrices")) {
+                    std::string format = inpJSON.get<std::string>("SurfSeparation.ExportMatricesFormat") == "mtx" ? ".mtx" : ".mat";
+                    auto expFunc = format == ".mtx" ? &MatrixCL::exportMTX : &MatrixCL::exportMAT;
+                    auto expMat = [&](MatrixCL& A, std::string const a, std::string const & b) {
+                        logger.beg(a);
+                        logger.buf << "size: " << A.num_rows() << "x" << A.num_cols();
+                        logger.log();
+                        (A.*expFunc)(dirName + "/matrices/" + b + format);
+                        tJSON.put("Matrices." + a, "../matrices/" + b + format);
+                        logger.end();
+                    };
+                    expMat(timedisc.Laplace.Data, "StiffnessMatrix", "A");
+
+                    // tmp
+                    std::ofstream cOut(dirName + "/matrices/c.txt");
+                    cDOF.Write(cOut, false);
+
+                    logger.log();
+                }
+
+                if (gridChanged) {
+
+                    std::cout << "Triangulation changed.\n";
+                    vidx.DeleteNumbering(mg);
+                    vidx.CreateNumbering(mg.GetLastLevel(), mg, Bnd_v);
+                    v.SetIdx(&vidx);
+                    InitVel(mg, &v, Bnd_v, the_wind_fun, cur_time);
+                    LSInit(mg, lset.Phi, the_lset_fun, cur_time);
+                    the_conc_sol_vd.SetIdx(&lset.idx);
+                    LSInit(mg, the_conc_sol_vd, the_conc_sol_fun, /*t*/ cur_time);
+                    the_poten_sol_vd.SetIdx(&lset.idx);
+                    LSInit(mg, the_poten_sol_vd, the_poten_sol_fun, /*t*/ cur_time);
+                    the_species_sol_vd.SetIdx(&lset.idx);
+                    LSInit(mg, the_species_sol_vd, the_species_sol_fun, /*t*/ cur_time);
+                    // timedisc.Update(); // Called unconditionally in DoStep.
+
+                    //lset2.SetupSystem( make_P2Eval( mg, Bnd_v, v), dt);
+
+                    std::cout << "rel. Volume: " << lset.GetVolume() / Vol << std::endl;
+                    lset.AdjustVolume();
+                    lset.GetVolumeAdjuster()->DebugOutput(std::cout);
+                    //vtkwriter->Write( cur_time+dt/2.);
+
+                }
+                ++STEP;
+            }
+        }
+        std::cout << std::endl;
+        std::cout << "L2t_L2x_omega L2t_L2x_chi L2t_H1x_omega L2t_H1x_chi Linft_L2x_omega Linft_L2x_chi  H1x_omega(T) H1x_chi(T) L2x_omega(T) L2x_chi(T)\t" <<std::endl
+                  << std::sqrt(L_2tL_2x_omega_err_sq) <<"\t" << std::sqrt( L_2tL_2x_chi_err_sq)<<"\t"
+                  << std::sqrt(L_2tH_1x_omega_err_sq) <<"\t" << std::sqrt(L_2tH_1x_chi_err_sq)<<"\t"
+                  << L_inftL_2x_omega_err<<"\t" << L_inftL_2x_chi_err << "\t"
+                  << H_1x_omega_err <<"\t" <<  H_1x_chi_err <<"\t"
+                  << L_2x_omega_err <<"\t" << L_2x_chi_err << "\t"
+                  <<std::endl;
+        log_errors << "L2t_L2x_omega L2t_L2x_chi L2t_H1x_omega L2t_H1x_chi Linft_L2x_omega Linft_L2x_chi  H1x_omega(T) H1x_chi(T) L2x_omega(T) L2x_chi(T)\t" <<std::endl
+                   << std::sqrt(L_2tL_2x_omega_err_sq) <<"\t" << std::sqrt( L_2tL_2x_chi_err_sq)<<"\t"
+                   << std::sqrt(L_2tH_1x_omega_err_sq) <<"\t" << std::sqrt(L_2tH_1x_chi_err_sq)<<"\t"
+                   << L_inftL_2x_omega_err<<"\t" << L_inftL_2x_chi_err << "\t"
+                   << H_1x_omega_err <<"\t" <<  H_1x_chi_err <<"\t"
+                   << L_2x_omega_err <<"\t" << L_2x_chi_err << "\t"
+                   <<std::endl;
+        log_global.close();
+        log_errors.close();
 
         delete &lset;
         rusage usage;
