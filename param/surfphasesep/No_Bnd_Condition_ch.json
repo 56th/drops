@@ -1,12 +1,15 @@
 {
+  "Output": {
+    "Directory":  "../../output/stat_surf/ch6_0.16",
+    "EveryStep":  1,
+    "Binary":     true
+  },
+
   "General":
   {
     "ProgressBar":  1,
     "DynamicLibsPrefix": "../",
-    "DynamicLibs": [
-
-
-    ]
+    "DynamicLibs": []
   },
 
   "Mesh":
@@ -17,16 +20,16 @@
     "E1": [3.33333, 0,0],
     "E2": [0,3.33333,0],
     "E3": [0,0,3.33333],
-    "N1": 5,
-    "N2": 5,
-    "N3": 5,
+    "N1": 2,
+    "N2": 2,
+    "N3": 2,
     "RestartFile": "",
     "AdaptRef": {
       "_comment":      "# adaptive refinement",
       "Freq":          0,
-      "Width":         10,
-      "CoarsestLevel": 7,
-      "FinestLevel":   7,
+      "Width":         -1,
+      "CoarsestLevel": 0,
+      "FinestLevel":   5,
       "SD":            0.1,
       "CurvDiff":      -1,
       "Discontinuous": 0
@@ -93,8 +96,9 @@
   {
     "Read" : 0,
     "Write": "yes",
-    "NumSteps":	100,
-    "StepSize": 0.0001
+    "NumSteps": 1000,
+    "FinalTime": 10,
+    "SubRatio" : 101
   },
 
 
@@ -151,25 +155,20 @@
 
   "SurfCahnHilliard":
   {
+    "VolumeStab" : {
+      "Factor" : 1.0,
+      "Power"  : 1.0
+    },
+    "Beta_s" : 1.0,
+    "RaftRatio" : 0.16,
+    "RaftRatioNoisePercent" : 0.1,
     "_comment": "# surface cahn-hilliard",
     "FE":           "P1P1",
     "model":        "CahnHilliard",
-    "testcase":      "9",
+    "testcase":      "no",
     "instationary": "BDF2",
     "mobility": 1,
     "epsilon": 0.01
-  },
-
-  "SurfNavStokes":
-  {
-    "_comment": "# surface navier stokes",
-    "FE":           "P1P1",
-    "fullgrad":     0,
-    "model":        "NavierStokes",
-    "testcase":      "95",
-    "instationary": "BDF2",
-    "nonlinear_term": "convective",
-    "kinematic_viscosity": 1
   },
 
   "SurfTransp":
@@ -197,12 +196,5 @@
     "PcBTol":       1e-4,
     "Iter":         1000,
     "Tol":          1e-8
-  },
-
-  "Output":
-  {
-    "Directory":    "../../output/",
-    "every timestep": "1"
   }
-
 }

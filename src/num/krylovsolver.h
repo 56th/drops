@@ -407,6 +407,7 @@ GMRES(const Mat& A, Vec& x, const Vec& b, const ExT& ex, PreCon& M,
                           << std::fabs(s[i+1]) << '\n';
             }
 
+            std::cout << std::scientific;
             std::cout << "          GMRES on " << j << " iteration with residual: " << resid << std::endl;
 
             if (resid <= tol) {
