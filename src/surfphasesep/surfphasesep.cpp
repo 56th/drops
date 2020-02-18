@@ -152,8 +152,8 @@ int main (int argc, char* argv[])
     std::string testcase = P.get<std::string>("SurfCahnHilliard.testcase");
     double h = P.get<DROPS::Point3DCL>("Mesh.E1")[0]/P.get<double>("Mesh.N1")*std::pow(2., -P.get<double>("Mesh.AdaptRef.FinestLevel"));
 
-    auto tau = P.get<double>("Time.FinalTime") / P.get<double>("Time.NumSteps");
-    if (P.get<std::string>("SurfCahnHilliard.instationary") == "none") tau = 1.;
+    auto dt = P.get<double>("Time.FinalTime") / P.get<double>("Time.NumSteps");
+    if (P.get<std::string>("SurfCahnHilliard.instationary") == "none") dt = 1.;
 
     double eta_order=-2.0;
     double epsilon_order=1.0;
@@ -164,7 +164,7 @@ int main (int argc, char* argv[])
     double rho         = 1.e0 * pow(h, 1); //constant for M_p complement preconditioner
 
     std::cout << "h is: " << h << std::endl;
-    std::cout << "tau is: " << tau << std::endl;
+    std::cout << "dt is: " << dt << std::endl;
     ParameterNS::h = h;
 
     auto S = inpJSON.get<double>("SurfCahnHilliard.Beta_s");
@@ -241,12 +241,12 @@ int main (int argc, char* argv[])
 
         if (model=="CahnHilliard")
         {
-            Precond3.LinComb(1.0/tau, Mass.Data, rho, Volume_stab.Data, sigm, Laplace.Data);
+            Precond3.LinComb(1.0 / dt, Mass.Data, rho, Volume_stab.Data, sigm, Laplace.Data);
             Precond4.LinComb(1.0, Mass.Data, rho*eps*eps, Volume_stab.Data, eps*eps, Laplace.Data);
         }
         else if (model=="AllenCahn")
         {
-            Precond3.LinComb(1.0/tau, Mass.Data, rho, Volume_stab.Data, sigm, Laplace.Data);
+            Precond3.LinComb(1.0 / dt, Mass.Data, rho, Volume_stab.Data, sigm, Laplace.Data);
             Precond4.LinComb(1.0    , Mass.Data, rho, Volume_stab.Data,   eps, Laplace.Data);
         }
 
@@ -433,8 +433,7 @@ int main (int argc, char* argv[])
 /////////////////////////////////////// Cahn-Hilliard ///////////////////////////////////////
 
 	if( !model.compare("CahnHilliard") || !model.compare("AllenCahn")) {
-        VectorCL id;
-        id.resize(rhs3.Data.size(), 1);
+        VectorCL unityVector(1., Mass.Data.num_rows());
 		//set up discrete vectors and matrices
         DROPS::VecDescCL omegaxtent, chixtent;
 
@@ -448,6 +447,9 @@ int main (int argc, char* argv[])
 
 
         VTKWriter vtkWriter(dirName + "/vtk/separation", mg, inpJSON.get<bool>("Output.Binary"));
+        vtkWriter
+                .add(VTKWriter::VTKVar({"level-set", &lset.Phi.Data, VTKWriter::VTKVar::Type::P2}))
+                .add(VTKWriter::VTKVar({"c_h", &chi_ext.Data, VTKWriter::VTKVar::Type::P1}));
         auto everyStep = inpJSON.get<int>("Output.EveryStep");
         auto writeVTK = [&](double t) {
             Extend(mg, chi, chi_ext);
@@ -490,14 +492,38 @@ int main (int argc, char* argv[])
         	chi=chiInit;
         	chi_old=chiInit;
 
-        	//output of initial data and exact solutions to vtk and custom
-            if (everyStep > 0) {
-                vtkWriter
-                        .add(VTKWriter::VTKVar({"level-set", &lset.Phi.Data, VTKWriter::VTKVar::Type::P2}))
-                        .add(VTKWriter::VTKVar({"c_h", &chi_ext.Data, VTKWriter::VTKVar::Type::P1}));
-                writeVTK(0.);
-            }
-
+        	auto t = 0.;
+        	auto cur_dt = dt;
+            auto exportStats = [&](size_t i) {
+                std::ofstream stats(dirName + "/stats/t_" + std::to_string(i) + ".json");
+                ParamCL tJSON;
+                tJSON.put("h", h);
+                tJSON.put("rho", alpha);
+                tJSON.put("t", t);
+                tJSON.put("c_h.Max", chi.Data.max());
+                tJSON.put("c_h.Min", chi.Data.min());
+                tJSON.put("Integral.PerimeterEstimate", eps * dot(Laplace.Data * chi.Data, chi.Data));
+                tJSON.put("Integral.LyapunovEnergy", (eps / 2.) * dot(Laplace.Data * chi.Data, chi.Data) + (1. / eps) * dot(Mass.Data * energy.Data, unityVector));
+                auto surfaceArea = dot(Mass.Data * unityVector, unityVector);
+                tJSON.put("Integral.SurfaceArea", surfaceArea);
+                tJSON.put("Integral.RaftFraction", dot(Mass.Data * chi.Data, unityVector) / surfaceArea);
+                if (i > 0) {
+                    tJSON.put("dt", cur_dt);
+                    tJSON.put("Integral.Solver.Outer.TotalIters", solver->GetIter());
+                    tJSON.put("Integral.Solver.Outer.Residual", solver->GetResid());
+                    tJSON.put("Integral.Solver.Outer.Converged", solver->GetResid() <= inpJSON.get<double>("Solver.Tol"));
+                }
+                if (everyStep > 0 && i % everyStep == 0) {
+                    logger.beg("write vtk");
+                        writeVTK(t);
+                    auto vtkTime = logger.end();
+                    tJSON.put("ElapsedTime.VTK", vtkTime);
+                }
+                stats << tJSON;
+                logger.buf << tJSON;
+                logger.log();
+            };
+            exportStats(0);
         	//right constant for temporal BDF
         	/*double c;
         	if ( P.get<std::string>("SurfCahnHilliard.instationary") == "BDF1")
@@ -521,15 +547,15 @@ int main (int argc, char* argv[])
                                      + "Plot_" + filename
                                      + "l="  + P.get<std::string>("Mesh.AdaptRef.FinestLevel") + "_"
                                      + P.get<std::string>("SurfCahnHilliard.instationary") + "="
-                                     + std::to_string(float(tau))
+                                     + std::to_string(float(dt))
                                      + ".txt");
 
-            log_global.open( dirname +"/"
-                                     + "Global_" + filename
-                                     + "l="  + P.get<std::string>("Mesh.AdaptRef.FinestLevel") + "_"
-                                     + P.get<std::string>("SurfCahnHilliard.instationary") + "="
-                                     + std::to_string(float(tau)) +
-                                     ".txt");
+            log_global.open(dirname + "/"
+                            + "Global_" + filename
+                            + "l=" + P.get<std::string>("Mesh.AdaptRef.FinestLevel") + "_"
+                            + P.get<std::string>("SurfCahnHilliard.instationary") + "="
+                            + std::to_string(float(dt)) +
+                            ".txt");
 
             double Energy_L2_omega=0.0;
             double Energy_L2_chi=0.0;
@@ -555,7 +581,7 @@ int main (int argc, char* argv[])
                     energy.Data[i] = Potential_function(chi.Data[i]);
                 }
                 double Lyapunov_energy = (eps / 2.) * dot(Laplace.Data * chi.Data, chi.Data) +
-                                         (1. / eps) * dot(Mass.Data * energy.Data, id);
+                                         (1. / eps) * dot(Mass.Data * energy.Data, unityVector);
                 log_plot << std::to_string((float) L2_omega) << "\t" << std::to_string((float) L2_chi) << "\t" <<
                          std::to_string((float) L2_omega_error) << "\t" << std::to_string((float) L2_chi_error) << "\t"
                          <<
@@ -564,11 +590,11 @@ int main (int argc, char* argv[])
             }
             auto total_subs = 1;
             auto sub_ratio = P.get<int>("Time.SubRatio");
-        	for (int i = 0, STEP = 1; i < P.get<double>("Time.NumSteps"); i++) {
+        	for (int i = 1, STEP = 1; i <= P.get<double>("Time.NumSteps"); i++) {
                 if (i > total_subs) sub_ratio = 1;
                 for (int substep = 1; substep <= sub_ratio; ++substep) {
-                    double t = (i + (double)substep/(double)sub_ratio) * tau;
-                    auto cur_dt = (1./(double)sub_ratio) * tau;
+                    t = (i - 1. + static_cast<double>(substep) / sub_ratio) * dt;
+                    cur_dt = dt / sub_ratio;
                     if (model=="CahnHilliard")
                         Precond3.LinComb(1.0/cur_dt, Mass.Data, rho, Volume_stab.Data, sigm, Laplace.Data);
                     else if (model=="AllenCahn")
@@ -584,7 +610,7 @@ int main (int argc, char* argv[])
                         }
                     } else if (P.get<std::string>("SurfCahnHilliard.instationary") == "BDF2") {
                         //leading time term mass coeff
-                        if (i != 0) {
+                        if (i != 1) {
                             c = 3.0 / 2.0;
                         } else c = 1.0;
                         chi_new.Data = 2.0 * chi.Data + (-1.) * chi_old.Data;
@@ -624,7 +650,7 @@ int main (int argc, char* argv[])
 
 
                     // pick inertial term and reinitialise unknowns
-                    if ((P.get<std::string>("SurfCahnHilliard.instationary") == "BDF1") || (i == 0)) {
+                    if ((P.get<std::string>("SurfCahnHilliard.instationary") == "BDF1") || (i == 1)) {
                         std::cout << "inertial term: BDF1 " << std::endl;
                         instantrhs3.Data += (1.0 / cur_dt) * (Mass.Data * chi.Data);
                         chi_old = chi;
@@ -636,7 +662,7 @@ int main (int argc, char* argv[])
                     }
                     if (model == "CahnHilliard") {
                         //add well-potential
-                        //instantrhs3.Data *= (tau/c);
+                        //instantrhs3.Data *= (dt/c);
                         instantrhs4.Data -= (1.) * (Mass.Data * well_potential.Data);
                         //instantrhs4.Data += (eps*eps/2.)*(Laplace.Data*chi_new.Data);
                         instantrhs4.Data += (S) * (Mass.Data * chi_new.Data);
@@ -672,14 +698,6 @@ int main (int argc, char* argv[])
                         AC_solver->Solve(A, chi.Data, instantrhs3.Data, chi.RowIdx->GetEx());
 
                     }
-
-                    //skip vtk output of needed
-                    if (everyStep > 0 && STEP % everyStep == 0) {
-                        logger.beg("write vtk");
-                            writeVTK(t);
-                        logger.end();
-                    }
-
                     log_plot << std::to_string((float) t) << "\t";
                     if (!prFE.compare("P1")) {
                         omegaxtent.SetIdx(&P1FEidx);
@@ -698,18 +716,11 @@ int main (int argc, char* argv[])
                         for (int i = 0; i < energy.Data.size(); i++) {
                             energy.Data[i] = Potential_function(chi.Data[i]);
                         }
-                        double Lyapunov_energy = (eps / 2.) * dot(Laplace.Data * chi.Data, chi.Data) +
-                                                 (1. / eps) * dot(Mass.Data * energy.Data, id);
-
-                        auto perimeter_estimator = eps * dot(Laplace.Data * chi.Data, chi.Data);
-                        VectorCL unityVector(1., Mass.Data.num_rows());
-                        auto surfaceArea = dot(Mass.Data * unityVector, unityVector);
-                        auto raftFraction = dot(Mass.Data * chi.Data, unityVector) / surfaceArea;
 
                         log_plot << std::to_string((float) L2_omega) << "\t" << std::to_string((float) L2_chi) << "\t" <<
                                  std::to_string((float) L2_omega_error) << "\t" << std::to_string((float) L2_chi_error)
                                  << "\t" <<
-                                 std::to_string((float) Lyapunov_energy) <<
+                                 // std::to_string((float) Lyapunov_energy) <<
                                  std::endl;
                         Energy_L2_omega += L2_omega_error * L2_omega_error * cur_dt;
                         Energy_L2_chi += L2_chi_error * L2_chi_error * cur_dt;
@@ -720,24 +731,7 @@ int main (int argc, char* argv[])
                             C_norm_omega = L2_omega_error;
                         }
                         // output
-                        std::ofstream stats(dirName + "/stats/t_" + std::to_string(STEP) + ".json");
-                        ParamCL tJSON;
-                        tJSON.put("h", h);
-                        tJSON.put("rho", alpha);
-                        tJSON.put("t", t);
-                        tJSON.put("dt", cur_dt);
-                        tJSON.put("c_h.Max", chi.Data.max());
-                        tJSON.put("c_h.Min", chi.Data.min());
-                        tJSON.put("Integral.PerimeterEstimate", perimeter_estimator);
-                        tJSON.put("Integral.LyapunovEnergy", Lyapunov_energy);
-                        tJSON.put("Integral.SurfaceArea", surfaceArea);
-                        tJSON.put("Integral.RaftFraction", raftFraction);
-                        tJSON.put("Integral.Solver.Outer.TotalIters", solver->GetIter());
-                        tJSON.put("Integral.Solver.Outer.Residual", solver->GetResid());
-                        tJSON.put("Integral.Solver.Outer.Converged", solver->GetResid() <= inpJSON.get<double>("Solver.Tol"));
-                        stats << tJSON;
-                        logger.buf << tJSON;
-                        logger.log();
+                        exportStats(STEP);
                     }
                     std::cout << "Total iterations of inner 3-solver, t=" << t << ": " << PCGSolver3.GetIter() << '\n';
                     std::cout << "Total iterations of inner 4-solver, t=" << t << ": " << PCGSolver4.GetIter() << '\n';
@@ -762,8 +756,8 @@ int main (int argc, char* argv[])
 
             if ( P.get<std::string>("Time.Write") != "none" )
             {
-                std::ofstream dump(dirname  + "/chi_dump"+"_t=" + std::to_string((float)(T0+tau*P.get<double>("Time.NumSteps"))) + ".dat");
-                std::ofstream dump2(dirname  + "/omega_dump"+"_t=" + std::to_string((float)(T0+tau*P.get<double>("Time.NumSteps"))) + ".dat");
+                std::ofstream dump(dirname + "/chi_dump" + "_t=" + std::to_string((float)(T0 + dt * P.get<double>("Time.NumSteps"))) + ".dat");
+                std::ofstream dump2(dirname + "/omega_dump" + "_t=" + std::to_string((float)(T0 + dt * P.get<double>("Time.NumSteps"))) + ".dat");
 
                 chi.Write(dump);
                 omega.Write(dump2);
