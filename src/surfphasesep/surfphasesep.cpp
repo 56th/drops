@@ -29,7 +29,6 @@
 
 #include "num/oseensolver.h"
 #include <fstream>
-#include <random>
 
 #include "surfphasesep/surfphasesep_funcs.h"
 #include "surfnavierstokes/surfnavierstokes_utils.h"
@@ -39,6 +38,8 @@
 #include "surfnavierstokes/VTKWriter.hpp"
 // logger
 #include "SingletonLogger.hpp"
+// initial data
+#include "SurfCahnHilliardData.hpp"
 
 using namespace DROPS;
 
@@ -84,6 +85,9 @@ int main (int argc, char* argv[])
           logger.log();
       }
     logger.end();
+    auto surfCahnHilliardData = SurfCahnHilliardDataFactory(inpJSON);
+    logger.buf << surfCahnHilliardData.description;
+    logger.log();
     // build initial mesh
     std::cout << "Setting up interface-PDE:\n";
     std::auto_ptr<DROPS::MGBuilderCL> builder( DROPS::make_MGBuilder( P));
@@ -96,26 +100,9 @@ int main (int argc, char* argv[])
     if (ch)
         read_PeriodicBoundaries( mg, *ch);
 
-
-    // choose level set
-    InstatScalarFunction levelset_fun;
-    std::string levelset_fun_str = P.get<std::string>("Levelset.case");
-
-    if( !levelset_fun_str.compare("sphere_2")) {
-        levelset_fun = &sphere_2;
-        std::cout << "The levelset is the unit sphere." << std::endl;
-    } else  if( !levelset_fun_str.compare("tamarind")) {
-        levelset_fun = &tamarind;
-        std::cout << "The levelset is the tamarind." << std::endl;
-    }
-    else  if( !levelset_fun_str.compare("spindle")) {
-        levelset_fun = &spindle;
-        std::cout << "The levelset is the spindle." << std::endl;
-    }
-
     // adaptive mesh refinement based on level set function
     typedef DROPS::DistMarkingStrategyCL InitMarkerT;
-    InitMarkerT initmarker( levelset_fun, P.get<double>("Mesh.AdaptRef.Width"), P.get<int>("Mesh.AdaptRef.CoarsestLevel"), P.get<int>("Mesh.AdaptRef.FinestLevel") );
+    InitMarkerT initmarker( surfCahnHilliardData.surface.phi, P.get<double>("Mesh.AdaptRef.Width"), P.get<int>("Mesh.AdaptRef.CoarsestLevel"), P.get<int>("Mesh.AdaptRef.FinestLevel") );
     //adap.set_marking_strategy( &initmarker );
       DROPS::AdapTriangCL adap( mg, &initmarker );
 
@@ -133,8 +120,8 @@ int main (int argc, char* argv[])
 
     lset.CreateNumbering( mg.GetLastLevel(), &lset.idx);
     lset.Phi.SetIdx( &lset.idx);
-//    LinearLSInit( mg, lset.Phi, levelset_fun);
-    lset.Init( levelset_fun);
+//    LinearLSInit( mg, lset.Phi, surfCahnHilliardData.surface.phi);
+    lset.Init( surfCahnHilliardData.surface.phi);
 
     // parse FE types and some other parameters from json file
     std::string FE = P.get<std::string>("SurfCahnHilliard.FE");
@@ -170,7 +157,7 @@ int main (int argc, char* argv[])
     auto S = inpJSON.get<double>("SurfCahnHilliard.Beta_s");
 
     double sigm = P.get<double>("SurfCahnHilliard.mobility");
-    double eps = P.get<double>("SurfCahnHilliard.epsilon");
+    double eps = P.get<double>("SurfCahnHilliard.Epsilon");
     ParameterNS::sigma = sigm;
     ParameterNS::eps = eps;
 
@@ -324,115 +311,6 @@ int main (int argc, char* argv[])
           solver=AC_solver;
       }
 
-    // set function pointers and rhs vectors for different test cases
-    DROPS::InstatScalarFunction extchisol = &ZeroScalarFun,
-    							 extrhs3=&ZeroScalarFun,
-								 extrhs4=&ZeroScalarFun,
-								 extomegasol=&ZeroScalarFun;
-
-    if( !levelset_fun_str.compare("sphere_2")) {
-        if( !testcase.compare("1")) {
-            std::cout << "Test case 1: mobility=const, stationary omega=harmonic, chi=harmonic/2" << std::endl;
-            extchisol = &Test1_chiSol;
-            extomegasol = &Test1_omegaSol;
-            extrhs3 = &Test1_rhs3;
-        }
-        if( !testcase.compare("2")) {
-                    std::cout << "Test case 2: mobility=const, instationary omega=(1-exp(-4t))*harmonic, chi=(1-exp(-4t))*harmonic/2" << std::endl;
-                    extchisol = &Test2_chiSol;
-                    extomegasol = &Test2_omegaSol;
-                    extrhs3 = &Test2_rhs3;
-
-        }
-        if( !testcase.compare("3")) {
-                           std::cout << "Test case 3: mobility=nonlinear, instationary omega=(1-exp(-4t))*harmonic, chi=(1-exp(-4t))*harmonic/2 " << std::endl;
-                           extchisol = &Test3_chiSol;
-                           extomegasol = &Test3_omegaSol;
-                           extrhs3 = &Test3_rhs3;
-                           extrhs4 = &Test3_rhs4;
-
-        }
-        if( !testcase.compare("4")) {
-            std::cout << "Test case 4: mobility=nonlinear and strictly positive, instationary omega=(1-exp(-4t))*harmonic, chi=(1-exp(-4t))*harmonic/2  " << std::endl;
-            extchisol = &Test3_chiSol;
-            extomegasol = &Test3_omegaSol;
-            extrhs3 = &Test4_rhs3;
-            extrhs4 = &Test3_rhs4;
-
-        }
-        if( !testcase.compare("5")) {
-            std::cout << "Test case 5: Allen-Cahn with space-uniform solution" << std::endl;
-            extchisol = &Test5_chiSol;
-        }
-        if( !testcase.compare("6")) {
-            std::cout << "Test case 6: Cahn-Hilliard with decay*harmonic initial condition" << std::endl;
-            extchisol = &Test6_chiSol;
-            extomegasol = &Test6_omegaSol;
-            extrhs3 = &Test6_rhs3;
-        }
-        if( !testcase.compare("7")) {
-            std::cout << "Test case 7: Allen-Cahn with decay*harmonic initial condition" << std::endl;
-            extchisol = &Test7_chiSol;
-            extrhs3 = &Test7_rhs3;
-
-        }
-        if( !testcase.compare("8")) {
-            std::cout << "Test case 8: Allen-Cahn with decay*harmonic initial condition but linear well potential" << std::endl;
-            extchisol = &Test7_chiSol;
-            extrhs3 = &Test8_rhs3;
-
-        }
-        if( !testcase.compare("9")) {
-            std::cout << "Test case 9: Allen-Cahn with random initial condition " << std::endl;
-            extchisol = &Test9_chiSol;
-
-        }
-        if( !testcase.compare("10")) {
-            std::cout << "Test case 10: Cahn-Hilliard with decay*second-order initial condition" << std::endl;
-            extchisol = &Test10_chiSol;
-            extomegasol = &Test10_omegaSol;
-            extrhs3 = &Test10_rhs3;
-
-        }
-        if( !testcase.compare("11")) {
-            std::cout << "Test case 11: Allen-Cahn with decay*second-order initial condition" << std::endl;
-            extchisol = &Test11_chiSol;
-            extrhs3 = &Test11_rhs3;
-
-        }
-        if( !testcase.compare("12")) {
-            std::cout << "Test case 12: Cahn-Hilliard with  harmonic initial condition" << std::endl;
-            extchisol = &Test12_chiSol;
-        }
-
-    } else if( !levelset_fun_str.compare("tamarind")) {
-        if (!testcase.compare("9")) {
-            std::cout << "Test case 9: Allen-Cahn with random initial condition " << std::endl;
-            extchisol = &Test9_chiSol;
-        }
-    }
-
-    else if( !levelset_fun_str.compare("spindle")) {
-            if (!testcase.compare("9")) {
-                std::cout << "Test case 9: Allen-Cahn with random initial condition " << std::endl;
-                extchisol = &Test9_chiSol;
-
-            }
-        }
-
-      auto raftRatio = P.get<double>("SurfCahnHilliard.RaftRatio");
-      auto raftRatioNoisePercent = P.get<double>("SurfCahnHilliard.RaftRatioNoisePercent");
-      std::random_device rd;
-      std::mt19937 gen(rd());
-      std::uniform_real_distribution<> dis(raftRatio - raftRatioNoisePercent * raftRatio, raftRatio + raftRatioNoisePercent * raftRatio);
-      extchisol = [&](Point3DCL const &, double) {
-          return dis(gen);
-      };
-      logger.wrn("concentration soln set to RaftRatio");
-
-/////////////////////////////////////// Cahn-Hilliard ///////////////////////////////////////
-
-	if( !model.compare("CahnHilliard") || !model.compare("AllenCahn")) {
         VectorCL unityVector(1., Mass.Data.num_rows());
 		//set up discrete vectors and matrices
         DROPS::VecDescCL omegaxtent, chixtent;
@@ -469,8 +347,8 @@ int main (int argc, char* argv[])
 //        vtkwriter->Register( make_VTKIfaceScalar(mg, rhs4, "rhs4", pbnd));
 
 
-        InitScalar(mg, chiInit, extchisol, 0.);
-        InitScalar(mg, chiSol, extchisol, 0.);
+        InitScalar(mg, chiInit, surfCahnHilliardData.chi, 0.);
+        InitScalar(mg, chiSol, surfCahnHilliardData.chi, 0.);
 
         //NAVIER-STOKES starts here
         if ( P.get<std::string>("SurfCahnHilliard.instationary") != "none" )
@@ -570,9 +448,9 @@ int main (int argc, char* argv[])
                 chixtent.SetIdx(&P1FEidx);
                 Extend(mg, chi, chixtent);
                 double L2_omega_error = L2_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, omegabnd, omegaxtent),
-                                                 extomegasol, T0);
+                                                 surfCahnHilliardData.omega, T0);
                 double L2_chi_error = L2_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, chibnd, chixtent),
-                                               extchisol, T0);
+                                               surfCahnHilliardData.chi, T0);
                 double L2_omega = L2_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, omegabnd, omegaxtent),
                                            ZeroScalarFun, T0);
                 double L2_chi = L2_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, chibnd, chixtent),
@@ -619,13 +497,13 @@ int main (int argc, char* argv[])
                                     2 * Potential_prime_function(chi.Data[i]) - Potential_prime_function(chi_old.Data[i]);
                         }
                     } else { return 0; }
-                    InitScalar(mg, chiSol, extchisol, t);
-                    InitScalar(mg, omegaSol, extomegasol, t);
+                    InitScalar(mg, chiSol, surfCahnHilliardData.chi, t);
+                    InitScalar(mg, omegaSol, surfCahnHilliardData.omega, t);
 
                     //current timestep logfile
                     std::ofstream log(dirname + "/" + filename + "_time=" + std::to_string(t) + ".txt");
-                    SetupInterfaceRhsP1(mg, &rhs3, lset.Phi, lset.GetBndData(), extrhs3, t);
-                    SetupInterfaceRhsP1(mg, &rhs4, lset.Phi, lset.GetBndData(), extrhs4, t);
+                    SetupInterfaceRhsP1(mg, &rhs3, lset.Phi, lset.GetBndData(), surfCahnHilliardData.rhs3, t);
+                    SetupInterfaceRhsP1(mg, &rhs4, lset.Phi, lset.GetBndData(), surfCahnHilliardData.rhs4, t);
 
 
                     for (int i = 0; i < well_potential_concave.Data.size(); i++) {
@@ -706,9 +584,9 @@ int main (int argc, char* argv[])
                         Extend(mg, chi, chixtent);
                         double L2_omega_error = L2_error(mg, lset.Phi, lset.GetBndData(),
                                                          make_P1Eval(mg, omegabnd, omegaxtent),
-                                                         extomegasol, t);
+                                                         surfCahnHilliardData.omega, t);
                         double L2_chi_error = L2_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, chibnd, chixtent),
-                                                       extchisol, t);
+                                                       surfCahnHilliardData.chi, t);
                         double L2_omega = L2_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, omegabnd, omegaxtent),
                                                    ZeroScalarFun, t);
                         double L2_chi = L2_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, chibnd, chixtent),
@@ -775,8 +653,8 @@ int main (int argc, char* argv[])
                                       + "Global_" + filename
                                       + "l="  + P.get<std::string>("Mesh.AdaptRef.FinestLevel")
                                       + ".txt");
-            SetupInterfaceRhsP1(mg, &rhs3, lset.Phi, lset.GetBndData(), extrhs3, 0);
-            SetupInterfaceRhsP1(mg, &rhs4, lset.Phi, lset.GetBndData(), extrhs4, 0);
+            SetupInterfaceRhsP1(mg, &rhs3, lset.Phi, lset.GetBndData(), surfCahnHilliardData.rhs3, 0);
+            SetupInterfaceRhsP1(mg, &rhs4, lset.Phi, lset.GetBndData(), surfCahnHilliardData.rhs4, 0);
 
 
             SetupCahnHilliardIF_P1P1(mg,  &Mass, &Normal_stab, &Tangent_stab, &Volume_stab, &Laplace, &LaplaceM,&Gprimeprime, lset.Phi, lset.GetBndData(), v, vbnd,chi, chibnd);
@@ -791,8 +669,8 @@ int main (int argc, char* argv[])
 
             chi.Data *= -1.0;
 
-            InitScalar(mg,   chiSol,   extchisol,1);
-            InitScalar(mg, omegaSol, extomegasol,1);
+            InitScalar(mg,   chiSol,   surfCahnHilliardData.chi,1);
+            InitScalar(mg, omegaSol, surfCahnHilliardData.omega,1);
 
             //skip vtk output of needed
             if (everyStep > 0) {
@@ -813,9 +691,9 @@ int main (int argc, char* argv[])
                 log_global <<  "L2 3-variable: " << std::to_string((float)L2_omega) << std::endl;
                 log_global <<  "L2 4-variable: " << std::to_string((float)L2_chi) << std::endl;
                 double L2_omega_error = L2_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, omegabnd, omegaxtent),
-                                           extomegasol, 0);
+                                           surfCahnHilliardData.omega, 0);
                 double L2_chi_error = L2_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, chibnd, chixtent),
-                                         extchisol, 0);
+                                         surfCahnHilliardData.chi, 0);
                 log_global <<  "L2 3-variable error: " << std::to_string((float)L2_omega_error) << std::endl;
                 log_global <<  "L2 4-variable error: " << std::to_string((float)L2_chi_error) << std::endl;
 
@@ -856,7 +734,6 @@ int main (int argc, char* argv[])
         log_global << "The average iterationsnumber of the global solver is: " << averageglobal << '\n' << " ...with a standart deviation of: " << variationglobal  << std::endl;
 
         std::cout << "Output is located: " << dirname << std::endl;
-    }
 
 /////////////////////////////////////// Error ///////////////////////////////////////
 
