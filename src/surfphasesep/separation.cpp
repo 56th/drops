@@ -2263,7 +2263,7 @@ int  main (int argc, char* argv[]) {
 
                 VectorCL unityVector(1., timedisc.Mass.Data.num_rows());
                 auto surfaceArea = dot(timedisc.Mass.Data * unityVector, unityVector);
-                auto raftFraction = dot(timedisc.Mass.Data * timedisc.ic.Data, unityVector) / surfaceArea;
+                auto raftFraction = dot(timedisc.Mass.Data * cDOF.Data, unityVector) / surfaceArea;
                 // auto surfaceArea = Integral_Gamma(mg, lset.Phi, lset.GetBndData(), unityFunc);
                 // auto raftFraction = Integral_Gamma(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, ifbnd, timedisc.ic)) / surfaceArea;
 
@@ -2363,6 +2363,8 @@ int  main (int argc, char* argv[]) {
                 tJSON.put("rho", rho);
                 tJSON.put("t", cur_time);
                 tJSON.put("dt", cur_dt);
+                tJSON.put("c_h.Max", cDOF.Data.max());
+                tJSON.put("c_h.Min", cDOF.Data.min());
                 tJSON.put("Integral.PerimeterEstimate", perimeter_estimator);
                 tJSON.put("Integral.LyapunovEnergy", Lyapunov_energy);
                 tJSON.put("Integral.SurfaceArea", surfaceArea);
