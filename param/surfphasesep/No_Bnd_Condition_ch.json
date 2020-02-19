@@ -1,6 +1,6 @@
 {
   "Output" : {
-    "Directory":  "../../output/ch7_per_0.005",
+    "Directory":  "../../output/test",
     "EveryStep":  1,
     "Binary":     true
   },
@@ -14,6 +14,7 @@
         "RaftRatioNoiseFraction" : 4.0
       }
     },
+    "c_0" : 0.5,
     "VolumeStab" : {
       "Factor" : 1.0,
       "Power"  : 1.0
@@ -30,7 +31,7 @@
   "Time": {
     "Read" : 0,
     "Write": "yes",
-    "NumSteps": 0,
+    "NumSteps": 1,
     "FinalTime": 1,
     "SubRatio" : 1
   },
@@ -50,7 +51,7 @@
       "Freq":          0,
       "Width":         -1,
       "CoarsestLevel": 0,
-      "FinestLevel":   7,
+      "FinestLevel":   4,
       "SD":            0.1,
       "CurvDiff":      -1,
       "Discontinuous": 0

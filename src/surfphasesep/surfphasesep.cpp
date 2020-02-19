@@ -88,6 +88,23 @@ int main (int argc, char* argv[])
     auto surfCahnHilliardData = SurfCahnHilliardDataFactory(inpJSON);
     logger.buf << surfCahnHilliardData.description;
     logger.log();
+    auto c0 = inpJSON.get<double>("SurfCahnHilliard.c_0");
+    auto c0ToHalf = [=](double c) { // maps [0, c_0] to [0, 1/2] and [c_0, 1] to [1/2, ]
+        if (c < c0) return c / (2. * c0);
+        return (c - c0) / (2. - 2. * c0) + .5;
+    };
+    auto c0ToHalfPrime = [=](double c) {
+        if (c < c0) return 1. / (2. * c0);
+        return 1. / (2. - 2. * c0);
+    };
+    auto potential = [&](double x) {
+        auto c = c0ToHalf(x);
+        return .25 * (1. - c) * (1. - c) * c * c;
+    };
+    auto potentialPrime = [&](double x) {
+        auto c = c0ToHalf(x);
+        return c0ToHalfPrime(x) * .5 * c * (1. - 3. * c + 2. * c * c);
+    };
     // build initial mesh
     std::cout << "Setting up interface-PDE:\n";
     std::auto_ptr<DROPS::MGBuilderCL> builder( DROPS::make_MGBuilder( P));
@@ -456,7 +473,7 @@ int main (int argc, char* argv[])
                 double L2_chi = L2_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, chibnd, chixtent),
                                          ZeroScalarFun, T0);
                 for (int i = 0; i < energy.Data.size(); i++) {
-                    energy.Data[i] = Potential_function(chi.Data[i]);
+                    energy.Data[i] = potential(chi.Data[i]);
                 }
                 double Lyapunov_energy = (eps / 2.) * dot(Laplace.Data * chi.Data, chi.Data) +
                                          (1. / eps) * dot(Mass.Data * energy.Data, unityVector);
@@ -484,7 +501,7 @@ int main (int argc, char* argv[])
                         c = 1.0;
                         chi_new.Data = chi.Data;
                         for (int i = 0; i < well_potential.Data.size(); i++) {
-                            well_potential.Data[i] = Potential_prime_function(chi.Data[i]);
+                            well_potential.Data[i] = potentialPrime(chi.Data[i]);
                         }
                     } else if (P.get<std::string>("SurfCahnHilliard.instationary") == "BDF2") {
                         //leading time term mass coeff
@@ -494,7 +511,7 @@ int main (int argc, char* argv[])
                         chi_new.Data = 2.0 * chi.Data + (-1.) * chi_old.Data;
                         for (int i = 0; i < well_potential.Data.size(); i++) {
                             well_potential.Data[i] =
-                                    2 * Potential_prime_function(chi.Data[i]) - Potential_prime_function(chi_old.Data[i]);
+                                    2 * potentialPrime(chi.Data[i]) - potentialPrime(chi_old.Data[i]);
                         }
                     } else { return 0; }
                     InitScalar(mg, chiSol, surfCahnHilliardData.chi, t);
@@ -513,8 +530,8 @@ int main (int argc, char* argv[])
                     for (int i = 0; i < well_potential_convex.Data.size(); i++) {
                         well_potential_convex.Data[i] = Potential_prime_convex_function(chi.Data[i]);
                     }
-                    //well_potential.Data = chi_new.Data.apply(&Potential_prime_function);
-                    //well_potential.Data += (-1)*chi_old.Data.apply(&Potential_prime_function);
+                    //well_potential.Data = chi_new.Data.apply(&potentialPrime);
+                    //well_potential.Data += (-1)*chi_old.Data.apply(&potentialPrime);
 
                     SetupCahnHilliardIF_P1P1(mg, &Mass, &Normal_stab, &Tangent_stab, &Volume_stab, &Laplace, &LaplaceM,
                                              &Gprimeprime, lset.Phi, lset.GetBndData(), v, vbnd, chi_new, chibnd);
@@ -592,7 +609,7 @@ int main (int argc, char* argv[])
                         double L2_chi = L2_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, chibnd, chixtent),
                                                  ZeroScalarFun, t);
                         for (int i = 0; i < energy.Data.size(); i++) {
-                            energy.Data[i] = Potential_function(chi.Data[i]);
+                            energy.Data[i] = potential(chi.Data[i]);
                         }
 
                         log_plot << std::to_string((float) L2_omega) << "\t" << std::to_string((float) L2_chi) << "\t" <<
