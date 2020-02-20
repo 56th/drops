@@ -269,7 +269,7 @@ class TorusBodyCL : public BodyCL
 class LevelsetBodyCL : public BodyCL
 {
   private:
-    double (*ls_)(const Point3DCL&, double);
+    InstatScalarFunction ls_;
 
   public:
     LevelsetBodyCL (BodyStackT&, const ParamCL& p)
@@ -284,7 +284,7 @@ class LevelsetBodyCL : public BodyCL
     }
 
     double operator() (const Point3DCL& x, double t) const
-        { return (*ls_)( x, t); }
+        { return ls_( x, t); }
 };
 
 ///\brief Load a body from another json-file.

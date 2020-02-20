@@ -58,7 +58,6 @@ namespace DROPS
 // typedef double    (*InstatScalarFunction)(const DROPS::Point3DCL&, double);
 // typedef std::pair<double,double> TimeInterval;
 
-typedef double    (*InstatScalarFunction)(const DROPS::Point3DCL&, double);
 typedef std::pair<double,double> TimeInterval;
 
 class SpaceTimeXSolutionCL

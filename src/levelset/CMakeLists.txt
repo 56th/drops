@@ -47,6 +47,28 @@ exec_par(twophasedrops geom-boundary geom-builder geom-deformation geom-simplex 
 
 exec_ser(twophasedrops geom-boundary geom-builder geom-deformation geom-simplex geom-multigrid num-unknowns geom-topo num-fe misc-problem levelset-levelset levelset-adaptriang levelset-marking_strategy misc-progressaccu misc-scopetimer misc-utils out-output num-discretize navstokes-instatnavstokes2phase misc-params levelset-fastmarch stokes-instatstokes2phase stokes-slipBndOnePhase num-MGsolver num-fe out-ensightOut num-oseenprecond poisson-transport2phase num-interfacePatch surfactant-ifacetransp levelset-surfacetension geom-geomselect levelset-twophaseutils num-hypre levelset-coupling misc-funcmap geom-principallattice geom-reftetracut geom-subtriangulation num-renumber num-quadrature misc-dynamicload out-vtkOut num-stokespardiso)
 
+# trilinos
+if (Trilinos_FOUND)
+    target_link_libraries(twophasedrops
+            ${Trilinos_LIBRARIES}
+            ${Trilinos_TPL_LIBRARIES}
+            )
+endif()
+
+# matlab for sparse mtx .mat binary output
+if(Matlab_FOUND)
+    add_library(${HOME}-matlab1 SHARED IMPORTED)
+    set_target_properties(${HOME}-matlab1 PROPERTIES
+            IMPORTED_LOCATION "${Matlab_ROOT_DIR}/extern/bin/glnxa64/libMatlabDataArray.so"
+            INTERFACE_INCLUDE_DIRECTORIES "${Matlab_ROOT_DIR}/extern/include"
+            )
+    add_library(${HOME}-matlab2 SHARED IMPORTED)
+    set_target_properties(${HOME}-matlab2 PROPERTIES
+            IMPORTED_LOCATION "${Matlab_ROOT_DIR}/extern/bin/glnxa64/libMatlabEngine.so"
+            INTERFACE_INCLUDE_DIRECTORIES "${Matlab_ROOT_DIR}/extern/include"
+            )
+    target_link_libraries(twophasedrops -lpthread ${HOME}-matlab1 ${HOME}-matlab2)
+endif()
 
 # convention: make sure that those coefficient-defining shared objects are built which ared used in the default configuration of the executable..
 add_dependencies(twophasedrops levelset-twophaseCoeff levelset-filmCoeff misc-scalarFunctions misc-vectorFunctions misc-csgFunctions)

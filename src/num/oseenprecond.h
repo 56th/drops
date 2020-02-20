@@ -59,10 +59,15 @@ class SchurPreBaseCL
     virtual void Apply(const MatrixCL& A,   VectorCL& x, const VectorCL& b, const ExchangeCL& vel_ex, const ExchangeCL& p_ex) const = 0;
     virtual void Apply(const MLMatrixCL& A, VectorCL& x, const VectorCL& b, const ExchangeCL& vel_ex, const ExchangeCL& p_ex) const = 0;
 #endif
-    virtual void Apply(const MatrixCL& A,   VectorCL& x, const VectorCL& b, const DummyExchangeCL& p_ex) const = 0;
-    virtual void Apply(const MatrixCL& A,   VectorCL& x, const VectorCL& b, const DummyExchangeCL& vel_ex, const DummyExchangeCL& p_ex) const = 0;
-    virtual void Apply(const MLMatrixCL& A, VectorCL& x, const VectorCL& b, const DummyExchangeCL& vel_ex, const DummyExchangeCL& p_ex) const = 0;
-
+    virtual void Apply(const MatrixCL& A,   VectorCL& x, const VectorCL& b, const DummyExchangeCL& p_ex) const {
+        throw std::logic_error("Apply() is note implemented for a derived class of SchurPreBaseCL");
+    }
+    virtual void Apply(const MatrixCL& A,   VectorCL& x, const VectorCL& b, const DummyExchangeCL& vel_ex, const DummyExchangeCL& p_ex) const {
+        throw std::logic_error("Apply() is note implemented for a derived class of SchurPreBaseCL");
+    }
+    virtual void Apply(const MLMatrixCL& A, VectorCL& x, const VectorCL& b, const DummyExchangeCL& vel_ex, const DummyExchangeCL& p_ex) const {
+        throw std::logic_error("Apply() is note implemented for a derived class of SchurPreBaseCL");
+    }
 
     // dummy Apply routine for inexact Uzawa. The matrix parameter in the Apply is not used, anyway.
     template<typename PcT, typename Mat, typename ExT>

@@ -978,9 +978,8 @@ class FunAsP2EvalCL
     }
 };
 
-typedef FunAsP2EvalCL<double (*) (const Point3DCL&, double), double>       ScalarFunAsP2EvalCL;
-typedef FunAsP2EvalCL<Point3DCL (*) (const Point3DCL&, double), Point3DCL> VectorFunAsP2EvalCL;
-
+using ScalarFunAsP2EvalCL = FunAsP2EvalCL<InstatScalarFunction, double>;
+using VectorFunAsP2EvalCL = FunAsP2EvalCL<InstatVectorFunction, Point3DCL>;
 
 //**************************************************************************
 // Class:   P1BubbleEvalCL                                                 *
