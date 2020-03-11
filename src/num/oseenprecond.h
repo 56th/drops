@@ -212,8 +212,8 @@ template <typename Mat, typename Vec, typename ExT>
 void SurfaceLaplacePreCL<SolverT>::Apply(const Mat&, Vec& p, const Vec& c, const ExT&, const ExT& ex) const
 {
     solver_.Solve(S_, p, c, ex);
-    std::cout << "                  SurfaceLaplacePreCL iterations: " << solver_.GetIter()
-              << "\tresidual: " <<  solver_.GetResid() << '\n';
+    //std::cout << "                  SurfaceLaplacePreCL iterations: " << solver_.GetIter()
+    //          << "\tresidual: " <<  solver_.GetResid() << '\n';
     if (solver_.GetIter() == solver_.GetMaxIter())
         std::cout << "SurfaceLaplacePreCL::Apply (1st solve: iterations: " << solver_.GetIter()
                   << "\tresidual: " <<  solver_.GetResid() << '\n';

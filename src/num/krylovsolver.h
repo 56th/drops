@@ -408,7 +408,7 @@ GMRES(const Mat& A, Vec& x, const Vec& b, const ExT& ex, PreCon& M,
             }
 
             std::cout << std::scientific;
-            std::cout << "          GMRES on " << j << " iteration with residual: " << resid << std::endl;
+            if (j % 100 == 0) std::cout << "          GMRES on " << j << " iteration with residual: " << resid << std::endl;
 
             if (resid <= tol) {
                 if (method == RightPreconditioning)

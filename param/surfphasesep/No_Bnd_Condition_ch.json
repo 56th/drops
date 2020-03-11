@@ -6,12 +6,12 @@
   },
 
   "SurfCahnHilliard" : {
-    "TestName" : "OneZeroSphere",
+    "TestName" : "Random",
     "IC" : {
       "Comment" : "initial condition parameters",
       "Random" : {
-        "RaftRatio" : 0.1,
-        "RaftRatioNoiseFraction" : 4.0
+        "RaftRatio" : 0.3,
+        "RaftRatioNoiseFraction" : 0.5
       }
     },
     "c_0" : 0.5,
@@ -25,15 +25,18 @@
     "testcase":      "no",
     "instationary": "BDF2",
     "mobility": 1,
-    "Epsilon": 0.005
+    "Epsilon": 0.01
   },
 
   "Time": {
     "Read" : 0,
     "Write": "yes",
-    "NumSteps": 1,
-    "FinalTime": 1,
-    "SubRatio" : 1
+    "StepSize": 0.01,
+    "FinalTime": 300 ,
+    "Adaptive" : {
+      "Tol" : 0.001,
+      "rho" : 0.9
+    }
   },
 
   "Mesh" : {
@@ -51,7 +54,7 @@
       "Freq":          0,
       "Width":         -1,
       "CoarsestLevel": 0,
-      "FinestLevel":   4,
+      "FinestLevel":   5,
       "SD":            0.1,
       "CurvDiff":      -1,
       "Discontinuous": 0
