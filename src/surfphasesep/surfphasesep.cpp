@@ -208,20 +208,18 @@ int main (int argc, char* argv[])
     P1FEidx.CreateNumbering(mg.GetLastLevel(), mg);
 
     // construct FE vectors (initialized with zero)
-     DROPS::VecDescCL v, omega, omegaSol, chi, chi_ext, chi_old, chi_BDF1, chi_BDF2, chi_extrap, chiSol, energy, well_potential, well_potential_concave,  well_potential_convex, chiInit, rhs3, instantrhs3, rhs4, instantrhs4;
+     DROPS::VecDescCL v, omega, omegaSol, chi, chi_ext, chi_prev, chi_prev_prev, chi_BDF1, chi_BDF2, chi_extrap, chiSol, energy, well_potential, rhs3, instantrhs3, rhs4, instantrhs4;
      if( !FE.compare("P1P1")) {
     	 v.SetIdx( &ifaceVecP1idx);
     	 chi.SetIdx( &ifaceP1idx);
     	 chi_ext.SetIdx(&P1FEidx);
-    	 chi_old.SetIdx( &ifaceP1idx);
+    	 chi_prev.SetIdx(&ifaceP1idx);
+         chi_prev_prev.SetIdx(&ifaceP1idx);
          chi_BDF1.SetIdx( &ifaceP1idx);
          chi_BDF2.SetIdx( &ifaceP1idx);
          chi_extrap.SetIdx(&ifaceP1idx);
          well_potential.SetIdx( &ifaceP1idx);
          energy.SetIdx( &ifaceP1idx);
-         well_potential_convex.SetIdx( &ifaceP1idx);
-         well_potential_concave.SetIdx( &ifaceP1idx);
-         chiInit.SetIdx( &ifaceP1idx);
     	 chiSol.SetIdx( &ifaceP1idx);
     	 omega.SetIdx( &ifaceP1idx);
     	 omegaSol.SetIdx( &ifaceP1idx);
@@ -244,19 +242,10 @@ int main (int argc, char* argv[])
         Tangent_stab.SetIdx(&ifaceP1idx, &ifaceP1idx);
         Volume_stab.SetIdx(&ifaceP1idx, &ifaceP1idx);
         SetupCahnHilliardIF_P1P1(mg,  &Mass,&Normal_stab, &Tangent_stab, &Volume_stab, &Laplace, &LaplaceM, &Gprimeprime, lset.Phi, lset.GetBndData(), v, vbnd, chi, chibnd);
-
         if (model=="CahnHilliard")
-        {
-            Precond3.LinComb(1.0 / dt, Mass.Data, rho, Volume_stab.Data, sigm, Laplace.Data);
             Precond4.LinComb(1.0, Mass.Data, rho*eps*eps, Volume_stab.Data, eps*eps, Laplace.Data);
-        }
         else if (model=="AllenCahn")
-        {
-            Precond3.LinComb(1.0 / dt, Mass.Data, rho, Volume_stab.Data, sigm, Laplace.Data);
             Precond4.LinComb(1.0    , Mass.Data, rho, Volume_stab.Data,   eps, Laplace.Data);
-        }
-
-
     }
 
     // construct preconditioners
@@ -331,17 +320,6 @@ int main (int argc, char* argv[])
       }
 
         VectorCL unityVector(1., Mass.Data.num_rows());
-		//set up discrete vectors and matrices
-        DROPS::VecDescCL omegaxtent, chixtent;
-
-        //set up output
-        std::string filename = "test" + testcase + "_";
-       	std::string dirname = P.get<std::string>("Output.Directory") + "/tmp";;
-
-       	std::cout << "dirname: " << dirname << std::endl;
-
-        std::ofstream log_global;
-
 
         VTKWriter vtkWriter(dirName + "/vtk/separation", mg, inpJSON.get<bool>("Output.Binary"));
         vtkWriter
@@ -353,43 +331,11 @@ int main (int argc, char* argv[])
             vtkWriter.write(t);
         };
 
-       	//set up VTK output
-//       	VTKOutCL * vtkwriter = NULL;
-//       	vtkwriter = new VTKOutCL(mg, "DROPS data", (int)P.get<double>("Time.NumSteps")/P.get<int>("Output.every timestep"), dirname , filename, "none", 1 );
-//        vtkwriter->Register( make_VTKScalar( lset.GetSolution(), "level-set") );
-//        vtkwriter->Register( make_VTKIfaceScalar(mg, chi, "volume fraction", pbnd));
-//        vtkwriter->Register( make_VTKIfaceScalar(mg, omega, "GL-potential", pbnd));
-//        vtkwriter->Register( make_VTKIfaceScalar(mg, chiSol, "volume fraction exact", pbnd));
-//        vtkwriter->Register( make_VTKIfaceScalar(mg, omegaSol, "GL-potential exact", pbnd));
-//        vtkwriter->Register( make_VTKIfaceVector(mg, v, "velocity", velFE, vbnd));
-//        vtkwriter->Register( make_VTKIfaceScalar(mg, rhs3, "rhs3", pbnd));
-//        vtkwriter->Register( make_VTKIfaceScalar(mg, rhs4, "rhs4", pbnd));
-
-
-        InitScalar(mg, chiInit, surfCahnHilliardData.chi, 0.);
-        InitScalar(mg, chiSol, surfCahnHilliardData.chi, 0.);
-
-        //NAVIER-STOKES starts here
-        if ( P.get<std::string>("SurfCahnHilliard.instationary") != "none" )
-        {
         	BndDataCL<Point3DCL> bndvec = vbnd;
         	BndDataCL<double> bndscalar = pbnd;
-
-        	double T0=P.get<double>("Time.Read");
-        	if (T0!= 0)
-            {
-                std::ifstream dump(dirname + "/chi_dump"+"_t=" + std::to_string((float)(T0)) + ".dat");
-                std::ifstream dump2(dirname + "/omega_dump"+"_t=" + std::to_string((float)(T0)) + ".dat");
-                if (dump.is_open()) chiInit.Read(dump);
-                if (dump2.is_open()) omega.Read(dump2);
-                else std::cout<< "Couldn't find " <<  dirname + "/chi_dump"+"_t=" + std::to_string((float)(T0)) + ".dat"<<std::endl;
-
-            }
-        	//initial velocity for backward Euler formula
-        	chi=chiInit;
-        	chi_old=chiInit;
-
         	auto t = 0.;
+            InitScalar(mg, chi, surfCahnHilliardData.chi, 0.);
+            InitScalar(mg, chiSol, surfCahnHilliardData.chi, 0.);
             size_t numbOfTries = 0;
             auto vtkExported = false;
             auto exportStats = [&](size_t i) {
@@ -401,6 +347,7 @@ int main (int argc, char* argv[])
                 tJSON.put("c_h.Max", chi.Data.max());
                 tJSON.put("c_h.Min", chi.Data.min());
                 tJSON.put("Integral.PerimeterEstimate", eps * dot(Laplace.Data * chi.Data, chi.Data));
+                for (int i = 0; i < energy.Data.size(); i++) energy.Data[i] = potential(chi.Data[i]);
                 tJSON.put("Integral.LyapunovEnergy", (eps / 2.) * dot(Laplace.Data * chi.Data, chi.Data) + (1. / eps) * dot(Mass.Data * energy.Data, unityVector));
                 auto surfaceArea = dot(Mass.Data * unityVector, unityVector);
                 tJSON.put("Integral.SurfaceArea", surfaceArea);
@@ -427,55 +374,8 @@ int main (int argc, char* argv[])
                 logger.log();
             };
             exportStats(0);
-
-            //set up a txt file for error time output
-            std::ofstream log_plot( dirname +"/"
-                                     + "Plot_" + filename
-                                     + "l="  + P.get<std::string>("Mesh.AdaptRef.FinestLevel") + "_"
-                                     + P.get<std::string>("SurfCahnHilliard.instationary") + "="
-                                     + std::to_string(float(dt))
-                                     + ".txt");
-
-            log_global.open(dirname + "/"
-                            + "Global_" + filename
-                            + "l=" + P.get<std::string>("Mesh.AdaptRef.FinestLevel") + "_"
-                            + P.get<std::string>("SurfCahnHilliard.instationary") + "="
-                            + std::to_string(float(dt)) +
-                            ".txt");
-
-            double Energy_L2_omega=0.0;
-            double Energy_L2_chi=0.0;
-            double C_norm_chi=0.0;
-            double C_norm_omega=0.0;
-            log_plot << "Time\t" << "L_2(omega)\t" << "L_2(chi)" << "L_2(omega-ext_omega)\t" << "L_2(chi-ext_chi)\t" << "Lyapunov_energy" << std::endl;
-
-            if ( !prFE.compare("P1")) {
-                log_plot <<  std::to_string((float)T0) << "\t";
-                omegaxtent.SetIdx(&P1FEidx);
-                Extend(mg, omega, omegaxtent);
-                chixtent.SetIdx(&P1FEidx);
-                Extend(mg, chi, chixtent);
-                double L2_omega_error = L2_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, omegabnd, omegaxtent),
-                                                 surfCahnHilliardData.omega, T0);
-                double L2_chi_error = L2_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, chibnd, chixtent),
-                                               surfCahnHilliardData.chi, T0);
-                double L2_omega = L2_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, omegabnd, omegaxtent),
-                                           ZeroScalarFun, T0);
-                double L2_chi = L2_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, chibnd, chixtent),
-                                         ZeroScalarFun, T0);
-                for (int i = 0; i < energy.Data.size(); i++) {
-                    energy.Data[i] = potential(chi.Data[i]);
-                }
-                double Lyapunov_energy = (eps / 2.) * dot(Laplace.Data * chi.Data, chi.Data) +
-                                         (1. / eps) * dot(Mass.Data * energy.Data, unityVector);
-                log_plot << std::to_string((float) L2_omega) << "\t" << std::to_string((float) L2_chi) << "\t" <<
-                         std::to_string((float) L2_omega_error) << "\t" << std::to_string((float) L2_chi_error) << "\t"
-                         <<
-                         std::to_string((float) Lyapunov_energy) <<
-                         std::endl;
-            }
-
             logger.beg("do timestep i = 1 w/ BDF1");
+                chi_prev = chi;
                 t = dt;
                 logger.buf
                     << "t  = " << t << '\n'
@@ -486,27 +386,19 @@ int main (int argc, char* argv[])
                     Precond3.LinComb(c / dt, Mass.Data, rho, Volume_stab.Data, sigm, Laplace.Data);
                 else if (model=="AllenCahn")
                     Precond3.LinComb(c / dt, Mass.Data, rho, Volume_stab.Data, sigm, Laplace.Data);
-                chi_extrap.Data = chi.Data;
-                for (int i = 0; i < well_potential.Data.size(); i++) {
-                    well_potential.Data[i] = potentialPrime(chi.Data[i]);
-                }
+                chi_extrap.Data = chi_prev.Data;
+                for (int i = 0; i < well_potential.Data.size(); i++)
+                    well_potential.Data[i] = potentialPrime(chi_prev.Data[i]);
                 InitScalar(mg, chiSol, surfCahnHilliardData.chi, t);
                 InitScalar(mg, omegaSol, surfCahnHilliardData.omega, t);
                 SetupInterfaceRhsP1(mg, &rhs3, lset.Phi, lset.GetBndData(), surfCahnHilliardData.rhs3, t);
                 SetupInterfaceRhsP1(mg, &rhs4, lset.Phi, lset.GetBndData(), surfCahnHilliardData.rhs4, t);
-                for (int i = 0; i < well_potential_concave.Data.size(); i++) {
-                    well_potential_concave.Data[i] = Potential_prime_concave_function(chi.Data[i]);
-                }
-                for (int i = 0; i < well_potential_convex.Data.size(); i++) {
-                    well_potential_convex.Data[i] = Potential_prime_convex_function(chi.Data[i]);
-                }
                 SetupCahnHilliardIF_P1P1(mg, &Mass, &Normal_stab, &Tangent_stab, &Volume_stab, &Laplace, &LaplaceM, &Gprimeprime, lset.Phi, lset.GetBndData(), v, vbnd, chi_extrap, chibnd);
                 //set actual external force to instant rhs
                 instantrhs3 = rhs3;
                 instantrhs4 = rhs4;
                 // pick inertial term and reinitialise unknowns
-                instantrhs3.Data += (c / dt) * (Mass.Data * chi.Data);
-                chi_old = chi; // save initial cond to chi_old
+                instantrhs3.Data += (c / dt) * (Mass.Data * chi_prev.Data);
                 if (model == "CahnHilliard") {
                     instantrhs4.Data -= Mass.Data * well_potential.Data;
                     instantrhs4.Data += S * (Mass.Data * chi_extrap.Data);
@@ -531,6 +423,8 @@ int main (int argc, char* argv[])
             size_t i = 2; // second time step, apply BDF1/BDF2 apaptive scheme
         	while (t < P.get<double>("Time.FinalTime")) {
         	    logger.beg("do timestep i = " + std::to_string(i) + " w/ BDF1/BDF2 adaptive scheme");
+        	        chi_prev_prev = chi_prev;
+        	        chi_prev = chi;
                     auto e = 0.;
                     auto t_old = t;
                     do {
@@ -553,31 +447,27 @@ int main (int argc, char* argv[])
                                 SetupInterfaceRhsP1(mg, &rhs4, lset.Phi, lset.GetBndData(), surfCahnHilliardData.rhs4, t);
                                 //set actual external force to instant rhs
                                 instantrhs3 = rhs3;
-                                instantrhs3.Data += (c / dt) * (Mass.Data * chi.Data);
+                                instantrhs3.Data += (c / dt) * (Mass.Data * chi_prev.Data);
                                 instantrhs4 = rhs4;
+                                for (int i = 0; i < well_potential.Data.size(); i++)
+                                    well_potential.Data[i] = potentialPrime(chi_prev.Data[i]);
                                 if (numbOfTries == 0) {
-                                    chi_extrap.Data = 2. * chi.Data - chi_old.Data;
-                                    for (int i = 0; i < well_potential.Data.size(); i++)
-                                        well_potential.Data[i] = 2. * potentialPrime(chi.Data[i]) - potentialPrime(chi_old.Data[i]);
-                                    for (int i = 0; i < well_potential_concave.Data.size(); i++)
-                                        well_potential_concave.Data[i] = Potential_prime_concave_function(chi.Data[i]);
-                                    for (int i = 0; i < well_potential_convex.Data.size(); i++)
-                                        well_potential_convex.Data[i] = Potential_prime_convex_function(chi.Data[i]);
+                                    chi_extrap.Data = 2. * chi_prev.Data - chi_prev_prev.Data;
                                     SetupCahnHilliardIF_P1P1(mg, &Mass, &Normal_stab, &Tangent_stab, &Volume_stab, &Laplace, &LaplaceM, &Gprimeprime, lset.Phi, lset.GetBndData(), v, vbnd, chi_extrap, chibnd);
                                 }
                                 if (model == "CahnHilliard") {
                                     instantrhs4.Data -= Mass.Data * well_potential.Data;
-                                    instantrhs4.Data += S * (Mass.Data * chi_extrap.Data);
+                                    instantrhs4.Data += S * (Mass.Data * chi_prev.Data);
                                     A.LinComb(sigm, LaplaceM.Data, alpha, Volume_stab.Data);
                                     B.LinComb(0., Laplace.Data, c / dt, Mass.Data);
                                     C.LinComb(0., Laplace.Data, -eps, Mass.Data);
                                     D.LinComb(eps * eps, Laplace.Data, S, Mass.Data,alpha * eps * eps, Volume_stab.Data);
-                                    CH_solver->Solve(A, B, C, D, omega.Data, chi_BDF1.Data, instantrhs3.Data, instantrhs4.Data, omega.RowIdx->GetEx(), chi.RowIdx->GetEx());
+                                    CH_solver->Solve(A, B, C, D, omega.Data, chi_BDF1.Data, instantrhs3.Data, instantrhs4.Data, omega.RowIdx->GetEx(), chi_BDF1.RowIdx->GetEx());
                                 } else if (model == "AllenCahn") {
                                     instantrhs3.Data -= (1. / eps) * (Mass.Data * well_potential.Data);
-                                    instantrhs3.Data += (S / eps) * (Mass.Data * chi_extrap.Data);
+                                    instantrhs3.Data += (S / eps) * (Mass.Data * chi_prev.Data);
                                     A.LinComb(sigm * eps, Laplace.Data, (S / eps + c / dt), Mass.Data, alpha * eps, Volume_stab.Data);
-                                    AC_solver->Solve(A, chi_BDF1.Data, instantrhs3.Data, chi.RowIdx->GetEx());
+                                    AC_solver->Solve(A, chi_BDF1.Data, instantrhs3.Data, chi_BDF1.RowIdx->GetEx());
                                 }
                             logger.end();
                             logger.beg("BDF2 step");
@@ -587,20 +477,27 @@ int main (int argc, char* argv[])
                                 else if (model=="AllenCahn")
                                     Precond3.LinComb(c / dt, Mass.Data, rho, Volume_stab.Data, sigm, Laplace.Data);
                                 instantrhs3 = rhs3;
-                                instantrhs3.Data += (2. / dt) * (Mass.Data * chi.Data) - (.5 / dt) * (Mass.Data * chi_old.Data);
+                                instantrhs3.Data += (2. / dt) * (Mass.Data * chi_prev.Data) - (.5 / dt) * (Mass.Data * chi_prev_prev.Data);
+                                instantrhs4 = rhs4;
+                                for (int i = 0; i < well_potential.Data.size(); i++)
+                                    well_potential.Data[i] = 2. * potentialPrime(chi_prev.Data[i]) - potentialPrime(chi_prev_prev.Data[i]);
                                 if (model == "CahnHilliard") {
+                                    instantrhs4.Data -= Mass.Data * well_potential.Data;
+                                    instantrhs4.Data += S * (Mass.Data * chi_extrap.Data);
                                     B.LinComb(0., Laplace.Data, c / dt, Mass.Data);
-                                    CH_solver->Solve(A, B, C, D, omega.Data, chi_BDF2.Data, instantrhs3.Data, instantrhs4.Data, omega.RowIdx->GetEx(), chi.RowIdx->GetEx());
+                                    CH_solver->Solve(A, B, C, D, omega.Data, chi_BDF2.Data, instantrhs3.Data, instantrhs4.Data, omega.RowIdx->GetEx(), chi_BDF2.RowIdx->GetEx());
                                 } else if (model == "AllenCahn") {
+                                    instantrhs3.Data -= (1. / eps) * (Mass.Data * well_potential.Data);
+                                    instantrhs3.Data += (S / eps) * (Mass.Data * chi_extrap.Data);
                                     A.LinComb(sigm * eps, Laplace.Data, (S / eps + c / dt), Mass.Data, alpha * eps, Volume_stab.Data);
-                                    AC_solver->Solve(A, chi_BDF2.Data, instantrhs3.Data, chi.RowIdx->GetEx());
+                                    AC_solver->Solve(A, chi_BDF2.Data, instantrhs3.Data, chi_BDF2.RowIdx->GetEx());
                                 }
                             logger.end();
                             e = std::sqrt(norm_sq(chi_BDF2.Data - chi_BDF1.Data) / norm_sq(chi_BDF2.Data));
                             ++numbOfTries;
                         logger.end();
                     } while (e > F_tol);
-                    chi = chi_old = chi_BDF2; // save soln as previous time step for (i + 1)th iteration
+                    chi = chi_BDF2; // save soln as BDF2
                     // export
                     exportStats(i);
                     // prepare for the next step
@@ -609,52 +506,6 @@ int main (int argc, char* argv[])
                     numbOfTries = 0;
                 logger.end();
 
-        	    // time for step
-        	    // make sure last timestep vtk is exported
-
-//                    log_plot << std::to_string((float) t) << "\t";
-//                    if (!prFE.compare("P1")) {
-//                        omegaxtent.SetIdx(&P1FEidx);
-//                        Extend(mg, omega, omegaxtent);
-//                        chixtent.SetIdx(&P1FEidx);
-//                        Extend(mg, chi, chixtent);
-//                        double L2_omega_error = L2_error(mg, lset.Phi, lset.GetBndData(),
-//                                                         make_P1Eval(mg, omegabnd, omegaxtent),
-//                                                         surfCahnHilliardData.omega, t);
-//                        double L2_chi_error = L2_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, chibnd, chixtent),
-//                                                       surfCahnHilliardData.chi, t);
-//                        double L2_omega = L2_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, omegabnd, omegaxtent),
-//                                                   ZeroScalarFun, t);
-//                        double L2_chi = L2_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, chibnd, chixtent),
-//                                                 ZeroScalarFun, t);
-//                        for (int i = 0; i < energy.Data.size(); i++) {
-//                            energy.Data[i] = potential(chi.Data[i]);
-//                        }
-//
-//                        log_plot << std::to_string((float) L2_omega) << "\t" << std::to_string((float) L2_chi) << "\t" <<
-//                                 std::to_string((float) L2_omega_error) << "\t" << std::to_string((float) L2_chi_error)
-//                                 << "\t" <<
-//                                 // std::to_string((float) Lyapunov_energy) <<
-//                                 std::endl;
-//                        Energy_L2_omega += L2_omega_error * L2_omega_error * cur_dt;
-//                        Energy_L2_chi += L2_chi_error * L2_chi_error * cur_dt;
-//                        if (L2_chi_error > C_norm_chi) {
-//                            C_norm_chi = L2_chi_error;
-//                        }
-//                        if (L2_omega_error > C_norm_omega) {
-//                            C_norm_omega = L2_omega_error;
-//                        }
-//                    }
-//                    std::cout << "Total iterations of inner 3-solver, t=" << t << ": " << PCGSolver3.GetIter() << '\n';
-//                    std::cout << "Total iterations of inner 4-solver, t=" << t << ": " << PCGSolver4.GetIter() << '\n';
-//                    std::cout << "Total iterations of outer solver, t=" << t << ": " << solver->GetIter() << '\n';
-//                    log_slice << "Total iterations of inner 3-solver, t=" << t << ": " << PCGSolver3.GetIter() << '\n';
-//                    log_slice << "Total iterations of inner 4-solver, t=" << t << ": " << PCGSolver4.GetIter() << '\n';
-//                    log_slice << "Total iterations of outer solver, t=" << t << ": " << solver->GetIter() << '\n';
-//                    std::cout << "Final residual, t=" << t << ": " << solver->GetResid() << '\n';
-//                    log_slice << "Final residual, t=" << t << ": " << solver->GetResid() << '\n';
-            }
-
             if (everyStep > 0 && !vtkExported) { // make sure to export final time
                 logger.beg("write vtk (last time frame)");
                     writeVTK(t);
@@ -662,90 +513,7 @@ int main (int argc, char* argv[])
                 // TODOLATER: update JSON
             }
 
-            std::cout << "L_2 energy error norm of 3- and 4-variable:\t" << std::sqrt(Energy_L2_omega) <<"\t" << std::sqrt(Energy_L2_chi) << std::endl;
-            log_global << "L_2 energy error norm of 3- and 4-variable:\t" << std::sqrt(Energy_L2_omega) <<"\t" << std::sqrt(Energy_L2_chi) << std::endl;
-            log_global << "C error norm of 3- and 4-variable:\t" << C_norm_omega <<"\t" << C_norm_chi << "\t" <<  std::endl;
-
-            if ( P.get<std::string>("Time.Write") != "none" )
-            {
-                std::ofstream dump(dirname + "/chi_dump" + "_t=" + std::to_string((float)(T0 + P.get<double>("Time.FinalTime"))) + ".dat");
-                std::ofstream dump2(dirname + "/omega_dump" + "_t=" + std::to_string((float)(T0 + P.get<double>("Time.FinalTime"))) + ".dat");
-
-                chi.Write(dump);
-                omega.Write(dump2);
-            }
-
-
         }
-        else if ( P.get<std::string>("SurfCahnHilliard.instationary") == "none" )
-        {
-            std::ofstream log_plot( dirname +"/"
-                                    + "Plot_" + filename
-                                    + "l="  + P.get<std::string>("Mesh.AdaptRef.FinestLevel")
-                                    + ".txt");
-            log_global.open( dirname +"/"
-                                      + "Global_" + filename
-                                      + "l="  + P.get<std::string>("Mesh.AdaptRef.FinestLevel")
-                                      + ".txt");
-            SetupInterfaceRhsP1(mg, &rhs3, lset.Phi, lset.GetBndData(), surfCahnHilliardData.rhs3, 0);
-            SetupInterfaceRhsP1(mg, &rhs4, lset.Phi, lset.GetBndData(), surfCahnHilliardData.rhs4, 0);
-
-
-            SetupCahnHilliardIF_P1P1(mg,  &Mass, &Normal_stab, &Tangent_stab, &Volume_stab, &Laplace, &LaplaceM,&Gprimeprime, lset.Phi, lset.GetBndData(), v, vbnd,chi, chibnd);
-
-
-            A.LinComb(sigm,    Laplace.Data, 0 , Mass.Data, alpha, Volume_stab.Data);
-            B.LinComb(0.   ,    Laplace.Data, 0 , Mass.Data);
-            C.LinComb(0.   ,    Laplace.Data, 1., Mass.Data);
-            D.LinComb(eps  ,    Laplace.Data, 0 , Mass.Data, alpha, Volume_stab.Data);
-
-//            CH_solver->Solve(A, B, C, D, omega.Data, chi.Data, rhs3.Data, rhs4.Data,omega.RowIdx->GetEx(), chi.RowIdx->GetEx() );
-
-            chi.Data *= -1.0;
-
-            InitScalar(mg,   chiSol,   surfCahnHilliardData.chi,1);
-            InitScalar(mg, omegaSol, surfCahnHilliardData.omega,1);
-
-            //skip vtk output of needed
-            if (everyStep > 0) {
-                logger.beg("write vtk");
-                    writeVTK(1.);
-                logger.end();
-            }
-
-            if ( !prFE.compare("P1")) {
-                omegaxtent.SetIdx(&P1FEidx);
-                Extend(mg, omega, omegaxtent);
-                chixtent.SetIdx(&P1FEidx);
-                Extend(mg, chi, chixtent);
-                double L2_omega = L2_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, omegabnd, omegaxtent),
-                                                 &ZeroScalarFun, 0);
-                double L2_chi = L2_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, chibnd, chixtent),
-                                               &ZeroScalarFun, 0);
-                log_global <<  "L2 3-variable: " << std::to_string((float)L2_omega) << std::endl;
-                log_global <<  "L2 4-variable: " << std::to_string((float)L2_chi) << std::endl;
-                double L2_omega_error = L2_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, omegabnd, omegaxtent),
-                                           surfCahnHilliardData.omega, 0);
-                double L2_chi_error = L2_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, chibnd, chixtent),
-                                         surfCahnHilliardData.chi, 0);
-                log_global <<  "L2 3-variable error: " << std::to_string((float)L2_omega_error) << std::endl;
-                log_global <<  "L2 4-variable error: " << std::to_string((float)L2_chi_error) << std::endl;
-
-            }
-
-
-            std::cout << "Total iterations of inner 3-solver"  << ": " << PCGSolver3.GetIter() << '\n';
-            std::cout << "Total iterations of inner 4-solver" << ": " << PCGSolver4.GetIter() << '\n';
-            std::cout << "Total iterations of outer solver" << ": " << solver->GetIter() << '\n';
-
-            log_global << "Total iterations of inner 3-solver" <<   ": " << PCGSolver3.GetIter() << '\n';
-            log_global << "Total iterations of inner 4-solver" <<   ": " << PCGSolver4.GetIter() << '\n';
-            log_global << "Total iterations of outer solver" <<    ": " <<solver->GetIter() << '\n';
-
-            std::cout	<< "Final residual" << ": " << solver->GetResid() << '\n';
-
-        }
-
         //
         double average3( 0.), variation3( 0.);
         double average4( 0.), variation4( 0.);
@@ -763,14 +531,6 @@ int main (int argc, char* argv[])
         ComputeVariationFromAverageIterations(Precondstream3copy, average3, variation3);
         ComputeVariationFromAverageIterations(Precondstream4copy, average4, variation4);
         RightComputeVariationFromAverageIterations(Globalstreamcopy, averageglobal, variationglobal);
-        log_global << "The average iterationsnumber of the 3-preconditioner is: " <<     average3     << '\n' << " ...with a variation of: " << variation3 << std::endl;
-        log_global << "The average iterationsnumber of the 4-preconditioner is: " << average4 << '\n' << " ...with a variation of: " << variation4 << std::endl;
-        log_global << "The average iterationsnumber of the global solver is: " << averageglobal << '\n' << " ...with a standart deviation of: " << variationglobal  << std::endl;
-
-        std::cout << "Output is located: " << dirname << std::endl;
-
-/////////////////////////////////////// Error ///////////////////////////////////////
-
     delete &lset;
 
     return 0;
