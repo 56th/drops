@@ -450,16 +450,13 @@ int main (int argc, char* argv[])
                     ++i;
                     numbOfTries = 0;
                 logger.end();
-
-            if (everyStep > 0 && !vtkExported) { // make sure to export final time
-                logger.beg("write vtk (last time frame)");
-                    writeVTK(t);
-                auto vtkTime = logger.end();
-                // TODOLATER: update JSON
-            }
-
         }
-        //
+        if (everyStep > 0 && !vtkExported) { // make sure to export final time
+            logger.beg("write vtk (last time frame)");
+            writeVTK(t);
+            auto vtkTime = logger.end();
+            // TODOLATER: update JSON
+        }
         double average3( 0.), variation3( 0.);
         double average4( 0.), variation4( 0.);
         double averageglobal( 0.), variationglobal( 0.);
