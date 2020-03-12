@@ -10,8 +10,8 @@
     "IC" : {
       "Comment" : "initial condition parameters",
       "Random" : {
-        "RaftRatio" : 0.3,
-        "RaftRatioNoiseFraction" : 0.5
+        "RaftRatio" : 0.1,
+        "RaftRatioNoiseFraction" : 9.0
       }
     },
     "c_0" : 0.5,
@@ -23,19 +23,19 @@
     "FE":           "P1P1",
     "model":        "CahnHilliard",
     "testcase":      "no",
-    "instationary": "BDF2",
-    "mobility": 1,
+    "MobilityScaling": 1.0,
     "Epsilon": 0.01
   },
 
   "Time": {
     "Read" : 0,
     "Write": "yes",
-    "StepSize": 0.01,
-    "FinalTime": 300 ,
+    "StepSize" : 0.01,
+    "FinalTime": 500,
     "Adaptive" : {
-      "Tol" : 0.001,
-      "rho" : 0.9
+      "Tol" : 0.01,
+      "rho" : 0.9,
+      "MinStepSize" : 0.01
     }
   },
 

@@ -64,7 +64,7 @@ int main (int argc, char* argv[])
 {
     srand(time(NULL));
     auto& logger = SingletonLogger::instance();
-  try {
+    try {
     logger.beg("read input .json");
       auto& inpJSON = P;
       read_parameter_file_from_cmdline( inpJSON, argc, argv, "../../param/surfphasesep/No_Bnd_Condition_ch.json");
@@ -156,24 +156,16 @@ int main (int argc, char* argv[])
     std::string testcase = P.get<std::string>("SurfCahnHilliard.testcase");
     double h = P.get<DROPS::Point3DCL>("Mesh.E1")[0]/P.get<double>("Mesh.N1")*std::pow(2., -P.get<double>("Mesh.AdaptRef.FinestLevel"));
 
+    auto T = P.get<double>("Time.FinalTime");
     auto dt = P.get<double>("Time.StepSize");
-    if (P.get<std::string>("SurfCahnHilliard.instationary") == "none") dt = 1.;
-
-    double eta_order=-2.0;
-    double epsilon_order=1.0;
-    //double alpha_order=1.0;
-    double eta 		   = 1.e0  * pow(h, eta_order);//std::pow(2.e0,eta_index);; //constant for tangential penalty
-    double epsilon     = 1.e0  * pow(h, epsilon_order); //constant for velocity stabilisation
-    double alpha       = inpJSON.get<double>("SurfCahnHilliard.VolumeStab.Factor") * pow(h, inpJSON.get<double>("SurfCahnHilliard.VolumeStab.Power"));; //constant for volume stabilisation
-    double rho         = 1.e0 * pow(h, 1); //constant for M_p complement preconditioner
-
+    auto alpha = inpJSON.get<double>("SurfCahnHilliard.VolumeStab.Factor") * pow(h, inpJSON.get<double>("SurfCahnHilliard.VolumeStab.Power"));
     std::cout << "h is: " << h << std::endl;
     std::cout << "dt is: " << dt << std::endl;
     ParameterNS::h = h;
 
     auto S = inpJSON.get<double>("SurfCahnHilliard.Beta_s");
 
-    double sigm = P.get<double>("SurfCahnHilliard.mobility");
+    double sigm = P.get<double>("SurfCahnHilliard.MobilityScaling");
     double eps = P.get<double>("SurfCahnHilliard.Epsilon");
     ParameterNS::sigma = sigm;
     ParameterNS::eps = eps;
@@ -243,23 +235,10 @@ int main (int argc, char* argv[])
         Volume_stab.SetIdx(&ifaceP1idx, &ifaceP1idx);
         SetupCahnHilliardIF_P1P1(mg,  &Mass,&Normal_stab, &Tangent_stab, &Volume_stab, &Laplace, &LaplaceM, &Gprimeprime, lset.Phi, lset.GetBndData(), v, vbnd, chi, chibnd);
         if (model=="CahnHilliard")
-            Precond4.LinComb(1.0, Mass.Data, rho*eps*eps, Volume_stab.Data, eps*eps, Laplace.Data);
+            Precond4.LinComb(S, Mass.Data, alpha*eps*eps, Volume_stab.Data, eps*eps, Laplace.Data);
         else if (model=="AllenCahn")
-            Precond4.LinComb(1.0    , Mass.Data, rho, Volume_stab.Data,   eps, Laplace.Data);
+            Precond4.LinComb(1.0    , Mass.Data, alpha, Volume_stab.Data,   eps, Laplace.Data);
     }
-
-    // construct preconditioners
-
-    /*typedef GMResSolverCL<DummyPcCL> GMResSolverT;
-
-    std::stringstream PCstream;
-
-    DummyPcCL Ident;
-
-    GMResSolverT GMResSolver_( Ident, P.get<int>("Solver.PcAIter"), P.get<int>("Solver.PcAIter"), P.get<double>("Solver.PcATol"),
-    		 *//*bool relative=*//* true, *//*bool calculate2norm=*//* false, *//*PreMethGMRES method=*//* LeftPreconditioning,
-			 *//*bool mod =*//* true,      *//*bool useModGS =*//* false, &PCstream);*/
-
       typedef SSORPcCL      SymmPcPcT;
       SymmPcPcT symmPcPc_;
 
@@ -299,16 +278,6 @@ int main (int argc, char* argv[])
               /*bool mod = */true, /* bool useModGS =*/ false, &Globalstream);
       BlockMatrixSolverCL<GMResBlockT> *CH_solver= new BlockMatrixSolverCL<GMResBlockT>( *GMRes_);
 
-      /*typedef SolverAsPreCL<PCGSolverT> PCGPcT;
-      PCGPcT PCGPc_( PCGSolver3);
-      typedef BlockPreCL<ExpensivePreBaseCL, SchurPreBaseCL, DiagSpdBlockPreCL>  DiagBlockEPcT;
-      typedef PLanczosONBCL<VectorCL, DiagBlockEPcT> LanczosT;
-      typedef PMResSolverCL<LanczosT> MinResT;
-      DiagBlockEPcT    *DBlock_ = new DiagBlockEPcT( PCGPc_, *spc4_);
-      LanczosT *lanczos_ = new LanczosT( *DBlock_);
-      MinResT *MinRes_ = new MinResT( *lanczos_,  P.get<int>("Solver.Iter"), P.get<double>("Solver.Tol"), *//*relative*//* false);
-      BlockMatrixSolverCL<MinResT> *stokessolver= new BlockMatrixSolverCL<MinResT>( *MinRes_);*/
-
       SolverBaseCL *solver;
       if (model=="CahnHilliard")
       {
@@ -334,6 +303,7 @@ int main (int argc, char* argv[])
         	BndDataCL<Point3DCL> bndvec = vbnd;
         	BndDataCL<double> bndscalar = pbnd;
         	auto t = 0.;
+        	auto e = 0.;
             InitScalar(mg, chi, surfCahnHilliardData.chi, 0.);
             InitScalar(mg, chiSol, surfCahnHilliardData.chi, 0.);
             size_t numbOfTries = 0;
@@ -360,6 +330,7 @@ int main (int argc, char* argv[])
                 }
                 if (i > 1) {
                     tJSON.put("ApaptiveTimeStep.NumbOfTries", numbOfTries);
+                    tJSON.put("ApaptiveTimeStep.RelativeError", e);
                 }
                 if (everyStep > 0 && i % everyStep == 0) {
                     vtkExported = true;
@@ -373,130 +344,104 @@ int main (int argc, char* argv[])
                 logger.buf << tJSON;
                 logger.log();
             };
-            exportStats(0);
-            logger.beg("do timestep i = 1 w/ BDF1");
+        exportStats(0);
+        logger.beg("do timestep i = 1 w/ BDF1");
+            logger.beg("assemble");
                 chi_prev = chi;
+                SetupCahnHilliardIF_P1P1(mg, &Mass, &Normal_stab, &Tangent_stab, &Volume_stab, &Laplace, &LaplaceM, &Gprimeprime, lset.Phi, lset.GetBndData(), v, vbnd, chi_prev, chibnd);
+                // Precond3.LinComb(sigm, LaplaceM.Data, alpha, Volume_stab.Data);
+            logger.end();
+            logger.beg("update time");
                 t = dt;
                 logger.buf
                     << "t  = " << t << '\n'
                     << "dt = " << dt;
                 logger.log();
-                auto c = 1.; // right constant for temporal BDF
-                if (model=="CahnHilliard")
-                    Precond3.LinComb(c / dt, Mass.Data, rho, Volume_stab.Data, sigm, Laplace.Data);
-                else if (model=="AllenCahn")
-                    Precond3.LinComb(c / dt, Mass.Data, rho, Volume_stab.Data, sigm, Laplace.Data);
-                chi_extrap.Data = chi_prev.Data;
-                for (int i = 0; i < well_potential.Data.size(); i++)
-                    well_potential.Data[i] = potentialPrime(chi_prev.Data[i]);
                 InitScalar(mg, chiSol, surfCahnHilliardData.chi, t);
                 InitScalar(mg, omegaSol, surfCahnHilliardData.omega, t);
                 SetupInterfaceRhsP1(mg, &rhs3, lset.Phi, lset.GetBndData(), surfCahnHilliardData.rhs3, t);
                 SetupInterfaceRhsP1(mg, &rhs4, lset.Phi, lset.GetBndData(), surfCahnHilliardData.rhs4, t);
-                SetupCahnHilliardIF_P1P1(mg, &Mass, &Normal_stab, &Tangent_stab, &Volume_stab, &Laplace, &LaplaceM, &Gprimeprime, lset.Phi, lset.GetBndData(), v, vbnd, chi_extrap, chibnd);
-                //set actual external force to instant rhs
-                instantrhs3 = rhs3;
-                instantrhs4 = rhs4;
-                // pick inertial term and reinitialise unknowns
-                instantrhs3.Data += (c / dt) * (Mass.Data * chi_prev.Data);
-                if (model == "CahnHilliard") {
-                    instantrhs4.Data -= Mass.Data * well_potential.Data;
-                    instantrhs4.Data += S * (Mass.Data * chi_extrap.Data);
-                    A.LinComb(sigm, LaplaceM.Data, 0, Mass.Data, alpha, Volume_stab.Data);
-                    B.LinComb(0., Laplace.Data, c / dt, Mass.Data);
-                    C.LinComb(0., Laplace.Data, -eps, Mass.Data);
-                    D.LinComb(eps * eps, Laplace.Data, S, Mass.Data,alpha * eps * eps, Volume_stab.Data);
-                    CH_solver->Solve(A, B, C, D, omega.Data, chi.Data, instantrhs3.Data, instantrhs4.Data, omega.RowIdx->GetEx(), chi.RowIdx->GetEx());
-                } else if (model == "AllenCahn") {
-                    instantrhs3.Data -= (1. / eps) * (Mass.Data * well_potential.Data);
-                    instantrhs3.Data += (S / eps) * (Mass.Data * chi_extrap.Data);
-                    A.LinComb(sigm * eps, Laplace.Data, (S / eps + c / dt), Mass.Data, alpha * eps, Volume_stab.Data);
-                    AC_solver->Solve(A, chi.Data, instantrhs3.Data, chi.RowIdx->GetEx());
-                }
+            logger.end();
+            logger.beg("BDF1 step");
+                auto doBDF1 = [&](VecDescCL& chi) {
+                    Precond3.LinComb(1. / dt, Mass.Data, alpha, Volume_stab.Data, sigm, Laplace.Data);
+                    for (int i = 0; i < well_potential.Data.size(); i++)
+                        well_potential.Data[i] = potentialPrime(chi_prev.Data[i]);
+                    instantrhs3 = rhs3;
+                    instantrhs3.Data += (1. / dt) * (Mass.Data * chi_prev.Data);
+                    instantrhs4 = rhs4;
+                    instantrhs4.Data += S * (Mass.Data * chi_prev.Data) - Mass.Data * well_potential.Data;
+                    if (model == "CahnHilliard") {
+                        A.LinComb(sigm, LaplaceM.Data, alpha, Volume_stab.Data);
+                        B.LinComb(0., Laplace.Data, 1. / dt, Mass.Data);
+                        C.LinComb(0., Laplace.Data, -1., Mass.Data);
+                        D.LinComb(eps * eps, Laplace.Data, S, Mass.Data, alpha * eps * eps, Volume_stab.Data);
+                        CH_solver->Solve(A, B, C, D, omega.Data, chi.Data, instantrhs3.Data, instantrhs4.Data, omega.RowIdx->GetEx(), chi.RowIdx->GetEx());
+                    } else if (model == "AllenCahn") {
+                        instantrhs3.Data += (S / eps) * (Mass.Data * chi_prev.Data) - (1. / eps) * (Mass.Data * well_potential.Data);
+                        A.LinComb(sigm * eps, Laplace.Data, (S / eps + 1. / dt), Mass.Data, alpha * eps, Volume_stab.Data);
+                        AC_solver->Solve(A, chi.Data, instantrhs3.Data, chi.RowIdx->GetEx());
+                    }
+                };
+                doBDF1(chi);
                 exportStats(1);
             logger.end();
             auto F_rho = P.get<double>("Time.Adaptive.rho");
             auto F_tol = P.get<double>("Time.Adaptive.Tol");
+            auto F_min = P.get<double>("Time.Adaptive.MinStepSize");
             auto F = [=](double e, double dt) {
-                return F_rho * std::sqrt(F_tol / e) * dt;
+                return std::max(F_min, F_rho * std::sqrt(F_tol / e) * dt);
             };
             size_t i = 2; // second time step, apply BDF1/BDF2 apaptive scheme
-        	while (t < P.get<double>("Time.FinalTime")) {
+        	while (t < T) {
         	    logger.beg("do timestep i = " + std::to_string(i) + " w/ BDF1/BDF2 adaptive scheme");
-        	        chi_prev_prev = chi_prev;
-        	        chi_prev = chi;
-                    auto e = 0.;
+                    logger.beg("assemble");
+                        chi_prev_prev = chi_prev;
+                        chi_prev = chi;
+                        chi_extrap.Data = 2. * chi_prev.Data - chi_prev_prev.Data;
+                        SetupCahnHilliardIF_P1P1(mg, &Mass, &Normal_stab, &Tangent_stab, &Volume_stab, &Laplace, &LaplaceM, &Gprimeprime, lset.Phi, lset.GetBndData(), v, vbnd, chi_extrap, chibnd);
+                        // Precond3.LinComb(sigm, LaplaceM.Data, alpha, Volume_stab.Data);
+                    logger.end();
                     auto t_old = t;
                     do {
                         logger.beg("attempt #" + std::to_string(numbOfTries + 1));
-                            if (numbOfTries > 0) dt = F(e, dt);
-                            t = t_old + dt;
-                            logger.buf
+                            logger.beg("update time");
+                                if (numbOfTries > 0) dt = F(e, dt);
+                                t = t_old + dt;
+                                logger.buf
                                     << "t  = " << t << '\n'
                                     << "dt = " << dt;
-                            logger.log();
-                            logger.beg("BDF1 step");
-                                c = 1.; // right constant for temporal BDF
-                                if (model=="CahnHilliard")
-                                    Precond3.LinComb(c / dt, Mass.Data, rho, Volume_stab.Data, sigm, Laplace.Data);
-                                else if (model=="AllenCahn")
-                                    Precond3.LinComb(c / dt, Mass.Data, rho, Volume_stab.Data, sigm, Laplace.Data);
+                                logger.log();
                                 InitScalar(mg, chiSol, surfCahnHilliardData.chi, t);
                                 InitScalar(mg, omegaSol, surfCahnHilliardData.omega, t);
                                 SetupInterfaceRhsP1(mg, &rhs3, lset.Phi, lset.GetBndData(), surfCahnHilliardData.rhs3, t);
                                 SetupInterfaceRhsP1(mg, &rhs4, lset.Phi, lset.GetBndData(), surfCahnHilliardData.rhs4, t);
-                                //set actual external force to instant rhs
-                                instantrhs3 = rhs3;
-                                instantrhs3.Data += (c / dt) * (Mass.Data * chi_prev.Data);
-                                instantrhs4 = rhs4;
-                                for (int i = 0; i < well_potential.Data.size(); i++)
-                                    well_potential.Data[i] = potentialPrime(chi_prev.Data[i]);
-                                if (numbOfTries == 0) {
-                                    chi_extrap.Data = 2. * chi_prev.Data - chi_prev_prev.Data;
-                                    SetupCahnHilliardIF_P1P1(mg, &Mass, &Normal_stab, &Tangent_stab, &Volume_stab, &Laplace, &LaplaceM, &Gprimeprime, lset.Phi, lset.GetBndData(), v, vbnd, chi_extrap, chibnd);
-                                }
-                                if (model == "CahnHilliard") {
-                                    instantrhs4.Data -= Mass.Data * well_potential.Data;
-                                    instantrhs4.Data += S * (Mass.Data * chi_prev.Data);
-                                    A.LinComb(sigm, LaplaceM.Data, alpha, Volume_stab.Data);
-                                    B.LinComb(0., Laplace.Data, c / dt, Mass.Data);
-                                    C.LinComb(0., Laplace.Data, -eps, Mass.Data);
-                                    D.LinComb(eps * eps, Laplace.Data, S, Mass.Data,alpha * eps * eps, Volume_stab.Data);
-                                    CH_solver->Solve(A, B, C, D, omega.Data, chi_BDF1.Data, instantrhs3.Data, instantrhs4.Data, omega.RowIdx->GetEx(), chi_BDF1.RowIdx->GetEx());
-                                } else if (model == "AllenCahn") {
-                                    instantrhs3.Data -= (1. / eps) * (Mass.Data * well_potential.Data);
-                                    instantrhs3.Data += (S / eps) * (Mass.Data * chi_prev.Data);
-                                    A.LinComb(sigm * eps, Laplace.Data, (S / eps + c / dt), Mass.Data, alpha * eps, Volume_stab.Data);
-                                    AC_solver->Solve(A, chi_BDF1.Data, instantrhs3.Data, chi_BDF1.RowIdx->GetEx());
-                                }
+                            logger.end();
+                            logger.beg("BDF1 step");
+                                doBDF1(chi_BDF1);
                             logger.end();
                             logger.beg("BDF2 step");
-                                c = 1.5; // right constant for temporal BDF
-                                if (model=="CahnHilliard")
-                                    Precond3.LinComb(c / dt, Mass.Data, rho, Volume_stab.Data, sigm, Laplace.Data);
-                                else if (model=="AllenCahn")
-                                    Precond3.LinComb(c / dt, Mass.Data, rho, Volume_stab.Data, sigm, Laplace.Data);
+                                Precond3.LinComb(1.5 / dt, Mass.Data, alpha, Volume_stab.Data, sigm, Laplace.Data);
+                                for (int i = 0; i < well_potential.Data.size(); i++) well_potential.Data[i] = 2. * potentialPrime(chi_prev.Data[i]) - potentialPrime(chi_prev_prev.Data[i]);
                                 instantrhs3 = rhs3;
                                 instantrhs3.Data += (2. / dt) * (Mass.Data * chi_prev.Data) - (.5 / dt) * (Mass.Data * chi_prev_prev.Data);
                                 instantrhs4 = rhs4;
-                                for (int i = 0; i < well_potential.Data.size(); i++)
-                                    well_potential.Data[i] = 2. * potentialPrime(chi_prev.Data[i]) - potentialPrime(chi_prev_prev.Data[i]);
+                                instantrhs4.Data += S * (Mass.Data * chi_extrap.Data) - Mass.Data * well_potential.Data;
                                 if (model == "CahnHilliard") {
-                                    instantrhs4.Data -= Mass.Data * well_potential.Data;
-                                    instantrhs4.Data += S * (Mass.Data * chi_extrap.Data);
-                                    B.LinComb(0., Laplace.Data, c / dt, Mass.Data);
+                                    B.LinComb(0., Laplace.Data, 1.5 / dt, Mass.Data);
                                     CH_solver->Solve(A, B, C, D, omega.Data, chi_BDF2.Data, instantrhs3.Data, instantrhs4.Data, omega.RowIdx->GetEx(), chi_BDF2.RowIdx->GetEx());
                                 } else if (model == "AllenCahn") {
-                                    instantrhs3.Data -= (1. / eps) * (Mass.Data * well_potential.Data);
-                                    instantrhs3.Data += (S / eps) * (Mass.Data * chi_extrap.Data);
-                                    A.LinComb(sigm * eps, Laplace.Data, (S / eps + c / dt), Mass.Data, alpha * eps, Volume_stab.Data);
+                                    instantrhs3.Data += (S / eps) * (Mass.Data * chi_extrap.Data) - (1. / eps) * (Mass.Data * well_potential.Data);
+                                    A.LinComb(sigm * eps, Laplace.Data, (S / eps + 1.5 / dt), Mass.Data, alpha * eps, Volume_stab.Data);
                                     AC_solver->Solve(A, chi_BDF2.Data, instantrhs3.Data, chi_BDF2.RowIdx->GetEx());
                                 }
                             logger.end();
                             e = std::sqrt(norm_sq(chi_BDF2.Data - chi_BDF1.Data) / norm_sq(chi_BDF2.Data));
+                            logger.buf << "e = " << e;
+                            logger.log();
                             ++numbOfTries;
                         logger.end();
-                    } while (e > F_tol);
+                    } while (e > F_tol && dt != F_min);
                     chi = chi_BDF2; // save soln as BDF2
                     // export
                     exportStats(i);
