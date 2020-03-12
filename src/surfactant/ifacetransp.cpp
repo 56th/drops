@@ -4764,11 +4764,11 @@ void LocalCahnHilliardCL::calc3DIntegrands(const SMatrixCL<3,3>& T, const LocalP
 
 double inverse_square_root(double x) {return(1./std::sqrt(x));}
 
-double Mobility_function(double x, double t)
-{
-    double scaling=1.0; //1./Density_function(x, t); //std::exp(-1000*t);
-	return( scaling*std::sqrt((1.-x)*(x)*(1.-x)*(x)));
-    //return(1);
+double Mobility_function(double x, double) {
+    auto val = (1. - x) * x;
+    if (val > 0.) return val;
+    return 0.;
+    // return std::sqrt((1.-x)*(x)*(1.-x)*(x)));
 }
 
 double Diffusion_function(double x, double t)

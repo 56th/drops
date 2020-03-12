@@ -1,7 +1,7 @@
 {
   "Output" : {
     "Directory":  "../../output/test",
-    "EveryStep":  1,
+    "EveryStep":  5,
     "Binary":     true
   },
 
@@ -30,12 +30,12 @@
   "Time": {
     "Read" : 0,
     "Write": "yes",
-    "StepSize" : 0.01,
-    "FinalTime": 500,
+    "StepSize" : 1.0,
+    "FinalTime": 10000,
     "Adaptive" : {
-      "Tol" : 0.01,
+      "Tol" : 0.001,
       "rho" : 0.9,
-      "MinStepSize" : 0.01
+      "MinStepSize" : 1.0
     }
   },
 
