@@ -374,7 +374,7 @@ int main (int argc, char* argv[])
                     if (model == "CahnHilliard") {
                         A.LinComb(sigm, LaplaceM.Data, alpha, Volume_stab.Data);
                         B.LinComb(0., Laplace.Data, 1. / dt, Mass.Data);
-                        C.LinComb(0., Laplace.Data, -1., Mass.Data);
+                        C.LinComb(0., Laplace.Data, -eps, Mass.Data);
                         D.LinComb(eps * eps, Laplace.Data, S, Mass.Data, alpha * eps * eps, Volume_stab.Data);
                         CH_solver->Solve(A, B, C, D, omega.Data, chi.Data, instantrhs3.Data, instantrhs4.Data, omega.RowIdx->GetEx(), chi.RowIdx->GetEx());
                     } else if (model == "AllenCahn") {
