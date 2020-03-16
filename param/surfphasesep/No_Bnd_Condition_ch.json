@@ -1,7 +1,7 @@
 {
   "Output" : {
     "Directory":  "../../output/test",
-    "EveryStep":  5,
+    "EveryStep":  20,
     "Binary":     true
   },
 
@@ -11,10 +11,10 @@
       "Comment" : "initial condition parameters",
       "Random" : {
         "RaftRatio" : 0.1,
-        "RaftRatioNoiseFraction" : 9.0
+        "RaftRatioNoiseFraction" : 0.1
       }
     },
-    "c_0" : 0.5,
+    "c_0" : 0.1,
     "VolumeStab" : {
       "Factor" : 1.0,
       "Power"  : 1.0
@@ -23,6 +23,7 @@
     "FE":           "P1P1",
     "model":        "CahnHilliard",
     "testcase":      "no",
+    "ChemicalPotentialScaling": 1.0,
     "MobilityScaling": 1.0,
     "Epsilon": 0.01
   },
@@ -30,12 +31,12 @@
   "Time": {
     "Read" : 0,
     "Write": "yes",
-    "StepSize" : 1.0,
-    "FinalTime": 10000,
+    "StepSize" : 0.001,
+    "FinalTime": 1000,
     "Adaptive" : {
       "Tol" : 0.001,
       "rho" : 0.9,
-      "MinStepSize" : 1.0
+      "MinStepSize" : 0.001
     }
   },
 

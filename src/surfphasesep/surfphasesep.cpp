@@ -26,7 +26,6 @@
 #include "num/precond.h"
 #include "parallel/exchange.h"
 
-
 #include "num/oseensolver.h"
 #include <fstream>
 
@@ -40,12 +39,10 @@
 #include "SingletonLogger.hpp"
 // initial data
 #include "SurfCahnHilliardData.hpp"
+// for chemical potential
+#include "hermite_cubic.hpp"
 
 using namespace DROPS;
-
-/////////////////////////////////////////////////////////////////////////////////////////////////////////
-/////////////////////////////////////// Model Test Cases ////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void InitVecLaplace(const MultiGridCL& MG, LevelsetP2CL& lset, DROPS::VecDescCL& rhs, DROPS::VecDescCL& vSol, DROPS::VecDescCL& pSol,
                     InstatVectorFunction f_rhs, InstatVectorFunction f_vsol, InstatScalarFunction f_psol, double t = 0.0)
@@ -88,23 +85,22 @@ int main (int argc, char* argv[])
     auto surfCahnHilliardData = SurfCahnHilliardDataFactory(inpJSON);
     logger.buf << surfCahnHilliardData.description;
     logger.log();
-    auto c0 = inpJSON.get<double>("SurfCahnHilliard.c_0");
-    auto c0ToHalf = [=](double c) { // maps [0, c_0] to [0, 1/2] and [c_0, 1] to [1/2, ]
-        if (c < c0) return c / (2. * c0);
-        return (c - c0) / (2. - 2. * c0) + .5;
-    };
-    auto c0ToHalfPrime = [=](double c) {
-        if (c < c0) return 1. / (2. * c0);
-        return 1. / (2. - 2. * c0);
-    };
-    auto potential = [&](double x) {
-        auto c = c0ToHalf(x);
-        return .25 * (1. - c) * (1. - c) * c * c;
-    };
-    auto potentialPrime = [&](double x) {
-        auto c = c0ToHalf(x);
-        return c0ToHalfPrime(x) * .5 * c * (1. - 3. * c + 2. * c * c);
-    };
+    logger.beg("set up chemical potential");
+        auto xi = inpJSON.get<double>("SurfCahnHilliard.ChemicalPotentialScaling");
+        auto c0 = inpJSON.get<double>("SurfCahnHilliard.c_0");
+        auto c0_l = std::min(c0, 1. - c0) / sqrt(3.);
+        auto chemicalPotential = [&](double c) {
+            if (c < 0.) return xi * (1. - c0) * c;
+            if (c > 1.) return xi * c0 * (c - 1.);
+            double x[1], f[1], d[1], s[1], t[1];
+            x[0] = c;
+            if      (c < c0 - c0_l) hermite_cubic_value(0., 0., 1. - c0, c0 - c0_l, 1. / (12. * sqrt(3.)), 0., 1, x, f, d, s, t);
+            else if (c < c0)        hermite_cubic_value(c0 - c0_l, 1. / (12. * sqrt(3.)), 0., c0, 0., -std::max(c0 * c0, (1. - c0) * (1. - c0)), 1, x, f, d, s, t);
+            else if (c < c0 + c0_l) hermite_cubic_value(c0, 0., -std::max(c0 * c0, (1. - c0) * (1. - c0)), c0 + c0_l, -1. / (12. * sqrt(3.)), 0., 1, x, f, d, s, t);
+            else                    hermite_cubic_value(c0 + c0_l, -1. / (12. * sqrt(3.)), 0., 1., 0., c0, 1, x, f, d, s, t);
+            return xi * f[0];
+        };
+    logger.end();
     // build initial mesh
     std::cout << "Setting up interface-PDE:\n";
     std::auto_ptr<DROPS::MGBuilderCL> builder( DROPS::make_MGBuilder( P));
@@ -317,8 +313,8 @@ int main (int argc, char* argv[])
                 tJSON.put("c_h.Max", chi.Data.max());
                 tJSON.put("c_h.Min", chi.Data.min());
                 tJSON.put("Integral.PerimeterEstimate", eps * dot(Laplace.Data * chi.Data, chi.Data));
-                for (int i = 0; i < energy.Data.size(); i++) energy.Data[i] = potential(chi.Data[i]);
-                tJSON.put("Integral.LyapunovEnergy", (eps / 2.) * dot(Laplace.Data * chi.Data, chi.Data) + (1. / eps) * dot(Mass.Data * energy.Data, unityVector));
+                // for (int i = 0; i < energy.Data.size(); i++) energy.Data[i] = potential(chi.Data[i]);
+                // tJSON.put("Integral.LyapunovEnergy", (eps / 2.) * dot(Laplace.Data * chi.Data, chi.Data) + (1. / eps) * dot(Mass.Data * energy.Data, unityVector));
                 auto surfaceArea = dot(Mass.Data * unityVector, unityVector);
                 tJSON.put("Integral.SurfaceArea", surfaceArea);
                 tJSON.put("Integral.RaftFraction", dot(Mass.Data * chi.Data, unityVector) / surfaceArea);
@@ -366,7 +362,7 @@ int main (int argc, char* argv[])
                 auto doBDF1 = [&](VecDescCL& chi) {
                     Precond3.LinComb(1. / dt, Mass.Data, alpha, Volume_stab.Data, sigm, Laplace.Data);
                     for (int i = 0; i < well_potential.Data.size(); i++)
-                        well_potential.Data[i] = potentialPrime(chi_prev.Data[i]);
+                        well_potential.Data[i] = chemicalPotential(chi_prev.Data[i]);
                     instantrhs3 = rhs3;
                     instantrhs3.Data += (1. / dt) * (Mass.Data * chi_prev.Data);
                     instantrhs4 = rhs4;
@@ -422,7 +418,7 @@ int main (int argc, char* argv[])
                             logger.end();
                             logger.beg("BDF2 step");
                                 Precond3.LinComb(1.5 / dt, Mass.Data, alpha, Volume_stab.Data, sigm, Laplace.Data);
-                                for (int i = 0; i < well_potential.Data.size(); i++) well_potential.Data[i] = 2. * potentialPrime(chi_prev.Data[i]) - potentialPrime(chi_prev_prev.Data[i]);
+                                for (int i = 0; i < well_potential.Data.size(); i++) well_potential.Data[i] = 2. * chemicalPotential(chi_prev.Data[i]) - chemicalPotential(chi_prev_prev.Data[i]);
                                 instantrhs3 = rhs3;
                                 instantrhs3.Data += (2. / dt) * (Mass.Data * chi_prev.Data) - (.5 / dt) * (Mass.Data * chi_prev_prev.Data);
                                 instantrhs4 = rhs4;

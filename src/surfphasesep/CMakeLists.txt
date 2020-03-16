@@ -7,6 +7,10 @@ set(HOME2 separation)
 exec_ser(${HOME1} geom-boundary geom-builder geom-simplex geom-multigrid geom-deformation num-unknowns geom-topo num-fe misc-problem levelset-levelset levelset-marking_strategy levelset-adaptriang misc-scopetimer misc-progressaccu misc-utils out-output num-discretize misc-params num-interfacePatch levelset-fastmarch surfactant-ifacetransp num-fe out-ensightOut levelset-surfacetension out-vtkOut geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature misc-dynamicload misc-funcmap misc-scopetimer)
 exec_ser(${HOME2} geom-boundary geom-builder geom-simplex geom-multigrid geom-deformation num-unknowns geom-topo num-fe misc-problem levelset-levelset levelset-marking_strategy levelset-adaptriang misc-scopetimer misc-progressaccu misc-utils out-output num-discretize misc-params num-interfacePatch levelset-fastmarch surfactant-ifacetransp num-fe out-ensightOut levelset-surfacetension out-vtkOut geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature misc-dynamicload misc-funcmap misc-scopetimer num-gradient_recovery levelset-levelsetmapper)
 
+# hermite interpolation
+add_library(${HOME1}-hermite STATIC hermite_cubic.cpp)
+target_link_libraries(${HOME1} ${HOME1}-hermite)
+
 # logger
 add_library(${HOME1}-logger STATIC ${LOGGER_PATH}/SingletonLogger.cpp)
 target_link_libraries(${HOME1} ${HOME1}-logger)
