@@ -697,14 +697,14 @@ private:
 public:
     typedef T value_type;
 
-    SparseMatBaseCL (); ///< empty zero-matrix
-    SparseMatBaseCL (const SparseMatBaseCL&);
-    ~SparseMatBaseCL ();
+    SparseMatBaseCL(); ///< empty zero-matrix
+    SparseMatBaseCL(const SparseMatBaseCL&);
+    ~SparseMatBaseCL();
+    SparseMatBaseCL(size_t rows, size_t cols, size_t nnz); ///< the fields are allocated, but not initialized
+    SparseMatBaseCL(const std::valarray<T>&); ///< Creates a square diagonal matrix.
+    SparseMatBaseCL(SparseMatBaseCL const &, SparseMatBaseCL const &, SparseMatBaseCL const &, SparseMatBaseCL const &) { ///< Creates block matrix
 
-    SparseMatBaseCL (size_t rows, size_t cols, size_t nnz); ///< the fields are allocated, but not initialized
-
-    SparseMatBaseCL (const std::valarray<T>&); ///< Creates a square diagonal matrix.
-
+    }
     SparseMatBaseCL& operator= (const SparseMatBaseCL& m);
 
     const T*      raw_val() const { return Addr(_val); }

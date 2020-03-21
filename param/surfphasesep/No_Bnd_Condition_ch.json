@@ -62,6 +62,16 @@
     }
   },
 
+  "Solver" : {
+    "Outer" : {
+      "Iteration" : "FLEXIBLE GMRES",
+      "OutputFrequency" : 1,
+      "KrylovSubspaceSize" : 100,
+      "MaxIter" : 50,
+      "RelResTol" : 1e-8
+    }
+  },
+
   "Stokes": {
     "VelocityBndData":
     {
@@ -164,17 +174,6 @@
   "EnsightCase":		"none",
   "EnsightDir":		"CNmass-lvl3",
   "LB":                   1,
-
-  "Solver":
-  {
-    "PcAIter":      500,
-    "PcATol":       1e-4,
-    "PcBIter":      500,
-    "PcBTol":       1e-4,
-    "Iter":         1000,
-    "Tol":          1e-8
-  },
-
   "General" : {
     "ProgressBar":  1,
     "DynamicLibsPrefix": "../",
