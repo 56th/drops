@@ -702,9 +702,42 @@ public:
     ~SparseMatBaseCL();
     SparseMatBaseCL(size_t rows, size_t cols, size_t nnz); ///< the fields are allocated, but not initialized
     SparseMatBaseCL(const std::valarray<T>&); ///< Creates a square diagonal matrix.
-    SparseMatBaseCL(SparseMatBaseCL const &, SparseMatBaseCL const &, SparseMatBaseCL const &, SparseMatBaseCL const &) { ///< Creates block matrix
-
+    SparseMatBaseCL(SparseMatBaseCL const & A, SparseMatBaseCL const & B, SparseMatBaseCL const & C, SparseMatBaseCL const & D)
+        : _rows(A.num_rows() + C.num_rows())
+        , _cols(A.num_cols() + B.num_cols())
+        , nnz_(0)
+        , _rowbeg(A.num_rows() + C.num_rows() + 1)
+        , version_(1)
+    { ///< Creates block matrix
+        if (   A.num_rows() != B.num_rows()
+            || C.num_rows() != D.num_rows()
+            || A.num_cols() != C.num_cols()
+            || B.num_cols() != D.num_cols()
+        ) throw std::invalid_argument("inconsictent block sizes");
+        num_nonzeros(A.nnz_ + B.nnz_ + C.nnz_ + D.nnz_);
+        _rowbeg[0] = 0;
+        auto mergeRowBlocks = [&](SparseMatBaseCL const & M1, SparseMatBaseCL const & M2, size_t i0) {
+            for (size_t i = 0; i < M1.num_rows(); ++i) {
+                auto numElem1 = M1._rowbeg[i + 1] - M1._rowbeg[i];
+                auto numElem2 = M2._rowbeg[i + 1] - M2._rowbeg[i];
+                auto I = i + i0;
+                // row pointer
+                _rowbeg[I + 1] = _rowbeg[I] + numElem1 + numElem2;
+                // values
+                _val[std::slice(_rowbeg[I],            numElem1, 0)] = M1._val[std::slice(M1._rowbeg[i], numElem1, 0)];
+                _val[std::slice(_rowbeg[I] + numElem1, numElem2, 0)] = M2._val[std::slice(M2._rowbeg[i], numElem2, 0)];
+                // column index
+                _colind[std::slice(_rowbeg[I],            numElem1, 0)] = M1._colind[std::slice(M1._rowbeg[i], numElem1, 0)];
+                _colind[std::slice(_rowbeg[I] + numElem1, numElem2, 0)] = M2._colind[std::slice(M2._rowbeg[i], numElem2, 0)];
+                std::for_each(std::begin(_colind) + _rowbeg[I] + numElem1, std::begin(_colind) + _rowbeg[I] + numElem1 + numElem2, [&](size_t& k) {
+                    k += M1.num_cols();
+                });
+            }
+        };
+        mergeRowBlocks(A, B, 0);
+        mergeRowBlocks(C, D, A.num_rows());
     }
+
     SparseMatBaseCL& operator= (const SparseMatBaseCL& m);
 
     const T*      raw_val() const { return Addr(_val); }
