@@ -1,12 +1,12 @@
 {
   "Output" : {
     "Directory":  "../../output/test",
-    "EveryStep":  20,
+    "EveryStep":  1,
     "Binary":     true
   },
 
   "SurfCahnHilliard" : {
-    "TestName" : "Random",
+    "TestName" : "OneZeroSphere",
     "IC" : {
       "Comment" : "initial condition parameters",
       "Random" : {
@@ -14,7 +14,7 @@
         "RaftRatioNoiseFraction" : 0.1
       }
     },
-    "c_0" : 0.1,
+    "c_0" : 0.5,
     "VolumeStab" : {
       "Factor" : 1.0,
       "Power"  : 1.0
@@ -25,14 +25,14 @@
     "testcase":      "no",
     "ChemicalPotentialScaling": 1.0,
     "MobilityScaling": 1.0,
-    "Epsilon": 0.01
+    "Epsilon": 0.05
   },
 
   "Time": {
     "Read" : 0,
     "Write": "yes",
-    "StepSize" : 0.001,
-    "FinalTime": 1000,
+    "StepSize" : 1.0,
+    "FinalTime": 1,
     "Adaptive" : {
       "Tol" : 0.001,
       "rho" : 0.9,
@@ -69,6 +69,9 @@
       "KrylovSubspaceSize" : 100,
       "MaxIter" : 50,
       "RelResTol" : 1e-8
+    },
+    "Inner" : {
+      "Use" : true
     }
   },
 
