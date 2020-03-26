@@ -425,77 +425,151 @@ int main (int argc, char* argv[]) {
                 exportStats(1);
             logger.end();
         logger.end();
-//            auto F_rho = P.get<double>("Time.Adaptive.rho");
-//            auto F_tol = P.get<double>("Time.Adaptive.Tol");
-//            auto F_min = P.get<double>("Time.Adaptive.MinStepSize");
-//            auto F = [=](double e, double dt) {
-//                return std::max(F_min, F_rho * std::sqrt(F_tol / e) * dt);
-//            };
-//            size_t i = 2; // second time step, apply BDF1/BDF2 apaptive scheme
-//        	while (t < T) {
-//        	    logger.beg("do timestep i = " + std::to_string(i) + " w/ BDF1/BDF2 adaptive scheme");
-//                    logger.beg("assemble");
-//                        chi_prev_prev = chi_prev;
-//                        chi_prev = chi;
-//                        chi_extrap.Data = 2. * chi_prev.Data - chi_prev_prev.Data;
-//                        SetupCahnHilliardIF_P1P1(mg, &Mass, &Normal_stab, &Tangent_stab, &Volume_stab, &Laplace, &LaplaceM, &Gprimeprime, lset.Phi, lset.GetBndData(), v, vbnd, chi_extrap, chibnd);
-//                        // Precond3.LinComb(sigm, LaplaceM.Data, alpha, Volume_stab.Data);
-//                    logger.end();
-//                    auto t_old = t;
-//                    do {
-//                        logger.beg("attempt #" + std::to_string(numbOfTries + 1));
-//                            logger.beg("update time");
-//                                if (numbOfTries > 0) dt = F(e, dt);
-//                                t = t_old + dt;
-//                                logger.buf
-//                                    << "t  = " << t << '\n'
-//                                    << "dt = " << dt;
-//                                logger.log();
-//                                InitScalar(mg, chiSol, surfCahnHilliardData.chi, t);
-//                                InitScalar(mg, omegaSol, surfCahnHilliardData.omega, t);
-//                                SetupInterfaceRhsP1(mg, &f1, lset.Phi, lset.GetBndData(), surfCahnHilliardData.rhs3, t);
-//                                SetupInterfaceRhsP1(mg, &f2, lset.Phi, lset.GetBndData(), surfCahnHilliardData.rhs4, t);
-//                            logger.end();
-//                            logger.beg("BDF1 step");
-//
-//                            logger.end();
-//                            logger.beg("BDF2 step");
-//                                for (int i = 0; i < well_potential.Data.size(); i++) well_potential.Data[i] = 2. * chemicalPotential(chi_prev.Data[i]) - chemicalPotential(chi_prev_prev.Data[i]);
-//                                rhs1 = f1;
-//                                rhs1.Data += (2. / dt) * (Mass.Data * chi_prev.Data) - (.5 / dt) * (Mass.Data * chi_prev_prev.Data);
-//                                rhs2 = f2;
-//                                rhs2.Data += S * (Mass.Data * chi_extrap.Data) - Mass.Data * well_potential.Data;
-//                                if (model == "CahnHilliard") {
-//                                    A.LinComb(0., Laplace.Data, 1.5 / dt, Mass.Data);
-//                                    CH_solver->Solve(A, B, C, D, omega.Data, chi_BDF2.Data, rhs1.Data, rhs2.Data, omega.RowIdx->GetEx(), chi_BDF2.RowIdx->GetEx());
-//                                }
-//                                /* else if (model == "AllenCahn") {
-//                                    instantrhs3.Data += (S / eps) * (Mass.Data * chi_extrap.Data) - (1. / eps) * (Mass.Data * well_potential.Data);
-//                                    A.LinComb(sigm * eps, Laplace.Data, (S / eps + 1.5 / dt), Mass.Data, alpha * eps, Volume_stab.Data);
-//                                    AC_solver->Solve(A, chi_BDF2.Data, instantrhs3.Data, chi_BDF2.RowIdx->GetEx());
-//                                } */
-//                            logger.end();
-//                            e = std::sqrt(norm_sq(chi_BDF2.Data - chi_BDF1.Data) / norm_sq(chi_BDF2.Data));
-//                            logger.buf << "e = " << e;
-//                            logger.log();
-//                            ++numbOfTries;
-//                        logger.end();
-//                    } while (e > F_tol && dt != F_min);
-//                    chi = chi_BDF2; // save soln as BDF2
-//                    // export
-//                    exportStats(i);
-//                    // prepare for the next step
-//                    dt = F(e, dt);
-//                    ++i;
-//                    numbOfTries = 0;
-//                logger.end();
-//        }
-//        if (everyStep > 0 && !vtkExported) { // make sure to export final time
-//            logger.beg("write vtk (last time frame)");
-//            writeVTK(t);
-//            auto vtkTime = logger.end();
-//            // TODOLATER: update JSON
-//        }
+        auto F_rho = P.get<double>("Time.Adaptive.rho");
+        auto F_tol = P.get<double>("Time.Adaptive.Tol");
+        auto F_min = P.get<double>("Time.Adaptive.MinStepSize");
+        auto F = [=](double e, double dt) {
+            return std::max(F_min, F_rho * std::sqrt(F_tol / e) * dt);
+        };
+        size_t i = 2; // second time step, apply BDF1/BDF2 apaptive scheme
+        while (t < T) {
+            logger.beg("do timestep i = " + std::to_string(i) + " w/ BDF1/BDF2 adaptive scheme");
+                logger.beg("assemble");
+                    chi_prev_prev = chi_prev;
+                    chi_prev = chi;
+                    chi_extrap.Data = 2. * chi_prev.Data - chi_prev_prev.Data;
+                    SetupCahnHilliardIF_P1P1(mg, &Mass, &Normal_stab, &Tangent_stab, &Volume_stab, &Laplace, &LaplaceM, &Gprimeprime, lset.Phi, lset.GetBndData(), v, vbnd, chi_extrap, chibnd);
+                logger.end();
+                auto t_old = t;
+                do {
+                    logger.beg("attempt #" + std::to_string(numbOfTries + 1));
+                        logger.beg("update time");
+                            if (numbOfTries > 0) dt = F(e, dt);
+                            t = t_old + dt;
+                            logger.buf
+                                << "t  = " << t << '\n'
+                                << "dt = " << dt;
+                            logger.log();
+                            InitScalar(mg, chiSol, surfCahnHilliardData.chi, t);
+                            InitScalar(mg, omegaSol, surfCahnHilliardData.omega, t);
+                            SetupInterfaceRhsP1(mg, &f1, lset.Phi, lset.GetBndData(), surfCahnHilliardData.rhs3, t);
+                            SetupInterfaceRhsP1(mg, &f2, lset.Phi, lset.GetBndData(), surfCahnHilliardData.rhs4, t);
+                        logger.end();
+                        logger.beg("BDF1 step");
+                            logger.beg("set up blocks");
+                                for (int i = 0; i < well_potential.Data.size(); i++)
+                                    well_potential.Data[i] = chemicalPotential(chi_prev.Data[i]);
+                                rhs1 = f1;
+                                rhs1.Data += (1. / dt) * (Mass.Data * chi_prev.Data);
+                                rhs2 = f2;
+                                rhs2.Data += S * (Mass.Data * chi_prev.Data) - Mass.Data * well_potential.Data;
+                                A.LinComb(0., Laplace.Data, 1. / dt, Mass.Data);
+                                B.LinComb(sigm, LaplaceM.Data, alpha, Volume_stab.Data);
+                                C.LinComb(eps * eps, Laplace.Data, S, Mass.Data, alpha * eps * eps, Volume_stab.Data);
+                                D.LinComb(0., Laplace.Data, -1., Mass.Data);
+                                ABCD = MatrixCL(A, B, C, D);
+                            logger.end();
+                            logger.beg("convert to Epetra");
+                                ABCD_Epetra = static_cast<Epetra_CrsMatrix>(ABCD);
+                                printStat("{A, B; C, D} block mtx", ABCD_Epetra);
+                                belosMTX = rcpFromRef(ABCD_Epetra);
+                                for (size_t i = 0; i < n_c; ++i) belosRHS[i] = rhs1.Data[i];
+                                for (size_t i = 0; i < n_omega; ++i) belosRHS[i + n_c] = rhs2.Data[i];
+                            logger.end();
+                            logger.beg("linear solve");
+                                belosLHS.PutScalar(0.);
+                                LinearProblem<ST, MV, OP> belosProblemBDF1(belosMTX, rcpFromRef(belosLHS), rcpFromRef(belosRHS));
+                                if (inpJSON.get<bool>("Solver.Inner.Use")) belosProblemBDF1.setRightPrec(belosPRE);
+                                belosProblemBDF1.setProblem();
+                                belosSolver->setProblem(rcpFromRef(belosProblemBDF1));
+                                std::cout << std::scientific;
+                                belosSolverResult = belosSolver->solve();
+                                if (myRank == 0) {
+                                    if (belosSolverResult == Belos::Converged) logger.log("belos converged");
+                                    else logger.wrn("belos did not converge");
+                                }
+                            solveTime = logger.end();
+                            if (belosSolverResult != Belos::Converged) {
+                                runFactorization();
+                                logger.beg("linear solve w/ new factorization");
+                                    belosLHS.PutScalar(0.);
+                                    belosSolverResult = belosSolver->solve();
+                                    if (belosSolverResult == Belos::Converged) logger.log("belos converged");
+                                    else logger.wrn("belos did not converge");
+                                solveTime += logger.end();
+                            }
+                            logger.beg("convert from Epetra");
+                                for (size_t i = 0; i < n_c; ++i) chi_BDF1.Data[i] = belosLHS[i];
+                            logger.end();
+                        logger.end();
+                        logger.beg("BDF2 step");
+                            logger.beg("set up blocks");
+                                for (int i = 0; i < well_potential.Data.size(); i++)
+                                    well_potential.Data[i] = 2. * chemicalPotential(chi_prev.Data[i]) - chemicalPotential(chi_prev_prev.Data[i]);
+                                rhs1 = f1;
+                                rhs1.Data += (2. / dt) * (Mass.Data * chi_prev.Data) - (.5 / dt) * (Mass.Data * chi_prev_prev.Data);
+                                rhs2 = f2;
+                                rhs2.Data += S * (Mass.Data * chi_extrap.Data) - Mass.Data * well_potential.Data;
+                                A.LinComb(0., Laplace.Data, 1.5 / dt, Mass.Data);
+                                ABCD = MatrixCL(A, B, C, D);
+                            logger.end();
+                            logger.beg("convert to Epetra");
+                                ABCD_Epetra = static_cast<Epetra_CrsMatrix>(ABCD);
+                                printStat("{A, B; C, D} block mtx", ABCD_Epetra);
+                                belosMTX = rcpFromRef(ABCD_Epetra);
+                                for (size_t i = 0; i < n_c; ++i) belosRHS[i] = rhs1.Data[i];
+                                for (size_t i = 0; i < n_omega; ++i) belosRHS[i + n_c] = rhs2.Data[i];
+                            logger.end();
+                            logger.beg("linear solve");
+                                belosLHS.PutScalar(0.);
+                                LinearProblem<ST, MV, OP> belosProblemBDF2(belosMTX, rcpFromRef(belosLHS), rcpFromRef(belosRHS));
+                                if (inpJSON.get<bool>("Solver.Inner.Use")) belosProblemBDF2.setRightPrec(belosPRE);
+                                belosProblemBDF2.setProblem();
+                                belosSolver->setProblem(rcpFromRef(belosProblemBDF2));
+                                std::cout << std::scientific;
+                                belosSolverResult = belosSolver->solve();
+                                if (myRank == 0) {
+                                    if (belosSolverResult == Belos::Converged) logger.log("belos converged");
+                                    else logger.wrn("belos did not converge");
+                                }
+                            solveTime += logger.end();
+                            if (belosSolverResult != Belos::Converged) {
+                                runFactorization();
+                                logger.beg("linear solve w/ new factorization");
+                                    belosLHS.PutScalar(0.);
+                                    belosSolverResult = belosSolver->solve();
+                                    if (belosSolverResult == Belos::Converged) logger.log("belos converged");
+                                    else logger.wrn("belos did not converge");
+                                solveTime += logger.end();
+                            }
+                            logger.beg("convert from Epetra");
+                                for (size_t i = 0; i < n_c; ++i) chi_BDF2.Data[i] = belosLHS[i];
+                            logger.end();
+                        logger.end();
+                        e = std::sqrt(norm_sq(chi_BDF2.Data - chi_BDF1.Data) / norm_sq(chi_BDF2.Data));
+                        logger.buf << "e = " << e;
+                        logger.log();
+                        ++numbOfTries;
+                    logger.end();
+                } while (e > F_tol && dt != F_min);
+                logger.beg("convert $\\omega$ from Epetra");
+                    for (size_t i = 0; i < n_omega; ++i) omega.Data[i] = belosLHS[i + n_c];
+                logger.end();
+                chi = chi_BDF2; // save soln as BDF2
+                // export
+                exportStats(i);
+                // prepare for the next step
+                dt = F(e, dt);
+                ++i;
+                numbOfTries = 0;
+            logger.end();
+        }
+        if (everyStep > 0 && !vtkExported) { // make sure to export final time
+            logger.beg("write vtk (last time frame)");
+            writeVTK(t);
+            auto vtkTime = logger.end();
+            // TODOLATER: update JSON
+        }
         #ifdef HAVE_MPI
                 MPI_Finalize() ;
         #endif
