@@ -724,11 +724,11 @@ public:
                 // row pointer
                 _rowbeg[I + 1] = _rowbeg[I] + numElem1 + numElem2;
                 // values
-                _val[std::slice(_rowbeg[I],            numElem1, 0)] = M1._val[std::slice(M1._rowbeg[i], numElem1, 0)];
-                _val[std::slice(_rowbeg[I] + numElem1, numElem2, 0)] = M2._val[std::slice(M2._rowbeg[i], numElem2, 0)];
+                _val[std::slice(_rowbeg[I],            numElem1, 1)] = M1._val[std::slice(M1._rowbeg[i], numElem1, 1)];
+                _val[std::slice(_rowbeg[I] + numElem1, numElem2, 1)] = M2._val[std::slice(M2._rowbeg[i], numElem2, 1)];
                 // column index
-                _colind[std::slice(_rowbeg[I],            numElem1, 0)] = M1._colind[std::slice(M1._rowbeg[i], numElem1, 0)];
-                _colind[std::slice(_rowbeg[I] + numElem1, numElem2, 0)] = M2._colind[std::slice(M2._rowbeg[i], numElem2, 0)];
+                _colind[std::slice(_rowbeg[I],            numElem1, 1)] = M1._colind[std::slice(M1._rowbeg[i], numElem1, 1)];
+                _colind[std::slice(_rowbeg[I] + numElem1, numElem2, 1)] = M2._colind[std::slice(M2._rowbeg[i], numElem2, 1)];
                 std::for_each(std::begin(_colind) + _rowbeg[I] + numElem1, std::begin(_colind) + _rowbeg[I] + numElem1 + numElem2, [&](size_t& k) {
                     k += M1.num_cols();
                 });
