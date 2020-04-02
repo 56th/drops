@@ -6,7 +6,7 @@
   },
 
   "SurfCahnHilliard" : {
-    "TestName" : "Random",
+    "TestName" : "RandomBernoulli",
     "IC" : {
       "Comment" : "initial condition parameters",
       "Random" : {
@@ -14,7 +14,7 @@
         "RaftRatioNoiseFraction" : 0.1
       }
     },
-    "c_0" : 0.1,
+    "c_0" : 0.5,
     "VolumeStab" : {
       "Factor" : 1.0,
       "Power"  : 1.0
@@ -25,14 +25,14 @@
     "testcase":      "no",
     "ChemicalPotentialScaling": 1.0,
     "MobilityScaling": 1.0,
-    "Epsilon": 0.05
+    "Epsilon": 0.01
   },
 
   "Time": {
     "Read" : 0,
     "Write": "yes",
     "StepSize" : 0.01,
-    "FinalTime": 10000,
+    "FinalTime": 1e5,
     "Adaptive" : {
       "Tol" : 0.001,
       "rho" : 0.9,
@@ -55,7 +55,7 @@
       "Freq":          0,
       "Width":         -1,
       "CoarsestLevel": 0,
-      "FinestLevel":   4,
+      "FinestLevel":   5,
       "SD":            0.1,
       "CurvDiff":      -1,
       "Discontinuous": 0

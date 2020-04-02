@@ -51,7 +51,7 @@ namespace DROPS {
             res(2, 2) = (std::pow(p[0],2) + std::pow(p[1],2)) / den;
             return res;
         };
-        if (test == "Random") {
+        if (test == "RandomUniform") {
             data.exactSoln = false;
             auto raftRatio = param.get<double>("SurfCahnHilliard.IC.Random.RaftRatio");
             auto raftRatioNoisePercent = param.get<double>("SurfCahnHilliard.IC.Random.RaftRatioNoiseFraction");
@@ -63,6 +63,23 @@ namespace DROPS {
             std::random_device rd;
             std::mt19937 gen(rd());
             std::uniform_real_distribution<> dis(a, b);
+            data.chi = [=](Point3DCL const &, double) mutable {
+                return dis(gen);
+            };
+            data.omega = data.rhs3 = data.rhs4 = [](Point3DCL const &, double) {
+                return 0.;
+            };
+            data.surface = sphere;
+        }
+        else if (test == "RandomBernoulli") {
+            data.exactSoln = false;
+            auto raftRatio = param.get<double>("SurfCahnHilliard.IC.Random.RaftRatio");
+            data.description =
+                    "phi = sqrt(x^2 + y^2 + z^2) - 1, chi ~ Bernoulli(" + std::to_string(raftRatio) + ")\n"
+                    "no force terms\n";
+            std::random_device rd;
+            std::mt19937 gen(rd());
+            std::bernoulli_distribution dis(raftRatio);
             data.chi = [=](Point3DCL const &, double) mutable {
                 return dis(gen);
             };
