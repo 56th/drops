@@ -1,7 +1,7 @@
 {
   "Output" : {
-    "Directory":  "../../output/test",
-    "EveryStep":  20,
+    "Directory":  "../../output/test1",
+    "EveryStep":  1,
     "Binary":     true
   },
 
@@ -9,6 +9,7 @@
     "TestName" : "RandomBernoulli",
     "IC" : {
       "Comment" : "initial condition parameters",
+      "ProlongateFromLevelNo" : 4,
       "Random" : {
         "RaftRatio" : 0.1,
         "RaftRatioNoiseFraction" : 0.1
@@ -31,12 +32,12 @@
   "Time": {
     "Read" : 0,
     "Write": "yes",
-    "StepSize" : 0.01,
-    "FinalTime": 1e5,
+    "StepSize" : 0.001,
+    "FinalTime": 0,
     "Adaptive" : {
       "Tol" : 0.001,
       "rho" : 0.9,
-      "MinStepSize" : 0.01
+      "MinStepSize" : 0.001
     }
   },
 
@@ -55,7 +56,7 @@
       "Freq":          0,
       "Width":         -1,
       "CoarsestLevel": 0,
-      "FinestLevel":   5,
+      "FinestLevel":   6,
       "SD":            0.1,
       "CurvDiff":      -1,
       "Discontinuous": 0

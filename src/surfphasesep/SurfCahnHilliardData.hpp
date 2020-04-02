@@ -13,6 +13,7 @@ namespace DROPS {
 
     struct SurfCahnHilliardData {
         bool exactSoln;
+        double raftRatio = -1.;
         InstatScalarFunction chi, omega, rhs3, rhs4;
         struct Surface {
             InstatScalarFunction phi;
@@ -52,18 +53,18 @@ namespace DROPS {
             return res;
         };
         if (test == "RandomUniform") {
+            data.raftRatio = param.get<double>("SurfCahnHilliard.IC.Random.RaftRatio");
             data.exactSoln = false;
-            auto raftRatio = param.get<double>("SurfCahnHilliard.IC.Random.RaftRatio");
             auto raftRatioNoisePercent = param.get<double>("SurfCahnHilliard.IC.Random.RaftRatioNoiseFraction");
-            auto a = raftRatio - raftRatioNoisePercent * raftRatio;
-            auto b = raftRatio + raftRatioNoisePercent * raftRatio;
+            auto a = data.raftRatio - raftRatioNoisePercent * data.raftRatio;
+            auto b = data.raftRatio + raftRatioNoisePercent * data.raftRatio;
             data.description =
                     "phi = sqrt(x^2 + y^2 + z^2) - 1, chi ~ Uniform(" + std::to_string(a) + ", " + std::to_string(b) + ")\n"
                     "no force terms\n";
-            std::random_device rd;
-            std::mt19937 gen(rd());
-            std::uniform_real_distribution<> dis(a, b);
             data.chi = [=](Point3DCL const &, double) mutable {
+                std::random_device rd;
+                std::mt19937 gen(rd());
+                std::uniform_real_distribution<> dis(a, b);
                 return dis(gen);
             };
             data.omega = data.rhs3 = data.rhs4 = [](Point3DCL const &, double) {
@@ -72,15 +73,15 @@ namespace DROPS {
             data.surface = sphere;
         }
         else if (test == "RandomBernoulli") {
+            data.raftRatio = param.get<double>("SurfCahnHilliard.IC.Random.RaftRatio");
             data.exactSoln = false;
-            auto raftRatio = param.get<double>("SurfCahnHilliard.IC.Random.RaftRatio");
             data.description =
-                    "phi = sqrt(x^2 + y^2 + z^2) - 1, chi ~ Bernoulli(" + std::to_string(raftRatio) + ")\n"
+                    "phi = sqrt(x^2 + y^2 + z^2) - 1, chi ~ Bernoulli(" + std::to_string(data.raftRatio) + ")\n"
                     "no force terms\n";
-            std::random_device rd;
-            std::mt19937 gen(rd());
-            std::bernoulli_distribution dis(raftRatio);
             data.chi = [=](Point3DCL const &, double) mutable {
+                std::random_device rd;
+                std::mt19937 gen(rd());
+                std::bernoulli_distribution dis(data.raftRatio);
                 return dis(gen);
             };
             data.omega = data.rhs3 = data.rhs4 = [](Point3DCL const &, double) {

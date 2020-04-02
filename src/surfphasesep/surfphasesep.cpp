@@ -61,13 +61,13 @@
 
 using namespace DROPS;
 
-void InitVecLaplace(const MultiGridCL& MG, LevelsetP2CL& lset, DROPS::VecDescCL& rhs, DROPS::VecDescCL& vSol, DROPS::VecDescCL& pSol,
+void InitVecLaplace(const MultiGridCL& MG, LevelsetP2CL& lset, VecDescCL& rhs, VecDescCL& vSol, VecDescCL& pSol,
                     InstatVectorFunction f_rhs, InstatVectorFunction f_vsol, InstatScalarFunction f_psol, double t = 0.0)
 {
     if( vSol.RowIdx->NumUnknownsEdge()) {
-        DROPS::SetupInterfaceVectorRhsP2(MG, &rhs, lset.Phi, lset.GetBndData(), f_rhs);
+        SetupInterfaceVectorRhsP2(MG, &rhs, lset.Phi, lset.GetBndData(), f_rhs);
     } else {
-        DROPS::SetupInterfaceVectorRhsP1(MG, &rhs, lset.Phi, lset.GetBndData(), f_rhs, t);
+        SetupInterfaceVectorRhsP1(MG, &rhs, lset.Phi, lset.GetBndData(), f_rhs, t);
     }
     InitScalar(MG, pSol, f_psol);
     InitVector(MG, vSol, f_vsol);
@@ -135,21 +135,24 @@ int main (int argc, char* argv[]) {
         logger.end();
         // build initial mesh
         std::cout << "Setting up interface-PDE:\n";
-        std::auto_ptr<DROPS::MGBuilderCL> builder( DROPS::make_MGBuilder( P));
-        DROPS::MultiGridCL mg( *builder);
-        const DROPS::ParamCL::ptree_type* ch= 0;
+        std::auto_ptr<MGBuilderCL> builder( make_MGBuilder( P));
+        MultiGridCL mg( *builder);
+        const ParamCL::ptree_type* ch= 0;
         try {
             ch= &P.get_child( "Mesh.Periodicity");
         }
-        catch (DROPS::DROPSParamErrCL) {}
+        catch (DROPSParamErrCL) {}
         if (ch)
             read_PeriodicBoundaries( mg, *ch);
 
         // adaptive mesh refinement based on level set function
-        typedef DROPS::DistMarkingStrategyCL InitMarkerT;
-        InitMarkerT initmarker( surfCahnHilliardData.surface.phi, P.get<double>("Mesh.AdaptRef.Width"), P.get<int>("Mesh.AdaptRef.CoarsestLevel"), P.get<int>("Mesh.AdaptRef.FinestLevel") );
+        typedef DistMarkingStrategyCL InitMarkerT;
+        auto meshCoarseLevel = std::max(0, P.get<int>("Mesh.AdaptRef.CoarsestLevel"));
+        auto meshFineLevel = std::max(0, P.get<int>("Mesh.AdaptRef.FinestLevel"));
+        if (meshFineLevel < meshCoarseLevel) meshFineLevel = meshCoarseLevel;
+        InitMarkerT initmarker(surfCahnHilliardData.surface.phi, P.get<double>("Mesh.AdaptRef.Width"), meshCoarseLevel, meshFineLevel);
         //adap.set_marking_strategy( &initmarker );
-        DROPS::AdapTriangCL adap( mg, &initmarker );
+        AdapTriangCL adap( mg, &initmarker );
         adap.MakeInitialTriang();
         adap.set_marking_strategy( 0 );
         // create level set
@@ -161,7 +164,7 @@ int main (int argc, char* argv[]) {
         auto& lset = *lsetPtr;
         lset.CreateNumbering( mg.GetLastLevel(), &lset.idx);
         lset.Phi.SetIdx( &lset.idx);
-        lset.Init( surfCahnHilliardData.surface.phi);
+        lset.Init(surfCahnHilliardData.surface.phi);
         // parse FE types and some other parameters from json file
         std::string FE = P.get<std::string>("SurfCahnHilliard.FE");
         std::string velFE, prFE, LgFE;
@@ -174,7 +177,7 @@ int main (int argc, char* argv[]) {
         }
         std::string model = P.get<std::string>("SurfCahnHilliard.model");
         std::string testcase = P.get<std::string>("SurfCahnHilliard.testcase");
-        double h = P.get<DROPS::Point3DCL>("Mesh.E1")[0]/P.get<double>("Mesh.N1")*std::pow(2., -P.get<double>("Mesh.AdaptRef.FinestLevel"));
+        double h = P.get<Point3DCL>("Mesh.E1")[0]/P.get<double>("Mesh.N1")*std::pow(2., -P.get<double>("Mesh.AdaptRef.FinestLevel"));
         auto T = P.get<double>("Time.FinalTime");
         auto dt = P.get<double>("Time.StepSize");
         auto alpha = inpJSON.get<double>("SurfCahnHilliard.VolumeStab.Factor") * pow(h, inpJSON.get<double>("SurfCahnHilliard.VolumeStab.Power"));
@@ -195,10 +198,10 @@ int main (int argc, char* argv[]) {
         read_BndData( chibnd, mg, P.get_child( "Stokes.VolumeFractionBndData"));
         BndDataCL<double> omegabnd( 0);
         read_BndData( omegabnd, mg, P.get_child( "Stokes.ChemPotentialBndData"));
-        DROPS::IdxDescCL ifaceVecP1idx( vecP1IF_FE, vbnd);
-        DROPS::IdxDescCL ifaceP1idx( P1IF_FE, pbnd);
-        DROPS::IdxDescCL vecP1idx( vecP1_FE, vbnd);
-        DROPS::IdxDescCL P1FEidx( P1_FE, pbnd);
+        IdxDescCL ifaceVecP1idx( vecP1IF_FE, vbnd);
+        IdxDescCL ifaceP1idx( P1IF_FE, pbnd);
+        IdxDescCL vecP1idx( vecP1_FE, vbnd);
+        IdxDescCL P1FEidx( P1_FE, pbnd);
         ifaceVecP1idx.GetXidx().SetBound( P.get<double>("SurfTransp.OmitBound"));
         ifaceVecP1idx.CreateNumbering( mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData());
         ifaceP1idx.GetXidx().SetBound( P.get<double>("SurfTransp.OmitBound"));
@@ -207,11 +210,18 @@ int main (int argc, char* argv[]) {
         vecP1idx.CreateNumbering(mg.GetLastLevel(), mg);
         P1FEidx.GetXidx().SetBound( P.get<double>("SurfTransp.OmitBound"));
         P1FEidx.CreateNumbering(mg.GetLastLevel(), mg);
+        auto coarseLevel = P.get<int>("SurfCahnHilliard.IC.ProlongateFromLevelNo");
+        if (coarseLevel < meshCoarseLevel) coarseLevel = meshCoarseLevel;
+        if (coarseLevel > meshFineLevel)   coarseLevel = meshFineLevel;
+        IdxDescCL P1FEidxCoarse(P1_FE, pbnd);
+        P1FEidxCoarse.GetXidx().SetBound(P.get<double>("SurfTransp.OmitBound"));
+        P1FEidxCoarse.CreateNumbering(coarseLevel, mg);
         // construct FE vectors (initialized with zero)
-        DROPS::VecDescCL v, omega, omegaSol, chi, chi_ext, chi_prev, chi_prev_prev, chi_BDF1, chi_BDF2, chi_extrap, chiSol, energy, well_potential, f1, rhs1, f2, rhs2;
+        VecDescCL v, omega, omegaSol, chi, chi_ext, chi_coarse_ini_ext, chi_prev, chi_prev_prev, chi_BDF1, chi_BDF2, chi_extrap, chiSol, energy, well_potential, f1, rhs1, f2, rhs2;
         if( !FE.compare("P1P1")) {
              v.SetIdx( &ifaceVecP1idx);
              chi.SetIdx( &ifaceP1idx);
+             chi_coarse_ini_ext.SetIdx(&P1FEidxCoarse);
              chi_ext.SetIdx(&P1FEidx);
              chi_prev.SetIdx(&ifaceP1idx);
              chi_prev_prev.SetIdx(&ifaceP1idx);
@@ -229,7 +239,7 @@ int main (int argc, char* argv[]) {
              rhs2.SetIdx(&ifaceP1idx);
         }
         // setup matrices
-        DROPS::MatDescCL Laplace, Mass, Normal_stab, Tangent_stab, Volume_stab, LaplaceM, Gprimeprime;
+        MatDescCL Laplace, Mass, Normal_stab, Tangent_stab, Volume_stab, LaplaceM, Gprimeprime;
         MatrixCL A, B, C, D;
         size_t n_c, n_omega;
         if( !FE.compare("P1P1")) {
@@ -281,11 +291,37 @@ int main (int argc, char* argv[]) {
         logger.beg("do timestep i = 0");
         	auto t = 0.;
         	auto e = 0.;
-            InitScalar(mg, chi, surfCahnHilliardData.chi, 0.);
-            InitScalar(mg, chiSol, surfCahnHilliardData.chi, 0.);
+            VectorCL unityVector(1., n_c);
+            {
+                IdxDescCL P1FEidxFrom(P1_FE, pbnd), P1FEidxTo(P1_FE, pbnd);
+                P1FEidxFrom.GetXidx().SetBound(P.get<double>("SurfTransp.OmitBound"));
+                P1FEidxTo.GetXidx().SetBound(P.get<double>("SurfTransp.OmitBound"));
+                std::vector<ProlongationCL<double>> P;
+                std::vector<ProlongationCL<double>> p;
+                for (size_t l = coarseLevel + 1; l <= meshFineLevel; ++l) {
+                    P.emplace_back(ProlongationCL<double>(mg));
+                    P1FEidxFrom.CreateNumbering(l - 1, mg);
+                    P1FEidxTo.CreateNumbering(l, mg);
+                    P.back().Create(&P1FEidxFrom, &P1FEidxTo);
+                }
+                double raftFraction, raftFractionError;
+                do {
+                    InitScalar(mg, chi_coarse_ini_ext, surfCahnHilliardData.chi, 0.);
+                    chi_ext.Data = chi_coarse_ini_ext.Data;
+                    for (auto const &p : P)
+                        chi_ext.Data = p * chi_ext.Data;
+                    Restrict(mg, chi_ext, chi);
+                    if (surfCahnHilliardData.raftRatio > 0.) {
+                        raftFraction = dot(Mass.Data * chi.Data, unityVector) / dot(Mass.Data * unityVector, unityVector);
+                        raftFractionError = std::fabs(surfCahnHilliardData.raftRatio - raftFraction) / surfCahnHilliardData.raftRatio;
+                        logger.buf << "raft ratio error (%) = " << raftFractionError;
+                        logger.log();
+                    }
+                } while (surfCahnHilliardData.raftRatio > 0. && raftFractionError > .001);
+            }
+            chiSol = chi;
             size_t numbOfTries = 0;
             auto vtkExported = false;
-            VectorCL unityVector(1., n_c);
             auto solveTime = 0.;
             auto factorizationTime = 0.;
             auto belosSolverResult = Belos::Converged;
