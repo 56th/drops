@@ -39,6 +39,7 @@ cmake \
 
 make -j2 install
 ```
+Use Paraview version 5.7.0-RC1 or newer.
 
 For UH compute nodes guide, check [Ilya's presentation](https://www.math.uh.edu/~ilya/gs/talk_comput.pdf) and [wiki](https://sites.google.com/view/josiclabwiki/home).
 
