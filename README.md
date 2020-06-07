@@ -17,6 +17,30 @@ You will need
   as parameter files) is not possible anymore. You can strip comments from JSON
   files by using `g++ -E -x c++ myparam.json > myparam-stripped.json` and removing
   the first lines starting with `#`.
+  
+### UH branch
+
+You will need the following third party libraries (TPLs): Trilinos, VTK, and Matlab. To build Trilinos, you may use the following script (modify paths for your local machine):
+
+```
+cmake \
+-DTPL_ENABLE_MPI=ON \
+-DMPI_BASE_DIR=/usr/lib/x86_64-linux-gnu/openmpi \
+-DCMAKE_INSTALL_PREFIX=~/trilinos/build \
+-DBUILD_SHARED_LIBS=ON \
+-DTrilinos_ENABLE_EXPLICIT_INSTANTIATION=ON \
+-DTrilinos_ENABLE_Epetra=ON \
+-DTrilinos_ENABLE_AztecOO=ON \
+-DTrilinos_ENABLE_Ifpack=ON \
+-DTrilinos_ENABLE_Ifpack2=ON \
+-DTrilinos_ENABLE_Belos=ON \
+-DTrilinos_ENABLE_Kokkos=ON \
+~/trilinos/source
+
+make -j2 install
+```
+
+For UH compute nodes guide, check [Ilya's presentation](https://www.math.uh.edu/~ilya/gs/talk_comput.pdf) and [wiki](https://sites.google.com/view/josiclabwiki/home).
 
 ### Generating Makefiles
 
