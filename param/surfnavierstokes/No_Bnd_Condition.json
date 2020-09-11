@@ -36,7 +36,7 @@
           "Frequency" : 20.0,
           "Amplitude" : 0.1
         },
-        "KelvinHelmholtzCristophSphere" : {
+        "KelvinHelmholtzCristoph" : {
           "Delta_0" : 0.05,
           "cn" : 0.01,
           "aa" : 1.0,
