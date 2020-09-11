@@ -26,34 +26,46 @@ namespace DROPS {
 
     SurfNavierStokesData SurfNavierStokesDataFactory(std::string const & test, double nu, ParamCL const & param) {
         SurfNavierStokesData data;
-        SurfNavierStokesData::Surface sphere;
-        sphere.phi = [](Point3DCL const & p, double) {
-            return std::pow(p[0], 2.) + std::pow(p[1], 2.) + std::pow(p[2], 2.) - 1.;
-        };
-        sphere.n = [](Point3DCL const & p, double) {
-            auto den = std::sqrt(p[0]*p[0]+p[1]*p[1]+p[2]*p[2]);
-            Point3DCL v(p[0]/den, p[1]/den, p[2]/den);
-            return v;
-        };
-        sphere.e = sphere.n;
-        sphere.H = [](Point3DCL const & p, double) {
-            SMatrixCL<3, 3> res;
-            auto den = std::pow(p[0],2) + std::pow(p[1],2) + std::pow(p[2],2);
-            res(0, 0) = (std::pow(p[1],2) + std::pow(p[2],2)) / den;
-            res(0, 1) = (-1.*p[0]*p[1]) / den;
-            res(0, 2) = (-1.*p[0]*p[2]) / den;
-            res(1, 0) = res(0, 1);
-            res(1, 1) = (std::pow(p[0],2) + std::pow(p[2],2)) / den;
-            res(1, 2) = (-1.*p[1]*p[2]) / den;
-            res(2, 0) = res(0, 2);
-            res(2, 1) = res(1, 2);
-            res(2, 2) = (std::pow(p[0],2) + std::pow(p[1],2)) / den;
-            return res;
-        };
+        if (test.find("Sphere") != std::string::npos) {
+            data.description = "phi = x^2 + y^2 + z^2 - 1\n";
+            data.surface.phi = [](Point3DCL const &p, double) {
+                return std::pow(p[0], 2.) + std::pow(p[1], 2.) + std::pow(p[2], 2.) - 1.;
+            };
+            data.surface.n = [](Point3DCL const &p, double) {
+                auto den = std::sqrt(p[0] * p[0] + p[1] * p[1] + p[2] * p[2]);
+                Point3DCL v(p[0] / den, p[1] / den, p[2] / den);
+                return v;
+            };
+            data.surface.e = data.surface.n;
+            data.surface.H = [](Point3DCL const &p, double) {
+                SMatrixCL<3, 3> res;
+                auto den = std::pow(p[0], 2) + std::pow(p[1], 2) + std::pow(p[2], 2);
+                res(0, 0) = (std::pow(p[1], 2) + std::pow(p[2], 2)) / den;
+                res(0, 1) = (-1. * p[0] * p[1]) / den;
+                res(0, 2) = (-1. * p[0] * p[2]) / den;
+                res(1, 0) = res(0, 1);
+                res(1, 1) = (std::pow(p[0], 2) + std::pow(p[2], 2)) / den;
+                res(1, 2) = (-1. * p[1] * p[2]) / den;
+                res(2, 0) = res(0, 2);
+                res(2, 1) = res(1, 2);
+                res(2, 2) = (std::pow(p[0], 2) + std::pow(p[1], 2)) / den;
+                return res;
+            };
+        }
+        else if (test.find("Torus") != std::string::npos) {
+            data.description = "phi = (x^2 + y^2 + z^2 + R^2 - r^2)^2 - 4 R^2 (x^2 + y^2), R = 1, r = 0.5\n";
+            data.surface.phi = [](Point3DCL const & p, double) {
+                return -4.*(std::pow(p[0],2) + std::pow(p[1],2)) + std::pow(0.75 + std::pow(p[0],2) + std::pow(p[1],2) + std::pow(p[2],2),2);
+            };
+            data.surface.e = [](Point3DCL const &p, double) {
+                return p;
+            };
+        }
+        else throw std::invalid_argument("unknown surface");
         if (test == "StokesSphereSimple" || test == "OseenSphereSimple") {
             data.exactSoln = true;
-            data.description =
-                    "phi = x^2 + y^2 + z^2 - 1, u = P (1, 0, 0)^e, p = 0\n"
+            data.description +=
+                    "u = P (1, 0, 0)^e, p = 0\n"
                     "u = u^e is tangential, mean of p = p^e is zero\n";
             data.u_T = [=](Point3DCL const & p, double) {
                 Point3DCL v;
@@ -81,7 +93,6 @@ namespace DROPS {
             data.m_g = [](Point3DCL const & p, double) {
                 return (2.*p[0])/(std::pow(p[0],2) + std::pow(p[1],2) + std::pow(p[2],2));
             };
-            data.surface = sphere;
             if (test == "OseenSphereSimple") {
                 data.description += "wind field is the same as soln\n";
                 data.w_T = data.u_T;
@@ -96,8 +107,8 @@ namespace DROPS {
         }
         else if (test == "StokesSphere" || test == "OseenSphere") {
             data.exactSoln = true;
-            data.description =
-                    "phi = x^2 + y^2 + z^2 - 1, u = P (-z^2, y, x)^e, p = (x y^3 + z)^e\n"
+            data.description +=
+                    "u = P (-z^2, y, x)^e, p = (x y^3 + z)^e\n"
                     "u = u^e is tangential, mean of p = p^e is zero\n";
             data.u_T = [=](Point3DCL const & p, double) {
                 Point3DCL v;
@@ -125,7 +136,6 @@ namespace DROPS {
             data.m_g = [](Point3DCL const & p, double) {
                 return (-1.*(4.*p[0]*std::pow(p[2],2) - 3.*std::pow(p[1],2)*std::sqrt(std::pow(p[0],2) + std::pow(p[1],2) + std::pow(p[2],2)) - 3.*p[0]*p[2]*std::sqrt(std::pow(p[0],2) + std::pow(p[1],2) + std::pow(p[2],2)) + std::pow(std::pow(p[0],2) + std::pow(p[1],2) + std::pow(p[2],2),1.5)))/std::pow(std::pow(p[0],2) + std::pow(p[1],2) + std::pow(p[2],2),2);
             };
-            data.surface = sphere;
             if (test == "OseenSphere") {
                 data.description += "wind field is the same as soln\n";
                 data.w_T = data.u_T;
@@ -140,8 +150,7 @@ namespace DROPS {
         }
         else if (test == "KelvinHelmholtzSphere") {
             data.exactSoln = false;
-            data.description =
-                    "phi = x^2 + y^2 + z^2 - 1, u_0 = Kelvin-Helmholtz, p = 0\n";
+            data.description += "u_0 = Kelvin-Helmholtz, p = 0\n";
             auto ang = [](double x, double y) {
                 auto pi = 3.1415926535897932;
                 if (x > 0 && y >= 0) return std::atan(y/x);
@@ -171,11 +180,10 @@ namespace DROPS {
             data.m_g = [](Point3DCL const & p, double) {
                 return 0.;
             };
-            data.surface = sphere;
         }
-        else if (test == "KelvinHelmholtzCristophSphere") {
+        else if (test.find("KelvinHelmholtzCristoph") != std::string::npos) {
+            data.description += "u_0 = Kelvin-Helmholtz, p = 0\n";
             data.exactSoln = false;
-            data.description = "phi = x^2 + y^2 + z^2 - 1, u_0 = Kelvin-Helmholtz, p = 0\n";
             auto eta = [=](Point3DCL const & p) {
                 return -0.3183098861837907*std::asin(p[2]/std::sqrt(std::pow(p[0],2) + std::pow(p[1],2) + std::pow(p[2],2)));
             };
@@ -193,12 +201,12 @@ namespace DROPS {
                 if (std::pow(p[0],2) + std::pow(p[1],2) == 0.) return Point3DCL(0., 0., 0.);
                 return Point3DCL(-1.*p[1]*std::sqrt(1/(std::pow(p[0],2) + std::pow(p[1],2))), p[0]*std::sqrt(1/(std::pow(p[0],2) + std::pow(p[1],2))), 0.);
             };
-            auto delta_0 = param.get<double>("SurfNavStokes.IC." + test + ".Delta_0");
-            auto cn = param.get<double>("SurfNavStokes.IC." + test + ".cn");
-            auto aa = param.get<double>("SurfNavStokes.IC." + test + ".aa");
-            auto ab = param.get<double>("SurfNavStokes.IC." + test + ".ab");
-            auto ma = param.get<double>("SurfNavStokes.IC." + test + ".ma");
-            auto mb = param.get<double>("SurfNavStokes.IC." + test + ".mb");
+            auto delta_0 = param.get<double>("SurfNavStokes.IC.KelvinHelmholtzCristoph.Delta_0");
+            auto cn = param.get<double>("SurfNavStokes.IC.KelvinHelmholtzCristoph.cn");
+            auto aa = param.get<double>("SurfNavStokes.IC.KelvinHelmholtzCristoph.aa");
+            auto ab = param.get<double>("SurfNavStokes.IC.KelvinHelmholtzCristoph.ab");
+            auto ma = param.get<double>("SurfNavStokes.IC.KelvinHelmholtzCristoph.ma");
+            auto mb = param.get<double>("SurfNavStokes.IC.KelvinHelmholtzCristoph.mb");
             auto Hs = [=](double eta) {
                 return std::tanh(2. * eta / delta_0);
             };
@@ -209,9 +217,15 @@ namespace DROPS {
                     (-0.5*(aa*ma*sin(0.5*ma*arctan(p[0],p[1])) + ab*mb*sin(0.5*mb*arctan(p[0],p[1]))))/(std::pow(2.718281828459045,(0.10132118364233778*std::pow(std::asin(p[2]/std::sqrt(std::pow(p[0],2) + std::pow(p[1],2) + std::pow(p[2],2))),2))/std::pow(delta_0,2))*std::sqrt(std::pow(p[0],2) + std::pow(p[1],2) + std::pow(p[2],2)))
                 );
             };
+            auto zDistMin = 0.;
+            if (test.find("Torus") != std::string::npos)
+                zDistMin = .5;
+            auto zDist = [=](Point3DCL const & p) {
+                return std::sqrt(p[0] * p[0] + p[1] * p[1]) - zDistMin;
+            };
             data.u_T = [=](Point3DCL const & p, double) {
-                auto x = sphere.e(p, 0.);
-                return Hs(eta(x)) * std::sqrt(1. - x[2] * x[2]) * eXi(x) + cn * pert(x);
+                auto x = data.surface.e(p, 0.);
+                return Hs(eta(x)) * zDist(x) * eXi(x) + cn * pert(x);
             };
             data.u_N = [](Point3DCL const &, double) {
                 return 0.;
@@ -225,7 +239,6 @@ namespace DROPS {
             data.m_g = [](Point3DCL const & p, double) {
                 return 0.;
             };
-            data.surface = sphere;
         }
         else throw std::invalid_argument("test '" + test + "' is not defined");
         data.description += data.exactSoln ? "exact solution is available and the errors will be computed\n" : "exact solution is NOT available and the errors will NOT be computed\n";
