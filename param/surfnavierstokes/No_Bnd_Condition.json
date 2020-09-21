@@ -1,16 +1,16 @@
 {
     "Output": {
-      "Directory":  "/scratch/alex/kh6_1280_8",
-      "EveryStep":  1,
+      "Directory":  "/scratch/alex/tor_kh6_1280_8_nu=1e-5",
+      "EveryStep":  100,
       "Binary":     true
     },
 
     "Mesh": {
         "Type": "BrickBuilder", 
         "Origin": [-1.66666,-1.66666,-1.66666],
-        "E1": [3.33333, 0,0],		
-        "E2": [0,3.33333,0],		
-        "E3": [0,0,3.33333],		
+        "E1": [3.33333, 0,0],
+        "E2": [0,3.33333,0],
+        "E3": [0,0,3.33333],
         "N1": 2,
         "N2": 2,
         "N3": 2,
@@ -36,7 +36,7 @@
           "Frequency" : 20.0,
           "Amplitude" : 0.1
         },
-        "KelvinHelmholtzCristophSphere" : {
+        "KelvinHelmholtzCristoph" : {
           "Delta_0" : 0.05,
           "cn" : 0.01,
           "aa" : 1.0,
@@ -45,7 +45,7 @@
           "mb" : 20.0
         }
       },
-      "TestName":                 "KelvinHelmholtzCristophSphere",
+      "TestName":                 "KelvinHelmholtzCristophTorus",
       "FE":                       "P2P1",
       "PressureVolumestabType":   "normal",
       "NormalPenaltyPower":       -2,
@@ -68,7 +68,7 @@
       "Read":         0,
       "Write":        "yes",
       "NumbOfSteps":  1280,
-      "FinalTime":    20
+      "FinalTime":    40
     },
 
     "Levelset": {
