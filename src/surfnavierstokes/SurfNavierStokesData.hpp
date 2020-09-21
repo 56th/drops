@@ -225,7 +225,7 @@ namespace DROPS {
             };
             data.u_T = [=](Point3DCL const & p, double) {
                 auto x = data.surface.e(p, 0.);
-                return Hs(eta(x)) * zDist(x) * eXi(x) + cn * pert(x);
+                return zDist(x) * (Hs(eta(x)) * eXi(x) + cn * pert(x));
             };
             data.u_N = [](Point3DCL const &, double) {
                 return 0.;

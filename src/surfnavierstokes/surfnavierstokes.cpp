@@ -45,10 +45,9 @@
 #include "BelosSolverFactory.hpp"
 #include "BelosLinearProblem.hpp"
 #include "BelosEpetraAdapter.hpp"
-// amesos (sparse-direct solvers)
-#include "Amesos.h"
-#include "Amesos_ConfigDefs.h"
-#include "Amesos_BaseSolver.h"
+// amesos2 (sparse-direct solvers)
+#include "Amesos2.hpp"
+#include "Amesos2_Version.hpp"
 // epetra (vectors and operators / matrices)
 #include "Epetra_OperatorApply.hpp"
 #include "Epetra_CrsMatrix.h"
@@ -335,6 +334,7 @@ int main(int argc, char* argv[]) {
         logger.beg("set up linear solver");
             using MV = Epetra_MultiVector;
             using OP = Epetra_Operator;
+            using MT = Epetra_CrsMatrix;
             using ST = double;
             using namespace Teuchos;
             using namespace Belos;
@@ -380,23 +380,11 @@ int main(int argc, char* argv[]) {
                 S_M_tmp.LinComb(1. / (gamma + nu), surfOseenSystem.M_p.Data, -1., surfOseenSystem.C.Data);
                 S_L_tmp.LinComb(1. / alpha, surfOseenSystem.A_p.Data, -1., surfOseenSystem.C.Data);
             auto assembleTime = logger.end();
-            logger.beg("estimate perimeter");
-                auto eps = 0.1;
-                InstatScalarFunction perEstFun = [=](Point3DCL const & p, double) {
-                    return .5 * (1. + std::tanh((1./(2*std::sqrt(2)*eps))*p[1]/pow(pow(p[0], 2.) + pow(p[1], 2.) + pow(p[2], 2.), 0.5)));
-                };
-                VecDescCL cDOF;
-                cDOF.SetIdx(&ifaceP1idx);
-                InitScalar(mg, cDOF, perEstFun, 0.);
-                auto perimeterEstimate = eps * dot(surfOseenSystem.A_p.Data * cDOF.Data, cDOF.Data);
-                logger.buf << "perimeter estimate = " << perimeterEstimate;
-                logger.log();
-            logger.end();
             logger.beg("t_0: project surface vorticity and export initial data to vtk");
                 // mtx
                 MatrixCL M_tmp;
                 M_tmp.LinComb(1., surfOseenSystem.M_p.Data, -1., surfOseenSystem.C.Data);
-                auto M = static_cast<Epetra_CrsMatrix>(M_tmp);
+                auto M = static_cast<MT>(M_tmp);
                 // rhs
                 auto Q_times_u = surfOseenSystem.Q.Data * u.Data;
                 auto Q_times_u_view_0 = static_cast<Epetra_Vector>(Q_times_u);
@@ -431,19 +419,19 @@ int main(int argc, char* argv[]) {
             logger.end();
             logger.beg("convert to Epetra");
                 logger.beg("cast matrices");
-                    auto A = static_cast<Epetra_CrsMatrix>(surfOseenSystem.sumA.Data);
-                    auto printStat = [&](std::string const & name, Epetra_CrsMatrix const & A) {
+                    auto A = static_cast<MT>(surfOseenSystem.sumA.Data);
+                    auto printStat = [&](std::string const & name, MT const & A) {
                         logger.buf << name << ": " << A.NumGlobalRows() << 'x' << A.NumGlobalCols() << ", " << A.NumGlobalNonzeros() << " nonzeros (" << (100. * A.NumGlobalNonzeros()) / (static_cast<double>(A.NumGlobalRows()) * A.NumGlobalCols()) << "%)";
                         logger.log();
                     };
                     printStat("A", A);
-                    auto B = static_cast<Epetra_CrsMatrix>(surfOseenSystem.B.Data);
+                    auto B = static_cast<MT>(surfOseenSystem.B.Data);
                     printStat("B", B);
-                    auto C = static_cast<Epetra_CrsMatrix>(surfOseenSystem.C.Data);
+                    auto C = static_cast<MT>(surfOseenSystem.C.Data);
                     printStat("C := -rho_p (pressure volume stabilization mtx)", C);
-                    auto S_M = static_cast<Epetra_CrsMatrix>(S_M_tmp);
+                    auto S_M = static_cast<MT>(S_M_tmp);
                     printStat("S_M := (\\nu + \\gamma)^{-1} M_p - C", S_M);
-                    auto S_L = static_cast<Epetra_CrsMatrix>(S_L_tmp);
+                    auto S_L = static_cast<MT>(S_L_tmp);
                     printStat("S_L := \\alpha^{-1} L_p - C", S_L);
                 logger.end();
                 logger.beg("cast rhs vectors");
@@ -488,40 +476,46 @@ int main(int argc, char* argv[]) {
                     size_t numItersA = 0;
                     logger.log(inpJSON.get<std::string>("Solver.Inner.A.Comment"));
                     auto iterationA = inpJSON.get<std::string>("Solver.Inner.A.Iteration");
-                    // amesos
-                    Epetra_LinearProblem amesosProblem;
-                    RCP<Amesos_BaseSolver> amesosSolver;
-                    Amesos amesosFactory;
+                    // amesos2
+                    RCP<Amesos2::Solver<MT, MV>> amesosSolver;
                     // belos
                     auto belosParamsA = parameterList();
                     decltype(belosSolver) belosSolverA;
                     // choose
                     auto factorizationTime = 0.;
                     std::string factorize = "Yes";
-                    auto useAmesos = iterationA.find("Amesos") != std::string::npos;
+                    auto useAmesos = false; {
+                        auto pos = iterationA.find("Amesos2_");
+                        if (pos != std::string::npos) {
+                            iterationA.erase(pos, std::string("Amesos2_").length());
+                            useAmesos = true;
+                        }
+                    }
                     std::function<void()> runFactorization;
                     if (useAmesos) { // Amesos
-                        logger.log("using Amesos");
-                        if (!amesosFactory.Query(iterationA))
-                            throw std::invalid_argument("solver " + iterationA + " is not available");
+                        logger.log("using Amesos2");
+                        if (!Amesos2::query(iterationA))
+                            throw std::invalid_argument("solver " + iterationA + " is not available for Amesos2");
                         logger.log("solver: " + iterationA);
-                        amesosProblem.SetOperator(&A);
-                        amesosSolver = rcp(amesosFactory.Create(iterationA, amesosProblem));
+                        amesosSolver = Amesos2::create<MT, MV>(iterationA, rcpFromRef(A));
                         runFactorization = [&]() {
                             logger.beg("factorization");
                                 logger.beg("symbolic factorization");
-                                    AMESOS_CHK_ERR(amesosSolver->SymbolicFactorization());
+                                    amesosSolver->symbolicFactorization();
                                 logger.end();
                                 logger.beg("numeric factorization");
-                                    AMESOS_CHK_ERR(amesosSolver->NumericFactorization());
+                                    amesosSolver->numericFactorization();
+                                    auto amesosStatus = amesosSolver->getStatus();
+                                    logger.buf << "numb of nonzeros in L + U = " << amesosStatus.getNnzLU() << " (" << (100. * amesosStatus.getNnzLU()) / (static_cast<double>(A.NumGlobalRows()) * A.NumGlobalCols()) << "%)";
+                                    logger.log();
                                 logger.end();
                             factorizationTime = logger.end();
                         };
                         runFactorization();
                         invA = [&](MV const &X, MV &Y) {
-                            amesosProblem.SetLHS(&Y);
-                            amesosProblem.SetRHS(const_cast<MV*>(&X));
-                            amesosSolver->Solve();
+                            amesosSolver->setB(rcpFromRef(X));
+                            amesosSolver->setX(rcpFromRef(Y));
+                            amesosSolver->solve();
                             numItersA++;
                         };
                     } else { // Belos
@@ -814,15 +808,15 @@ int main(int argc, char* argv[]) {
                 assembleTime = logger.end();
                 logger.beg("convert to Epetra");
                     logger.beg("cast matrices");
-                        A = static_cast<Epetra_CrsMatrix>(surfOseenSystem.sumA.Data);
+                        A = static_cast<MT>(surfOseenSystem.sumA.Data);
                         printStat("A", A);
-                        B = static_cast<Epetra_CrsMatrix>(surfOseenSystem.B.Data);
+                        B = static_cast<MT>(surfOseenSystem.B.Data);
                         printStat("B", B);
-                        C = static_cast<Epetra_CrsMatrix>(surfOseenSystem.C.Data);
+                        C = static_cast<MT>(surfOseenSystem.C.Data);
                         printStat("C := -rho_p (pressure volume stabilization mtx)", C);
-                        S_M = static_cast<Epetra_CrsMatrix>(S_M_tmp);
+                        S_M = static_cast<MT>(S_M_tmp);
                         printStat("S_M := (\\nu + \\gamma)^{-1} M_p - C", S_M);
-                        S_L = static_cast<Epetra_CrsMatrix>(S_L_tmp);
+                        S_L = static_cast<MT>(S_L_tmp);
                         printStat("S_L := \\alpha^{-1} L_p - C", S_L);
                     logger.end();
                     logger.beg("cast rhs vectors");

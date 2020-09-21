@@ -45,10 +45,9 @@
 #include "BelosSolverFactory.hpp"
 #include "BelosLinearProblem.hpp"
 #include "BelosEpetraAdapter.hpp"
-// amesos (sparse-direct solvers)
-#include "Amesos.h"
-#include "Amesos_ConfigDefs.h"
-#include "Amesos_BaseSolver.h"
+// amesos2 (sparse-direct solvers)
+#include "Amesos2.hpp"
+#include "Amesos2_Version.hpp"
 // epetra (vectors and operators / matrices)
 #include "../surfnavierstokes/Epetra_OperatorApply.hpp"
 #include "Epetra_CrsMatrix.h"
@@ -267,6 +266,7 @@ int main (int argc, char* argv[]) {
         logger.beg("set up outer solver");
             using MV = Epetra_MultiVector;
             using OP = Epetra_Operator;
+            using MT = Epetra_CrsMatrix;
             using ST = double;
             using namespace Teuchos;
             using namespace Belos;
@@ -416,26 +416,26 @@ int main (int argc, char* argv[]) {
                         for (size_t i = 0; i < n_omega; ++i) belosRHS[i + n_c] = rhs2.Data[i];
                     logger.end();
                     RCP<OP> belosPRE;
-                    Epetra_LinearProblem amesosProblem;
-                    RCP<Amesos_BaseSolver> amesosSolver;
-                    Amesos amesosFactory;
+                    RCP<Amesos2::Solver<MT, MV>> amesosSolver;
                     std::function<void()> runFactorization = [](){};
                     if (inpJSON.get<bool>("Solver.Inner.Use")) {
                         logger.beg("set up preconditioner");
-                            amesosProblem.SetOperator(&ABCD_Epetra);
-                            amesosSolver = rcp(amesosFactory.Create("Amesos_Klu", amesosProblem));
+                            amesosSolver = Amesos2::create<MT, MV>("Klu", rcpFromRef(ABCD_Epetra));
                             belosPRE = rcp(new Epetra_OperatorApply([&](MV const &X, MV &Y) {
-                                amesosProblem.SetLHS(&Y);
-                                amesosProblem.SetRHS(const_cast<MV*>(&X));
-                                amesosSolver->Solve();
+                                amesosSolver->setB(rcpFromRef(X));
+                                amesosSolver->setX(rcpFromRef(Y));
+                                amesosSolver->solve();
                             }));
                             runFactorization = [&]() {
                                 logger.beg("factorization");
                                     logger.beg("symbolic factorization");
-                                        amesosSolver->SymbolicFactorization();
+                                        amesosSolver->symbolicFactorization();
                                     logger.end();
                                     logger.beg("numeric factorization");
-                                        amesosSolver->NumericFactorization();
+                                        amesosSolver->numericFactorization();
+                                        auto amesosStatus = amesosSolver->getStatus();
+                                        logger.buf << "numb of nonzeros in L + U = " << amesosStatus.getNnzLU() << " (" << (100. * amesosStatus.getNnzLU()) / (static_cast<double>(ABCD_Epetra.NumGlobalRows()) * ABCD_Epetra.NumGlobalCols()) << "%)";
+                                        logger.log();
                                     logger.end();
                                 factorizationTime = logger.end();
                             };
