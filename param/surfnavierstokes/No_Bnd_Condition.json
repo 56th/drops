@@ -141,8 +141,8 @@
             "Use" : true,
             "Type" : "BlockTriangular",
             "A" : {
-              "Comment" : "Use Amesos_* (e.g. Amesos_Klu) for the sparse-direct solver. Or use some Belos iterations (e.g. CG or BICGSTAB)",
-              "Iteration" : "Amesos_Klu",
+              "Comment" : "use Amesos2_* (e.g. Amesos2_Klu, Amesos2_SuperLU etc.) for the sparse-direct solver. Or use some Belos iterations (e.g. CG or BICGSTAB)",
+              "Iteration" : "Amesos2_SuperLU",
               "ReFactorizeTol" : 0.2,
               "MaxIter" : 200,
               "RelResTol" : 1e-4
