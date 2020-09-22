@@ -496,8 +496,11 @@ int main(int argc, char* argv[]) {
                         logger.log("using Amesos2");
                         if (!Amesos2::query(iterationA))
                             throw std::invalid_argument("solver " + iterationA + " is not available for Amesos2");
-                        logger.log("solver: " + iterationA);
                         amesosSolver = Amesos2::create<MT, MV>(iterationA, rcpFromRef(A));
+                        logger.buf
+                            << "solver:      " << amesosSolver->name() << '\n'
+                            << "description: " << amesosSolver->description();
+                        logger.log();
                         runFactorization = [&]() {
                             logger.beg("factorization");
                                 logger.beg("symbolic factorization");
@@ -506,7 +509,7 @@ int main(int argc, char* argv[]) {
                                 logger.beg("numeric factorization");
                                     amesosSolver->numericFactorization();
                                     auto amesosStatus = amesosSolver->getStatus();
-                                    logger.buf << "numb of nonzeros in L + U = " << amesosStatus.getNnzLU() << " (" << (100. * amesosStatus.getNnzLU()) / (static_cast<double>(A.NumGlobalRows()) * A.NumGlobalCols()) << "%)";
+                                    logger.buf << "numb of nonzeros in L + U = " << amesosStatus.getNnzLU() << " (" << (100. * amesosStatus.getNnzLU()) / (static_cast<double>(n) * n) << "%)";
                                     logger.log();
                                 logger.end();
                             factorizationTime = logger.end();
