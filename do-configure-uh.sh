@@ -5,7 +5,7 @@ mkdir bin
 cd bin
 
 cmake \
-	-D TRILINOS_PATH:FILEPATH="/shared/surfpde-nb/alex/trilinos/build" \
+	-D TRILINOS_PATH:FILEPATH="/shared/surfpde-nb/alex/trilinos-dev/build" \
 	-D VTK_DIR:FILEPATH="/usr/lib64/cmake/vtk" \
 	-D Matlab_ROOT_DIR:FILEPATH="/opt/matlab" \
         -D DROPS_BUILD_TYPE:STRING="RELEASE" \
