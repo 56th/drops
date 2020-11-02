@@ -134,17 +134,18 @@
             "Iteration" : "FLEXIBLE GMRES",
             "OutputFrequency" : 1,
             "KrylovSubspaceSize" : 100,
-            "MaxIter" : 50,
+            "MaxIter" : 200,
             "RelResTol" : 1e-8
         },
         "Inner" : {
             "Use" : true,
             "Type" : "BlockTriangular",
             "A" : {
-              "Comment" : "use Amesos2_* (e.g. Amesos2_Klu, Amesos2_SuperLU etc.) for the sparse-direct solver; or use some Belos iterations (e.g. CG, BICGSTAB etc.)",
+              "Comment" : "use Iteration = Amesos2_* (e.g. Amesos2_Klu, Amesos2_SuperLU etc.) for the sparse-direct solver (use Type = Full for full factorization, BlockTriangular for block Gauss-Seidel, BlockDiagonal for block Jacobi); or use some Belos iterations (e.g. Iteration = CG, BICGSTAB etc.)",
+              "Type" : "BlockTriangular",
               "Iteration" : "Amesos2_KLU",
               "ReFactorizeTol" : 0.2,
-              "MaxIter" : 200,
+              "MaxIter" : 20,
               "RelResTol" : 1e-4
             },
             "S" : {

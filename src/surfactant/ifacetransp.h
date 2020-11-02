@@ -941,6 +941,10 @@ struct SurfOseenParam {
 };
 
 struct SurfOseenSystem {
+    struct {
+      double alpha, gamma, nu, tau_u, rho_u;
+      MatDescCL block[6];
+    } A_BD; // block-diagonal preconditioner for velocity matrix
     MatDescCL A, A_stab, N, M, S, // velocity stiffness, volume stabilization, convection, mass, and normal penalty mtx
               // LB, LB_stab; // laplace-beltrami
               AL, // AL / grad-div stabilization mtx

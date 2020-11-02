@@ -1680,7 +1680,7 @@ class SurfOseenAccumulatorP2P1 : public TetraAccumulatorCL {
     LocalVelocitySetupFunction setupA_P2;
     using LocalPressureSetupFunction = void(LocalSurfOseen::*)(double[4][4], double);
     LocalPressureSetupFunction setupC_P1;
-    MatrixBuilderCL *mN_P2_, *mAL_P2_, *mA_P2_, *mA_P2_stab_, *mB_P1P2_, *mQ_P1P2_, *mM_P2_, *mS_P2_, *mM_P1_, *mC_P1_, *mA_P1_;
+    MatrixBuilderCL *mN_P2_, *mAL_P2_, *mA_P2_, *mA_P2_stab_, *mB_P1P2_, *mQ_P1P2_, *mM_P2_, *mS_P2_, *mM_P1_, *mC_P1_, *mA_P1_, *mA_BD1_, *mA_BD12_, *mA_BD13_, *mA_BD2_, *mA_BD23_, *mA_BD3_;
     // *mLB_P2_, *mLB_stab_P2_;
     double locAL_P2[30][30], locN_P2[30][30], locA_P2[30][30], locA_P2_stab[10][10], locB_P1P2[4][30], locQ_P1P2[4][30], locM_P2[10][10], locS_P2[30][30], locM_P1[4][4], locC_P1[4][4], locA_P1[4][4];
     // locLB_P2[10][10];
@@ -1728,7 +1728,13 @@ void SurfOseenAccumulatorP2P1::begin_accumulation() {
     mM_P1_= new MatrixBuilderCL(&system->M_p.Data, num_unks_p1_scalar, num_unks_p1_scalar);
     mC_P1_ = new MatrixBuilderCL(&system->C.Data, num_unks_p1_scalar, num_unks_p1_scalar);
     mA_P1_ = new MatrixBuilderCL(&system->A_p.Data, num_unks_p1_scalar, num_unks_p1_scalar);
-    // size_t num_unks_p2_scalar = num_unks_p2 / 3;
+    size_t num_unks_p2_scalar = num_unks_p2 / 3;
+    mA_BD1_ = new MatrixBuilderCL(&system->A_BD.block[0].Data, num_unks_p2_scalar, num_unks_p2_scalar);
+    mA_BD2_ = new MatrixBuilderCL(&system->A_BD.block[1].Data, num_unks_p2_scalar, num_unks_p2_scalar);
+    mA_BD3_ = new MatrixBuilderCL(&system->A_BD.block[2].Data, num_unks_p2_scalar, num_unks_p2_scalar);
+    mA_BD12_ = new MatrixBuilderCL(&system->A_BD.block[3].Data, num_unks_p2_scalar, num_unks_p2_scalar);
+    mA_BD13_ = new MatrixBuilderCL(&system->A_BD.block[4].Data, num_unks_p2_scalar, num_unks_p2_scalar);
+    mA_BD23_ = new MatrixBuilderCL(&system->A_BD.block[5].Data, num_unks_p2_scalar, num_unks_p2_scalar);
     // mLB_P2_ = new MatrixBuilderCL(&system->LB.Data, num_unks_p2_scalar, num_unks_p2_scalar);
     // mLB_stab_P2_ = new MatrixBuilderCL(&system->LB_stab.Data, num_unks_p2_scalar, num_unks_p2_scalar);
     system->fRHS.Data.resize(num_unks_p2, 0.);
@@ -1759,6 +1765,18 @@ void SurfOseenAccumulatorP2P1::finalize_accumulation() {
     delete mC_P1_;
     mA_P1_->Build();
     delete mA_P1_;
+    mA_BD1_->Build();
+    delete mA_BD1_;
+    mA_BD12_->Build();
+    delete mA_BD12_;
+    mA_BD13_->Build();
+    delete mA_BD13_;
+    mA_BD2_->Build();
+    delete mA_BD2_;
+    mA_BD23_->Build();
+    delete mA_BD23_;
+    mA_BD3_->Build();
+    delete mA_BD3_;
     // mLB_P2_->Build();
     // delete mLB_P2_;
     // mLB_stab_P2_->Build();
@@ -1811,8 +1829,22 @@ void SurfOseenAccumulatorP2P1::update_global_system() {
     auto& mM_P1 = *mM_P1_;
     auto& mC_P1  = *mC_P1_;
     auto& mA_P1  = *mA_P1_;
+    auto& mA_BD1 = *mA_BD1_;
+    auto& mA_BD12 = *mA_BD12_;
+    auto& mA_BD13 = *mA_BD13_;
+    auto& mA_BD2 = *mA_BD2_;
+    auto& mA_BD23 = *mA_BD23_;
+    auto& mA_BD3 = *mA_BD3_;
     // auto& mLB_P2 = *mLB_P2_;
     // auto& mLB_P2_stab = *mLB_stab_P2_;
+    auto A_BD = [&](size_t j, size_t i, size_t l, size_t k) {
+        auto res = l == k ? system->A_BD.alpha * locM_P2[j][i] + system->A_BD.rho_u * locA_P2_stab[j][i] : 0.;
+        return res +
+            system->A_BD.gamma * locAL_P2[3*j+l][3*i+k] +
+            locN_P2[3*j+l][3*i+k] +
+            system->A_BD.nu * locA_P2[3*j+l][3*i+k] +
+            system->A_BD.tau_u * locS_P2[3*j+l][3*i+k];
+    };
     for(int i = 0; i < 10; ++i) {
         const IdxT ii= numP2[i];
         if (ii==NoIdx) continue;
@@ -1827,6 +1859,12 @@ void SurfOseenAccumulatorP2P1::update_global_system() {
             if (jj==NoIdx) continue;
             // mLB_P2(ii/3, jj/3) += locLB_P2[j][i];
             // mLB_P2_stab(ii/3, jj/3) += locA_P2_stab[j][i];
+            mA_BD1(ii/3, jj/3) += A_BD(j, i, 0, 0);
+            mA_BD12(ii/3, jj/3) += A_BD(j, i, 0, 1);
+            mA_BD13(ii/3, jj/3) += A_BD(j, i, 0, 2);
+            mA_BD2(ii/3, jj/3) += A_BD(j, i, 1, 1);
+            mA_BD23(ii/3, jj/3) += A_BD(j, i, 1, 2);
+            mA_BD3(ii/3, jj/3) += A_BD(j, i, 2, 2);
             for (int k = 0; k < 3; ++k)
                 for (int l = 0; l < 3; ++l) {
                     mA_P2(ii+k, jj+l) += locA_P2[3*j+l][3*i+k];
