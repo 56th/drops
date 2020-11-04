@@ -377,6 +377,8 @@ int main(int argc, char* argv[]) {
                 surfOseenSystem.A_BD.tau_u = tau_u;
                 surfOseenSystem.A_BD.rho_u = rho_u;
                 SetupSurfOseen_P2P1(mg, lset, &surfOseenSystem, &param);
+                MatrixCL B_T;
+                transpose(surfOseenSystem.B.Data, B_T);
                 VectorCL I_p;
                 I_p.resize(m, 1.);
                 surfOseenSystem.gRHS.Data -= (dot(surfOseenSystem.gRHS.Data, I_p) / dot(I_p, I_p)) * I_p;
@@ -734,9 +736,26 @@ int main(int argc, char* argv[]) {
                 }
             logger.end();
             logger.beg("linear solve");
+                auto residual = [&](VectorCL const & u, VectorCL const & p) {
+                    auto velResSq = norm_sq(surfOseenSystem.sumA.Data * u + B_T * p - surfOseenSystem.fRHS.Data);
+                    auto preResSq = norm_sq(surfOseenSystem.B.Data * u + surfOseenSystem.C.Data * p - surfOseenSystem.gRHS.Data);
+                    return std::tuple<double, double, double>(sqrt(velResSq), sqrt(preResSq), sqrt(velResSq + preResSq));
+                };
+                auto b_norm = sqrt(norm_sq(surfOseenSystem.fRHS.Data) + norm_sq(surfOseenSystem.gRHS.Data));
+                auto r0_norm = std::get<2>(residual(u.Data, p.Data));
                 if (inpJSON.get<bool>("Solver.UsePreviousFrameAsInitialGuess")) {
                     for (size_t i = 0; i < n; ++i) belosLHS[i] = u.Data[i];
                     for (size_t i = 0; i < m; ++i) belosLHS[n + i] = p.Data[i];
+//                    auto belosResidual = belosLHS;
+//                    belosMTX->Apply(belosLHS, belosResidual);
+//                    belosResidual.Update(1., belosRHS, -1.);
+//                    auto belosPreResidual = belosResidual;
+//                    belosPRE->Apply(belosResidual, belosPreResidual);
+//                    double belosPreResidualNorm;
+//                    belosPreResidual.Norm2(&belosPreResidualNorm);
+                    auto rel_tol = inpJSON.get<double>("Solver.Outer.RelResTol") * b_norm / r0_norm;
+                    belosParams->set("Convergence Tolerance", rel_tol);
+                    belosSolver = belosFactory.create(inpJSON.get<std::string>("Solver.Outer.Iteration"), belosParams);
                 } else belosLHS.PutScalar(0.);
                 LinearProblem<ST, MV, OP> belosProblem(belosMTX, rcpFromRef(belosLHS), rcpFromRef(belosRHS));
                 if (inpJSON.get<bool>("Solver.Inner.Use")) belosProblem.setRightPrec(belosPRE);
@@ -773,20 +792,16 @@ int main(int argc, char* argv[]) {
             auto projectTime = logger.end();
         auto stepTime = logger.end();
         logger.beg("output");
-            MatrixCL B_T;
-            auto residual = [&](VectorCL const & u, VectorCL const & p) {
-                auto velResSq = norm_sq(surfOseenSystem.sumA.Data * u + B_T * p - surfOseenSystem.fRHS.Data);
-                auto preResSq = norm_sq(surfOseenSystem.B.Data * u + surfOseenSystem.C.Data * p - surfOseenSystem.gRHS.Data);
-                return std::tuple<double, double, double>(sqrt(velResSq), sqrt(preResSq), sqrt(velResSq + preResSq));
-            };
             auto exportStats = [&](size_t i) {
                 std::ofstream stats(dirName + "/stats/t_" + std::to_string(i) + ".json");
                 ParamCL tJSON;
-                transpose(surfOseenSystem.B.Data, B_T);
                 auto res = residual(u.Data, p.Data);
                 tJSON.put("Solver.Outer.ResidualNorm.TrueAbsolute.Velocity", std::get<0>(res));
                 tJSON.put("Solver.Outer.ResidualNorm.TrueAbsolute.Pressure", std::get<1>(res));
                 tJSON.put("Solver.Outer.ResidualNorm.TrueAbsolute.Full", std::get<2>(res));
+                tJSON.put("Solver.Outer.ResidualNorm.b", b_norm);
+                tJSON.put("Solver.Outer.ResidualNorm.r_0", r0_norm);
+                tJSON.put("Solver.Outer.ResidualNorm.r_i/b", std::get<2>(res) / b_norm);
                 tJSON.put("Solver.Outer.ResidualNorm.SolverRelative", belosSolver->achievedTol());
                 tJSON.put("Solver.Outer.TotalIters", belosSolver->getNumIters());
                 tJSON.put("Solver.Outer.DOF", n + m);
@@ -910,6 +925,7 @@ int main(int argc, char* argv[]) {
                     logger.log();
                     surfOseenSystem.A_BD.alpha = alpha;
                     SetupSurfOseen_P2P1(mg, lset, &surfOseenSystem, &param);
+                    transpose(surfOseenSystem.B.Data, B_T);
                     surfOseenSystem.gRHS.Data -= (dot(surfOseenSystem.gRHS.Data, I_p) / dot(I_p, I_p)) * I_p;
                     surfOseenSystem.fRHS.Data += (2. / stepSize) * (surfOseenSystem.M.Data * u_prev.Data) - (.5 / stepSize) * (surfOseenSystem.M.Data * u_prev_prev.Data) - gamma * surfOseenSystem.alRHS.Data;
                     surfOseenSystem.sumA.Data.LinComb(alpha, surfOseenSystem.M.Data, gamma, surfOseenSystem.AL.Data, 1., surfOseenSystem.N.Data, nu, surfOseenSystem.A.Data, tau_u, surfOseenSystem.S.Data, rho_u, surfOseenSystem.A_stab.Data);
@@ -953,7 +969,13 @@ int main(int argc, char* argv[]) {
                     else logger.log("using factorization from prev step");
                 }
                 logger.beg("linear solve");
-                    if (!inpJSON.get<bool>("Solver.UsePreviousFrameAsInitialGuess")) belosLHS.PutScalar(0.);
+                    b_norm = sqrt(norm_sq(surfOseenSystem.fRHS.Data) + norm_sq(surfOseenSystem.gRHS.Data));
+                    r0_norm = std::get<2>(residual(u.Data, p.Data));
+                    if (inpJSON.get<bool>("Solver.UsePreviousFrameAsInitialGuess")) {
+                        auto rel_tol = inpJSON.get<double>("Solver.Outer.RelResTol") * b_norm / r0_norm;
+                        belosParams->set("Convergence Tolerance", rel_tol);
+                        belosSolver = belosFactory.create(inpJSON.get<std::string>("Solver.Outer.Iteration"), belosParams);
+                    } else belosLHS.PutScalar(0.);
                     belosProblem = LinearProblem<ST, MV, OP>(belosMTX, rcpFromRef(belosLHS), rcpFromRef(belosRHS));
                     if (inpJSON.get<bool>("Solver.Inner.Use")) belosProblem.setRightPrec(belosPRE);
                     belosProblem.setProblem();

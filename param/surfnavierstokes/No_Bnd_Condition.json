@@ -129,13 +129,13 @@
     "LB":               1,
     
     "Solver": {
-        "UsePreviousFrameAsInitialGuess" : false,
+        "UsePreviousFrameAsInitialGuess" : true,
         "Outer" : {
             "Iteration" : "FLEXIBLE GMRES",
             "OutputFrequency" : 1,
             "KrylovSubspaceSize" : 100,
-            "MaxIter" : 200,
-            "RelResTol" : 1e-8
+            "MaxIter" : 100,
+            "RelResTol" : 1e-6
         },
         "Inner" : {
             "Use" : true,
@@ -145,7 +145,7 @@
               "Type" : "BlockTriangular",
               "Iteration" : "Amesos2_KLU",
               "ReFactorizeTol" : 0.2,
-              "MaxIter" : 20,
+              "MaxIter" : 1,
               "RelResTol" : 1e-4
             },
             "S" : {
