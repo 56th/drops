@@ -581,7 +581,7 @@ int main(int argc, char* argv[]) {
                             };
                             if (inpJSON.get<std::string>("Solver.Inner.A.Type") == "BlockTriangular")
                                 A_prec = [&](MV const &X, MV &Y) {
-                                    auto transA = true;
+                                    auto transA = false;
                                     // (1)
                                     auto x3 = readMVComponent(2, X);
                                     amesosSolverBlock[2]->setB(rcpFromRef(x3));
@@ -962,7 +962,7 @@ int main(int argc, char* argv[]) {
                 factorizationTime = 0.;
                 factorize = "No";
                 if (useAmesos) {
-                    if (norm(wind - wind_prev) > reFactorizeTol * std::max(norm(wind), norm(wind_prev))) {
+                    if (reFactorizeTol >= 0. && norm(wind - wind_prev) > reFactorizeTol * std::max(norm(wind), norm(wind_prev))) {
                         factorize = "Yes";
                         runFactorization();
                     }
@@ -995,7 +995,10 @@ int main(int argc, char* argv[]) {
                         numItersA = numItersS_M = numItersS_L = 0;
                         runFactorization();
                         logger.beg("linear solve w/ new factorization");
-                            belosLHS.PutScalar(0.);
+                            if (inpJSON.get<bool>("Solver.UsePreviousFrameAsInitialGuess")) {
+                                for (size_t i = 0; i < n; ++i) belosLHS[i] = u.Data[i];
+                                for (size_t i = 0; i < m; ++i) belosLHS[n + i] = p.Data[i];
+                            } else belosLHS.PutScalar(0.);
                             belosSolverResult = belosSolver->solve();
                             if (belosSolverResult == Belos::Converged) logger.log("belos converged");
                             else logger.wrn("belos did not converge");
