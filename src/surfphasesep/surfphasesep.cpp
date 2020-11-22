@@ -138,7 +138,7 @@ int main (int argc, char* argv[]) {
         MultiGridCL mg( *builder);
         const ParamCL::ptree_type* ch= 0;
         try {
-            ch= &P.get_child( "Mesh.Periodicity");
+            ch= &inpJSON.get_child( "Mesh.Periodicity");
         }
         catch (DROPSParamErrCL) {}
         if (ch)
@@ -146,10 +146,10 @@ int main (int argc, char* argv[]) {
 
         // adaptive mesh refinement based on level set function
         typedef DistMarkingStrategyCL InitMarkerT;
-        auto meshCoarseLevel = std::max(0, P.get<int>("Mesh.AdaptRef.CoarsestLevel"));
-        auto meshFineLevel = std::max(0, P.get<int>("Mesh.AdaptRef.FinestLevel"));
+        auto meshCoarseLevel = std::max(0, inpJSON.get<int>("Mesh.AdaptRef.CoarsestLevel"));
+        auto meshFineLevel = std::max(0, inpJSON.get<int>("Mesh.AdaptRef.FinestLevel"));
         if (meshFineLevel < meshCoarseLevel) meshFineLevel = meshCoarseLevel;
-        InitMarkerT initmarker(surfCahnHilliardData.surface.phi, P.get<double>("Mesh.AdaptRef.Width"), meshCoarseLevel, meshFineLevel);
+        InitMarkerT initmarker(surfCahnHilliardData.surface.phi, inpJSON.get<double>("Mesh.AdaptRef.Width"), meshCoarseLevel, meshFineLevel);
         //adap.set_marking_strategy( &initmarker );
         AdapTriangCL adap( mg, &initmarker );
         adap.MakeInitialTriang();
@@ -158,14 +158,14 @@ int main (int argc, char* argv[]) {
         InstatScalarFunction sigma (0);
         SurfaceTensionCL sf( sigma, 0);
         BndDataCL<double> lsbnd( 0);
-        read_BndData( lsbnd, mg, P.get_child( "Levelset.BndData"));
+        read_BndData( lsbnd, mg, inpJSON.get_child( "Levelset.BndData"));
         std::shared_ptr<LevelsetP2CL> lsetPtr(LevelsetP2CL::Create(mg, lsbnd, sf));
         auto& lset = *lsetPtr;
         lset.CreateNumbering( mg.GetLastLevel(), &lset.idx);
         lset.Phi.SetIdx( &lset.idx);
         lset.Init(surfCahnHilliardData.surface.phi);
         // parse FE types and some other parameters from json file
-        std::string FE = P.get<std::string>("SurfCahnHilliard.FE");
+        std::string FE = inpJSON.get<std::string>("SurfCahnHilliard.FE");
         std::string velFE, prFE, LgFE;
         velFE = FE.substr(0,2);
         prFE = FE.substr(2,2);
@@ -174,46 +174,46 @@ int main (int argc, char* argv[]) {
         } else {
             LgFE = FE.substr(2,2);
         }
-        std::string model = P.get<std::string>("SurfCahnHilliard.model");
-        std::string testcase = P.get<std::string>("SurfCahnHilliard.testcase");
-        double h = P.get<Point3DCL>("Mesh.E1")[0]/P.get<double>("Mesh.N1")*std::pow(2., -P.get<double>("Mesh.AdaptRef.FinestLevel"));
-        auto T = P.get<double>("Time.FinalTime");
-        auto dt = P.get<double>("Time.StepSize");
+        std::string model = inpJSON.get<std::string>("SurfCahnHilliard.model");
+        std::string testcase = inpJSON.get<std::string>("SurfCahnHilliard.testcase");
+        double h = inpJSON.get<Point3DCL>("Mesh.E1")[0]/inpJSON.get<double>("Mesh.N1")*std::pow(2., -inpJSON.get<double>("Mesh.AdaptRef.FinestLevel"));
+        auto T = inpJSON.get<double>("Time.FinalTime");
+        auto dt = inpJSON.get<double>("Time.StepSize");
         auto alpha = inpJSON.get<double>("SurfCahnHilliard.VolumeStab.Factor") * pow(h, inpJSON.get<double>("SurfCahnHilliard.VolumeStab.Power"));
         std::cout << "h is: " << h << std::endl;
         std::cout << "dt is: " << dt << std::endl;
         ParameterNS::h = h;
         auto S = inpJSON.get<double>("SurfCahnHilliard.Beta_s");
-        double sigm = P.get<double>("SurfCahnHilliard.MobilityScaling");
-        double eps = P.get<double>("SurfCahnHilliard.Epsilon");
+        double sigm = inpJSON.get<double>("SurfCahnHilliard.MobilityScaling");
+        double eps = inpJSON.get<double>("SurfCahnHilliard.Epsilon");
         ParameterNS::sigma = sigm;
         ParameterNS::eps = eps;
         // construct FE spaces
         BndDataCL<Point3DCL> vbnd( 0);
-        read_BndData( vbnd, mg, P.get_child( "Stokes.VelocityBndData"));
+        read_BndData( vbnd, mg, inpJSON.get_child( "Stokes.VelocityBndData"));
         BndDataCL<double> pbnd( 0);
-        read_BndData( pbnd, mg, P.get_child( "Stokes.PressureBndData"));
+        read_BndData( pbnd, mg, inpJSON.get_child( "Stokes.PressureBndData"));
         BndDataCL<double> chibnd( 0);
-        read_BndData( chibnd, mg, P.get_child( "Stokes.VolumeFractionBndData"));
+        read_BndData( chibnd, mg, inpJSON.get_child( "Stokes.VolumeFractionBndData"));
         BndDataCL<double> omegabnd( 0);
-        read_BndData( omegabnd, mg, P.get_child( "Stokes.ChemPotentialBndData"));
+        read_BndData( omegabnd, mg, inpJSON.get_child( "Stokes.ChemPotentialBndData"));
         IdxDescCL ifaceVecP1idx( vecP1IF_FE, vbnd);
         IdxDescCL ifaceP1idx( P1IF_FE, pbnd);
         IdxDescCL vecP1idx( vecP1_FE, vbnd);
         IdxDescCL P1FEidx( P1_FE, pbnd);
-        ifaceVecP1idx.GetXidx().SetBound( P.get<double>("SurfTransp.OmitBound"));
+        ifaceVecP1idx.GetXidx().SetBound( inpJSON.get<double>("SurfTransp.OmitBound"));
         ifaceVecP1idx.CreateNumbering( mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData());
-        ifaceP1idx.GetXidx().SetBound( P.get<double>("SurfTransp.OmitBound"));
+        ifaceP1idx.GetXidx().SetBound( inpJSON.get<double>("SurfTransp.OmitBound"));
         ifaceP1idx.CreateNumbering( mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData());
-        vecP1idx.GetXidx().SetBound( P.get<double>("SurfTransp.OmitBound"));
+        vecP1idx.GetXidx().SetBound( inpJSON.get<double>("SurfTransp.OmitBound"));
         vecP1idx.CreateNumbering(mg.GetLastLevel(), mg);
-        P1FEidx.GetXidx().SetBound( P.get<double>("SurfTransp.OmitBound"));
+        P1FEidx.GetXidx().SetBound( inpJSON.get<double>("SurfTransp.OmitBound"));
         P1FEidx.CreateNumbering(mg.GetLastLevel(), mg);
-        auto coarseLevel = P.get<int>("SurfCahnHilliard.IC.ProlongateFromLevelNo");
+        auto coarseLevel = inpJSON.get<int>("SurfCahnHilliard.IC.ProlongateFromLevelNo");
         if (coarseLevel < meshCoarseLevel) coarseLevel = meshCoarseLevel;
         if (coarseLevel > meshFineLevel)   coarseLevel = meshFineLevel;
         IdxDescCL P1FEidxCoarse(P1_FE, pbnd);
-        P1FEidxCoarse.GetXidx().SetBound(P.get<double>("SurfTransp.OmitBound"));
+        P1FEidxCoarse.GetXidx().SetBound(inpJSON.get<double>("SurfTransp.OmitBound"));
         P1FEidxCoarse.CreateNumbering(coarseLevel, mg);
         // construct FE vectors (initialized with zero)
         VecDescCL v, omega, omegaSol, chi, chi_ext, chi_coarse_ini_ext, chi_prev, chi_prev_prev, chi_BDF1, chi_BDF2, chi_extrap, chiSol, energy, well_potential, f1, rhs1, f2, rhs2;
@@ -294,10 +294,9 @@ int main (int argc, char* argv[]) {
             VectorCL unityVector(1., n_c);
             {
                 IdxDescCL P1FEidxFrom(P1_FE, pbnd), P1FEidxTo(P1_FE, pbnd);
-                P1FEidxFrom.GetXidx().SetBound(P.get<double>("SurfTransp.OmitBound"));
-                P1FEidxTo.GetXidx().SetBound(P.get<double>("SurfTransp.OmitBound"));
+                P1FEidxFrom.GetXidx().SetBound(inpJSON.get<double>("SurfTransp.OmitBound"));
+                P1FEidxTo.GetXidx().SetBound(inpJSON.get<double>("SurfTransp.OmitBound"));
                 std::vector<ProlongationCL<double>> P;
-                std::vector<ProlongationCL<double>> p;
                 for (size_t l = coarseLevel + 1; l <= meshFineLevel; ++l) {
                     P.emplace_back(ProlongationCL<double>(mg));
                     P1FEidxFrom.CreateNumbering(l - 1, mg);
@@ -462,9 +461,9 @@ int main (int argc, char* argv[]) {
                     exportStats(1);
                 logger.end();
             logger.end();
-            auto F_rho = P.get<double>("Time.Adaptive.rho");
-            auto F_tol = P.get<double>("Time.Adaptive.Tol");
-            auto F_min = P.get<double>("Time.Adaptive.MinStepSize");
+            auto F_rho = inpJSON.get<double>("Time.Adaptive.rho");
+            auto F_tol = inpJSON.get<double>("Time.Adaptive.Tol");
+            auto F_min = inpJSON.get<double>("Time.Adaptive.MinStepSize");
             auto F = [=](double e, double dt) {
                 return std::max(F_min, F_rho * std::sqrt(F_tol / e) * dt);
             };
