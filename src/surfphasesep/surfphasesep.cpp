@@ -473,7 +473,7 @@ int main (int argc, char* argv[]) {
                     logger.beg("assemble");
                         chi_prev_prev = chi_prev;
                         chi_prev = chi;
-                        chi_extrap.Data = 2. * chi_prev.Data - chi_prev_prev.Data;
+                        chi_extrap.Data = 2. * chi_prev.Data - chi_prev_prev.Data; // TODO: eqn (2) in https://www.researchgate.net/publication/30046083_Adaptive_Time-Stepping_for_Incompressible_Flow_Part_II_Navier-Stokes_Equations
                         SetupCahnHilliardIF_P1P1(mg, &Mass, &Normal_stab, &Tangent_stab, &Volume_stab, &Laplace, &LaplaceM, &Gprimeprime, lset.Phi, lset.GetBndData(), v, vbnd, chi_extrap, chibnd);
                     logger.end();
                     auto t_old = t;
