@@ -43,6 +43,10 @@
           "ma" : 16.0,
           "ab" : 0.1,
           "mb" : 20.0
+        },
+        "Bubble" : {
+          "r0" : 1.0,
+          "a"  : 0.1
         }
       },
       "TestName":                 "KelvinHelmholtzCristophTorus",

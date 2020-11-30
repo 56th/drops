@@ -13,9 +13,9 @@ namespace DROPS {
     struct SurfNavierStokesData {
         bool exactSoln;
         InstatVectorFunction u_T, f_T, w_T = nullptr; // w_T = nullptr for the Navier-Stokes case
-        InstatScalarFunction u_N, p, m_g; // m_g is "-g"
+        InstatScalarFunction p, m_g; // m_g is "-g"
         struct Surface {
-            InstatScalarFunction phi;
+            InstatScalarFunction phi, u_N;
             InstatVectorFunction n;
             InstatVectorFunction e;
             InstatMatrixFunction H;
@@ -28,6 +28,9 @@ namespace DROPS {
         SurfNavierStokesData data;
         if (test.find("Sphere") != std::string::npos) {
             data.description = "phi = x^2 + y^2 + z^2 - 1\n";
+            data.surface.u_N = [](Point3DCL const &, double) {
+                return 0.;
+            };
             data.surface.phi = [](Point3DCL const &p, double) {
                 return std::pow(p[0], 2.) + std::pow(p[1], 2.) + std::pow(p[2], 2.) - 1.;
             };
@@ -52,17 +55,66 @@ namespace DROPS {
                 return res;
             };
         }
+        else if (test.find("Bubble") != std::string::npos) {
+            auto r0 = param.get<double>("SurfNavStokes.IC.Bubble.r0");
+            auto a  = param.get<double>("SurfNavStokes.IC.Bubble.a");
+            data.description = "phi = x^2 + y^2 + z^2 - r^2(t), r(t) = r0 (1 + a sin(2 Pi t))\n";
+            data.surface.u_N = [=](Point3DCL const &, double t) {
+                return 6.283185307179586*a*r0*cos(6.283185307179586*t);
+            };
+            data.surface.phi = [=](Point3DCL const & p, double t) {
+                return std::pow(p[0],2) + std::pow(p[1],2) + std::pow(p[2],2) - 1.*std::pow(r0,2)*std::pow(1. + a*sin(6.283185307179586*t),2);
+            };
+            data.surface.n = [](Point3DCL const &p, double) {
+                auto den = std::sqrt(p[0] * p[0] + p[1] * p[1] + p[2] * p[2]);
+                Point3DCL v(p[0] / den, p[1] / den, p[2] / den);
+                return v;
+            };
+        }
         else if (test.find("Torus") != std::string::npos) {
             data.description = "phi = (x^2 + y^2 + z^2 + R^2 - r^2)^2 - 4 R^2 (x^2 + y^2), R = 1, r = 0.5\n";
+            data.surface.u_N = [](Point3DCL const &, double) {
+                return 0.;
+            };
             data.surface.phi = [](Point3DCL const & p, double) {
                 return -4.*(std::pow(p[0],2) + std::pow(p[1],2)) + std::pow(0.75 + std::pow(p[0],2) + std::pow(p[1],2) + std::pow(p[2],2),2);
             };
-            data.surface.e = [](Point3DCL const &p, double) {
+            data.surface.e = [](Point3DCL const &p, double) { // TODO: correct using distance func
                 return p;
             };
         }
         else throw std::invalid_argument("unknown surface");
-        if (test == "StokesSphereSimple" || test == "OseenSphereSimple") {
+        if (test == "OseenBubbleDirection") {
+            data.exactSoln = true;
+            data.description +=
+                    "u = P (1 - 2 t, 0, 0)^e, p = 0\n"
+                    "u = u^e is tangential, mean of p = p^e is zero\n"
+                    "wind field is u + u_N n\n";
+            data.u_T = [=](Point3DCL const & p, double t) {
+                Point3DCL v;
+                v[0] = ((1. - 2.*t)*(std::pow(p[1],2) + std::pow(p[2],2)))/(std::pow(p[0],2) + std::pow(p[1],2) + std::pow(p[2],2));
+                v[1] = (-1.*(1. - 2.*t)*p[0]*p[1])/(std::pow(p[0],2) + std::pow(p[1],2) + std::pow(p[2],2));
+                v[2] = (-1.*(1. - 2.*t)*p[0]*p[2])/(std::pow(p[0],2) + std::pow(p[1],2) + std::pow(p[2],2));
+                return v;
+            };
+            data.w_T = data.u_T;
+            data.p = [](Point3DCL const & p, double) {
+                return 0.;
+            };
+            auto r0 = param.get<double>("SurfNavStokes.IC.Bubble.r0");
+            auto a  = param.get<double>("SurfNavStokes.IC.Bubble.a");
+            data.f_T = [=](Point3DCL const & p, double t) {
+                Point3DCL v;
+                v[0] = (-1.*(std::pow(p[1],2) + std::pow(p[2],2))*(std::sqrt(std::pow(p[0],2) + std::pow(p[1],2) + std::pow(p[2],2))*(std::pow(1. - 2.*t,2)*p[0] + 2.*std::pow(p[0],2) + 2.*std::pow(p[1],2) + 2.*std::pow(p[2],2) - 1.*nu + 2.*t*nu) + 6.283185307179586*a*r0*(-1. + 2.*t)*(std::pow(p[0],2) + std::pow(p[1],2) + std::pow(p[2],2))*cos(6.283185307179586*t)))/std::pow(std::pow(p[0],2) + std::pow(p[1],2) + std::pow(p[2],2),2.5);
+                v[1] = (p[0]*p[1]*(std::pow(1. - 2.*t,2)*p[0] + 2.*std::pow(p[0],2) + 2.*std::pow(p[1],2) + 2.*std::pow(p[2],2) - 1.*nu + 2.*t*nu + 6.283185307179586*a*r0*(-1. + 2.*t)*std::sqrt(std::pow(p[0],2) + std::pow(p[1],2) + std::pow(p[2],2))*cos(6.283185307179586*t)))/std::pow(std::pow(p[0],2) + std::pow(p[1],2) + std::pow(p[2],2),2);
+                v[2] = (p[0]*p[2]*(std::pow(1. - 2.*t,2)*p[0] + 2.*std::pow(p[0],2) + 2.*std::pow(p[1],2) + 2.*std::pow(p[2],2) - 1.*nu + 2.*t*nu + 6.283185307179586*a*r0*(-1. + 2.*t)*std::sqrt(std::pow(p[0],2) + std::pow(p[1],2) + std::pow(p[2],2))*cos(6.283185307179586*t)))/std::pow(std::pow(p[0],2) + std::pow(p[1],2) + std::pow(p[2],2),2);
+                return v;
+            };
+            data.m_g = [=](Point3DCL const & p, double t) {
+                return (-2.*(-1. + 2.*t)*p[0])/(std::pow(p[0],2) + std::pow(p[1],2) + std::pow(p[2],2)) - (12.566370614359172*a*r0*cos(6.283185307179586*t))/std::sqrt(std::pow(p[0],2) + std::pow(p[1],2) + std::pow(p[2],2));
+            };
+        }
+        else if (test == "StokesSphereSimple" || test == "OseenSphereSimple") {
             data.exactSoln = true;
             data.description +=
                     "u = P (1, 0, 0)^e, p = 0\n"
@@ -76,9 +128,6 @@ namespace DROPS {
             };
             data.w_T = [](Point3DCL const &, double) {
                 return Point3DCL(0., 0., 0.);
-            };
-            data.u_N = [](Point3DCL const &, double) {
-                return 0.;
             };
             data.p = [](Point3DCL const & p, double) {
                 return 0.;
@@ -119,9 +168,6 @@ namespace DROPS {
             };
             data.w_T = [](Point3DCL const &, double) {
                 return Point3DCL(0., 0., 0.);
-            };
-            data.u_N = [](Point3DCL const &, double) {
-                return 0.;
             };
             data.p = [](Point3DCL const & p, double) {
                 return (p[0]*std::pow(p[1],3))/std::pow(std::pow(p[0],2) + std::pow(p[1],2) + std::pow(p[2],2),2) + p[2]/std::sqrt(std::pow(p[0],2) + std::pow(p[1],2) + std::pow(p[2],2));
@@ -167,9 +213,6 @@ namespace DROPS {
                 v[0] = -x[1];
                 v[1] = x[0];
                 return v;
-            };
-            data.u_N = [](Point3DCL const &, double) {
-                return 0.;
             };
             data.p = [](Point3DCL const &, double) {
                 return 0.;
@@ -226,9 +269,6 @@ namespace DROPS {
             data.u_T = [=](Point3DCL const & p, double) {
                 auto x = data.surface.e(p, 0.);
                 return zDist(x) * (Hs(eta(x)) * eXi(x) + cn * pert(x));
-            };
-            data.u_N = [](Point3DCL const &, double) {
-                return 0.;
             };
             data.p = [](Point3DCL const &, double) {
                 return 0.;
