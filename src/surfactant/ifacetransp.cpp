@@ -592,12 +592,11 @@ private:
             qPatchNormal, // normals exact to patch of integration
             qPatchOrP2Normal, // either normal computed from P2 interpolant, or normals exact to patch of integration
             qExactNormal, // exact normal to exact surface
-            qrotP1[12], qvP1, qvProjP1,
             qP_row[3], // ith element is ith row (= column) of P
             qF, // moment eqn rhs
             qWind; // wind field
-    GridFunctionCL<Point3DCL> qLsGrad, qP1Grad[4], qSurfP1Grad[4], qP2Grad[10], qSurfP2Grad[10], qP2HatCrossN[30];
-    GridFunctionCL<> qG, qP1Hat[4], qP2Hat[10], qLsGradNorm, qconvP1[4], qdivP1, qP2NormalComp[3], qExactOrP2NormalComp[3], qvProjP1_comp[3], qvP1_comp[3];
+    GridFunctionCL<Point3DCL> qLsGrad, qSurfVelocitySurfGrad, qP1Grad[4], qSurfP1Grad[4], qP2Grad[10], qSurfP2Grad[10], qP2HatCrossN[30];
+    GridFunctionCL<> qG, qSurfVelocity, qP1Hat[4], qP2Hat[10], qLsGradNorm, qconvP1[4], qP2NormalComp[3], qExactOrP2NormalComp[3];
     GridFunctionCL<SMatrixCL<3,3>> qP; // projection
     GridFunctionCL<SMatrixCL<3,3>> qP2E[30]; // surface rate-of-strain stress tensor, qP1E[i] = $E_s(\phi_i)$, $\phi_i$ = ith vector (velocity) shape func
     GridFunctionCL<SMatrixCL<3,3>> qHess, qAnalyticHess;
@@ -607,8 +606,8 @@ private:
     QuadDomainCL q3Ddomain;
     GridFunctionCL<Point3DCL> q3Dnormal, q3DP2Grad[10];
     GridFunctionCL<Point3DCL> q3DP1Grad[4];
-    LocalP1CL<Point3DCL> getLevelsetGrad(LocalP2CL<> const &);
-    SMatrixCL<3, 3>      getLevelsetHess(LocalP2CL<> const &);
+    LocalP1CL<Point3DCL> getP2Grad(LocalP2CL<> const &);
+    SMatrixCL<3, 3>      getP2Hess(LocalP2CL<> const &);
 public:
     SurfOseenParam* param;
     LocalSurfOseen(SurfOseenParam* param)
@@ -624,7 +623,8 @@ public:
     void exportPatchInfo(std::string const & path, const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, const TetraCL& tet);
     void calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, const TetraCL& tet); ///< has to be called before any setup method!
     template<typename Interp>
-    void calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, Interp const & w, const TetraCL& tet); ///< has to be called before any setup method!
+    void calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, Interp const & w, const TetraCL& tet); // for compatability with P1P1
+    void calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, const LocalP2CL<>& uN, LocalP2CL<Point3DCL> const & w, const TetraCL& tet);
     void calc3DIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, const TetraCL& tet); ///< has to be called after calcIntegrands!
     void setupLB_P2(double LB_P2[10][10]); // laplace-beltrami
     void setupLB_P1(double LB_P1[4][4]);
@@ -634,13 +634,14 @@ public:
     void setupA_P1(double A_P1[12][12]);
     void setupA_P1_stab(double A_P1_stab[4][4], double absdet);
     void setupN_P2(double N_P2[30][30]); // convection matrix
+    void setupH_P2(double H_P2[30][30]); // surface velocity matrix
     void setupAL_P2(double AL_P2[30][30]); // AL / grad-div stab mtx
-    void setupRhsAL_P2(double RhsAL_P2[30]); // AL / grad-div stab rhs
     void setupQ_P1P2(double Q_P1P2[4][30]); // rhs matrix for surface curl projection
     void setupB_P1P2(double B_P1P2[4][30]);
     void setupB_P1P1(double B_P1P1[4][12]);
     void setupB_P2P2(double B_P2P2[10][30]);
     void setupB_P2P1(double B_P2P1[10][12]);
+    void setupM_P2_tang(double M_P2[30][30]);
     void setupM_P2(double M_P2[10][10]);
     void setupF_P2(double F_P2[30]);
     void setupM_P1 (double M_P1[4][4]);
@@ -651,23 +652,23 @@ public:
     void setupM_P1_stab (double M_P1_stab[4][4], double absdet);
 };
 
-LocalP1CL<Point3DCL> LocalSurfOseen::getLevelsetGrad(const LocalP2CL<>& ls) {
+LocalP1CL<Point3DCL> LocalSurfOseen::getP2Grad(const LocalP2CL<>& f) {
     LocalP1CL<Point3DCL> res;
-    for(size_t i = 0; i < 10 ; ++i)
-        res += ls[i] * P2Grad[i];
+    for (size_t i = 0; i < 10 ; ++i)
+        res += f[i] * P2Grad[i];
     return res;
 }
 
-SMatrixCL<3,3> LocalSurfOseen::getLevelsetHess(const LocalP2CL<>& ls) {
+SMatrixCL<3,3> LocalSurfOseen::getP2Hess(const LocalP2CL<>& f) {
     SMatrixCL<3,3> res;
-    for(size_t i = 0; i < 10 ; ++i)
-        res += ls[i] * P2Hess[i];
+    for (size_t i = 0; i < 10 ; ++i)
+        res += f[i] * P2Hess[i];
     return res;
 }
 
 void LocalSurfOseen::calc3DIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, const TetraCL& tet) {
     make_SimpleQuadDomain<Quad5DataCL> (q3Ddomain, AllTetraC);
-    auto Normals = getLevelsetGrad(ls);
+    auto Normals = getP2Grad(ls);
     resize_and_evaluate_on_vertexes (Normals, q3Ddomain, q3Dnormal);
     // scale normals accordingly to the Euclidean Norm (only consider the ones which make a contribution in the sense of them being big enough... otherwise one has to expect problems with division through small numbers)
     for(Uint i=0; i<q3Dnormal.size(); ++i)
@@ -706,7 +707,6 @@ void LocalSurfOseen::exportPatchInfo(std::string const & path, const SMatrixCL<3
 }
 
 void LocalSurfOseen::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, const TetraCL& tet) {
-    ++param->output.numbOfCutTetras;
     P2DiscCL::GetGradients(P2Grad, P2GradRef, T);
     P2DiscCL::GetHessians(P2Hess, T);
     P1DiscCL::GetGradients(P1Grad, T);
@@ -730,11 +730,8 @@ void LocalSurfOseen::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& 
     //    }
     //    std::cout << '\n';
     // DO NOT DELETE
-    // compute rhs
-    if (param->input.f != nullptr) resize_and_evaluate_on_vertexes(param->input.f, tet, q2Ddomain, param->input.t, qF);
-    if (param->input.g != nullptr) resize_and_evaluate_on_vertexes(param->input.g, tet, q2Ddomain, param->input.t, qG);
     // compute normal
-    resize_and_evaluate_on_vertexes(getLevelsetGrad(ls), q2Ddomain, qLsGrad);
+    resize_and_evaluate_on_vertexes(getP2Grad(ls), q2Ddomain, qLsGrad);
     qLsGradNorm   = sqrt(dot(qLsGrad, qLsGrad));
     qP2Normal     = qLsGrad / qLsGradNorm;
     size_t numbOfQuadPoints = qP2Normal.size() / spatch.facet_size();
@@ -763,7 +760,7 @@ void LocalSurfOseen::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& 
     if (param->input.formulation == SurfOseenParam::Formulation::consistent || param->input.exactShape != nullptr) {
         // qHess = qP;
         qHess.resize(q2Ddomain.vertex_size());
-        qHess = getLevelsetHess(ls);
+        qHess = getP2Hess(ls);
         qHess = qP * (qHess / qLsGradNorm) * qP;
         if (param->input.exactShape != nullptr) {
             resize_and_evaluate_on_vertexes(param->input.exactShape, tet, q2Ddomain, 0., qAnalyticHess);
@@ -824,6 +821,9 @@ void LocalSurfOseen::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& 
         qP2E[vecShapeIndex] = qP * sym_part(qVectGrad(vecShapeIndex, qP2Grad)) * qP;
         qP2HatCrossN[vecShapeIndex] = qHatCrossN(vecShapeIndex, qP2Hat);
     }
+    // compute rhs
+    resize_and_evaluate_on_vertexes(param->input.f, tet, q2Ddomain, param->input.t, qF);
+    resize_and_evaluate_on_vertexes(param->input.g, tet, q2Ddomain, param->input.t, qG);
 }
 
 template<typename Interp>
@@ -831,6 +831,17 @@ void LocalSurfOseen::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& 
     calcIntegrands(T, ls, tet);
     // compute wind
     resize_and_evaluate_on_vertexes(w, q2Ddomain, qWind);
+}
+
+void LocalSurfOseen::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, const LocalP2CL<>& uN, LocalP2CL<Point3DCL> const & w, const TetraCL& tet) {
+    calcIntegrands(T, ls, w, tet);
+    // compute surface speed
+    resize_and_evaluate_on_vertexes(uN, q2Ddomain, qSurfVelocity);
+    qWind += qSurfVelocity * qPatchOrP2Normal;
+    qG += qSurfVelocity * trace(qHess);
+    qSurfVelocitySurfGrad = uN[0] * qSurfP2Grad[0];
+    for (size_t i = 1; i < 10; ++i)
+        qSurfVelocitySurfGrad += uN[i] * qSurfP2Grad[i];
 }
 
 void LocalSurfOseen::setupA_P2_consistent(double A_P2[30][30]) {
@@ -876,11 +887,6 @@ void LocalSurfOseen::setupAL_P2(double AL_P2[30][30]) {
             AL_P2[i][j] = quad_2D(trace(qP2E[j]) * trace(qP2E[i]), q2Ddomain);
             AL_P2[j][i] = AL_P2[i][j];
         }
-}
-
-void LocalSurfOseen::setupRhsAL_P2(double RhsAL_P2[30]) {
-    for (size_t i = 0; i < 30; ++i)
-        RhsAL_P2[i] = quad_2D(qG * trace(qP2E[i]), q2Ddomain);
 }
 
 // TODO: Den Fall fullGrad testen!
@@ -981,10 +987,23 @@ void LocalSurfOseen::setupB_P2P1 (double B_P2P1[10][12]) {
     }
 }
 
-void LocalSurfOseen::setupM_P2 (double M_P2[10][10]) {
+void LocalSurfOseen::setupM_P2(double M_P2[10][10]) {
      for (int i=0; i < 10; ++i)
          for (int j=0; j<10; ++j)
              M_P2[i][j] = quad_2D(qP2Hat[i]*qP2Hat[j], q2Ddomain);
+}
+
+void LocalSurfOseen::setupM_P2_tang(double M_P2[30][30]) {
+    for (size_t i = 0; i < 30; ++i) {
+        auto is = i / 3; // scalar shape index
+        auto in = i - 3 * is; // nonzero vect component
+        for (size_t j = i; j < 30; ++j) {
+            auto js = j / 3; // scalar shape index
+            auto jn = j - 3 * js; // nonzero vect component
+            M_P2[i][j] = quad_2D(qP2Hat[js] * take(qP, jn, in) * qP2Hat[is], q2Ddomain);
+            M_P2[j][i] = M_P2[i][j];
+        }
+    }
 }
 
 void LocalSurfOseen::setupF_P2(double F_P2[30]) {
@@ -992,7 +1011,11 @@ void LocalSurfOseen::setupF_P2(double F_P2[30]) {
         auto is = i / 3; // scalar shape index
         auto in = i - 3 * is; // nonzero vect component
         auto e_in = DROPS::std_basis<3>(in + 1);
-        F_P2[i] = quad_2D(dot(e_in, qF) * qP2Hat[is], q2Ddomain);
+        F_P2[i] = quad_2D(
+                (dot(e_in, qF) + qSurfVelocity * dot(e_in, qSurfVelocitySurfGrad)) * qP2Hat[is] -
+                param->input.nu * qSurfVelocity * contract(qHess, qP2E[i]) -
+                param->input.gamma * qG * trace(qP2E[i]),
+        q2Ddomain);
     }
 }
 
@@ -1004,6 +1027,19 @@ void LocalSurfOseen::setupN_P2(double N_P2[30][30]) {
             auto js = j / 3; // scalar shape index
             auto jn = j - 3 * js; // nonzero vect component
             N_P2[i][j] = quad_2D(dot(qWind, qP2Grad[is]) * qP2Hat[js] * take(qP, in, jn), q2Ddomain);
+        }
+    }
+}
+
+void LocalSurfOseen::setupH_P2(double H_P2[30][30]) {
+    for (size_t i = 0; i < 30; ++i) {
+        auto is = i / 3; // scalar shape index
+        auto in = i - 3 * is; // nonzero vect component
+        for (size_t j = i; j < 30; ++j) {
+            auto js = j / 3; // scalar shape index
+            auto jn = j - 3 * js; // nonzero vect component
+            H_P2[i][j] = quad_2D(qP2Hat[js] * qSurfVelocity * take(qHess, jn, in) * qP2Hat[is], q2Ddomain);
+            H_P2[j][i] = H_P2[i][j];
         }
     }
 }
@@ -1680,15 +1716,15 @@ class SurfOseenAccumulatorP2P1 : public TetraAccumulatorCL {
     LocalVelocitySetupFunction setupA_P2;
     using LocalPressureSetupFunction = void(LocalSurfOseen::*)(double[4][4], double);
     LocalPressureSetupFunction setupC_P1;
-    MatrixBuilderCL *mN_P2_, *mAL_P2_, *mA_P2_, *mA_P2_stab_, *mB_P1P2_, *mQ_P1P2_, *mM_P2_, *mS_P2_, *mM_P1_, *mC_P1_, *mA_P1_, *mA_BD1_, *mA_BD12_, *mA_BD13_, *mA_BD2_, *mA_BD23_, *mA_BD3_;
+    MatrixBuilderCL *mH_P2_, *mN_P2_, *mAL_P2_, *mA_P2_, *mA_P2_stab_, *mB_P1P2_, *mQ_P1P2_, *mM_P2_, *mS_P2_, *mM_P1_, *mC_P1_, *mA_P1_, *mA_BD1_, *mA_BD12_, *mA_BD13_, *mA_BD2_, *mA_BD23_, *mA_BD3_;
     // *mLB_P2_, *mLB_stab_P2_;
-    double locAL_P2[30][30], locN_P2[30][30], locA_P2[30][30], locA_P2_stab[10][10], locB_P1P2[4][30], locQ_P1P2[4][30], locM_P2[10][10], locS_P2[30][30], locM_P1[4][4], locC_P1[4][4], locA_P1[4][4];
+    double locH_P2[30][30], locAL_P2[30][30], locN_P2[30][30], locA_P2[30][30], locA_P2_stab[10][10], locB_P1P2[4][30], locQ_P1P2[4][30], locM_P2[30][30], locS_P2[30][30], locM_P1[4][4], locC_P1[4][4], locA_P1[4][4];
     // locLB_P2[10][10];
-    double locRhsAL_P2[30], locF_P2[30], locG_P1[4];
+    double locF_P2[30], locG_P1[4];
     LocalSurfOseen localProblem;
     SMatrixCL<3,3> T;
     double det, absdet;
-    LocalP2CL<> ls_loc;
+    LocalP2CL<> ls_loc, uN_loc;
     LocalP2CL<Point3DCL> w_loc;
     ///\brief Computes the mapping from local to global data "n", the local matrices in loc and.
     void local_setup (const TetraCL& tet);
@@ -1714,12 +1750,13 @@ public:
 };
 
 void SurfOseenAccumulatorP2P1::begin_accumulation() {
-    std::cout << "entering StokesIF: \n";
+    std::cout << "entering SurfOseenAccumulatorP2P1: \n";
     size_t num_unks_p1_scalar = ScalarP1Idx_.NumUnknowns();
     size_t num_unks_p2 = P2Idx_.NumUnknowns();
     mA_P2_= new MatrixBuilderCL(&system->A.Data, num_unks_p2, num_unks_p2);
     mAL_P2_ = new MatrixBuilderCL(&system->AL.Data, num_unks_p2, num_unks_p2);
     mN_P2_= new MatrixBuilderCL(&system->N.Data, num_unks_p2, num_unks_p2);
+    mH_P2_= new MatrixBuilderCL(&system->H.Data, num_unks_p2, num_unks_p2);
     mA_P2_stab_= new MatrixBuilderCL(&system->A_stab.Data, num_unks_p2, num_unks_p2);
     mB_P1P2_= new MatrixBuilderCL(&system->B.Data, num_unks_p1_scalar, num_unks_p2);
     mQ_P1P2_= new MatrixBuilderCL(&system->Q.Data, num_unks_p1_scalar, num_unks_p2);
@@ -1729,16 +1766,17 @@ void SurfOseenAccumulatorP2P1::begin_accumulation() {
     mC_P1_ = new MatrixBuilderCL(&system->C.Data, num_unks_p1_scalar, num_unks_p1_scalar);
     mA_P1_ = new MatrixBuilderCL(&system->A_p.Data, num_unks_p1_scalar, num_unks_p1_scalar);
     size_t num_unks_p2_scalar = num_unks_p2 / 3;
-    mA_BD1_ = new MatrixBuilderCL(&system->A_BD.block[0].Data, num_unks_p2_scalar, num_unks_p2_scalar);
-    mA_BD2_ = new MatrixBuilderCL(&system->A_BD.block[1].Data, num_unks_p2_scalar, num_unks_p2_scalar);
-    mA_BD3_ = new MatrixBuilderCL(&system->A_BD.block[2].Data, num_unks_p2_scalar, num_unks_p2_scalar);
-    mA_BD12_ = new MatrixBuilderCL(&system->A_BD.block[3].Data, num_unks_p2_scalar, num_unks_p2_scalar);
-    mA_BD13_ = new MatrixBuilderCL(&system->A_BD.block[4].Data, num_unks_p2_scalar, num_unks_p2_scalar);
-    mA_BD23_ = new MatrixBuilderCL(&system->A_BD.block[5].Data, num_unks_p2_scalar, num_unks_p2_scalar);
+    if (system->A_BD.build) {
+        mA_BD1_ = new MatrixBuilderCL(&system->A_BD.block[0].Data, num_unks_p2_scalar, num_unks_p2_scalar);
+        mA_BD2_ = new MatrixBuilderCL(&system->A_BD.block[1].Data, num_unks_p2_scalar, num_unks_p2_scalar);
+        mA_BD3_ = new MatrixBuilderCL(&system->A_BD.block[2].Data, num_unks_p2_scalar, num_unks_p2_scalar);
+        mA_BD12_ = new MatrixBuilderCL(&system->A_BD.block[3].Data, num_unks_p2_scalar, num_unks_p2_scalar);
+        mA_BD13_ = new MatrixBuilderCL(&system->A_BD.block[4].Data, num_unks_p2_scalar, num_unks_p2_scalar);
+        mA_BD23_ = new MatrixBuilderCL(&system->A_BD.block[5].Data, num_unks_p2_scalar, num_unks_p2_scalar);
+    }
     // mLB_P2_ = new MatrixBuilderCL(&system->LB.Data, num_unks_p2_scalar, num_unks_p2_scalar);
     // mLB_stab_P2_ = new MatrixBuilderCL(&system->LB_stab.Data, num_unks_p2_scalar, num_unks_p2_scalar);
     system->fRHS.Data.resize(num_unks_p2, 0.);
-    system->alRHS.Data.resize(num_unks_p2, 0.);
     system->gRHS.Data.resize(num_unks_p1_scalar, 0.);
 }
 
@@ -1749,6 +1787,8 @@ void SurfOseenAccumulatorP2P1::finalize_accumulation() {
     delete mAL_P2_;
     mN_P2_->Build();
     delete mN_P2_;
+    mH_P2_->Build();
+    delete mH_P2_;
     mA_P2_stab_->Build();
     delete mA_P2_stab_;
     mB_P1P2_->Build();
@@ -1765,18 +1805,20 @@ void SurfOseenAccumulatorP2P1::finalize_accumulation() {
     delete mC_P1_;
     mA_P1_->Build();
     delete mA_P1_;
-    mA_BD1_->Build();
-    delete mA_BD1_;
-    mA_BD12_->Build();
-    delete mA_BD12_;
-    mA_BD13_->Build();
-    delete mA_BD13_;
-    mA_BD2_->Build();
-    delete mA_BD2_;
-    mA_BD23_->Build();
-    delete mA_BD23_;
-    mA_BD3_->Build();
-    delete mA_BD3_;
+    if (system->A_BD.build) {
+        mA_BD1_->Build();
+        delete mA_BD1_;
+        mA_BD12_->Build();
+        delete mA_BD12_;
+        mA_BD13_->Build();
+        delete mA_BD13_;
+        mA_BD2_->Build();
+        delete mA_BD2_;
+        mA_BD23_->Build();
+        delete mA_BD23_;
+        mA_BD3_->Build();
+        delete mA_BD3_;
+    }
     // mLB_P2_->Build();
     // delete mLB_P2_;
     // mLB_stab_P2_->Build();
@@ -1786,7 +1828,8 @@ void SurfOseenAccumulatorP2P1::finalize_accumulation() {
 void SurfOseenAccumulatorP2P1::visit(const TetraCL& tet) {
     ls_loc.assign(tet, lset, BndDataCL<>());
     if (isInCutMesh(ls_loc)) {
-        w_loc.assign(tet, system->w, BndDataCL<Point3DCL>());
+        w_loc.assign(tet, system->w_T, BndDataCL<Point3DCL>());
+        uN_loc.assign(tet, system->u_N, BndDataCL<>());
         local_setup(tet);
         update_global_system();
     }
@@ -1798,15 +1841,16 @@ void SurfOseenAccumulatorP2P1::local_setup (const TetraCL& tet) {
     GetLocalNumbP2NoBnd(numP2, tet, P2Idx_);
     GetLocalNumbP1NoBnd(numScalarP1, tet, ScalarP1Idx_);
     // localProblem.exportPatchInfo("../../../MKL-Eigs-for-Sparse-Matrices/output/patch/hOver" + std::to_string(localProblem.num_intervals()), T, ls_loc, tet);
-    localProblem.calcIntegrands(T, ls_loc, w_loc, tet);
+    localProblem.calcIntegrands(T, ls_loc, uN_loc, w_loc, tet);
     localProblem.calc3DIntegrands(T, ls_loc, tet);
     (localProblem.*setupA_P2)(locA_P2);
     localProblem.setupAL_P2(locAL_P2);
     localProblem.setupN_P2(locN_P2);
+    localProblem.setupH_P2(locH_P2);
     localProblem.setupA_P2_stab(locA_P2_stab, absdet);
     localProblem.setupB_P1P2(locB_P1P2);
     localProblem.setupQ_P1P2(locQ_P1P2);
-    localProblem.setupM_P2(locM_P2);
+    localProblem.setupM_P2_tang(locM_P2);
     localProblem.setupS_P2(locS_P2);
     localProblem.setupM_P1(locM_P1);
     (localProblem.*setupC_P1)(locC_P1, absdet);
@@ -1814,13 +1858,13 @@ void SurfOseenAccumulatorP2P1::local_setup (const TetraCL& tet) {
     // localProblem.setupLB_P2(locLB_P2);
     localProblem.setupF_P2(locF_P2);
     localProblem.setupG_P1(locG_P1);
-    localProblem.setupRhsAL_P2(locRhsAL_P2);
 }
 
 void SurfOseenAccumulatorP2P1::update_global_system() {
     auto& mA_P2 = *mA_P2_;
     auto& mAL_P2 = *mAL_P2_;
     auto& mN_P2 = *mN_P2_;
+    auto& mH_P2 = *mH_P2_;
     auto& mA_P2_stab = *mA_P2_stab_;
     auto& mB_P1P2 = *mB_P1P2_;
     auto& mQ_P1P2 = *mQ_P1P2_;
@@ -1838,46 +1882,45 @@ void SurfOseenAccumulatorP2P1::update_global_system() {
     // auto& mLB_P2 = *mLB_P2_;
     // auto& mLB_P2_stab = *mLB_stab_P2_;
     auto A_BD = [&](size_t j, size_t i, size_t l, size_t k) {
-        auto res = l == k ? system->A_BD.alpha * locM_P2[j][i] + system->A_BD.rho_u * locA_P2_stab[j][i] : 0.;
+        auto res = l == k ? localProblem.param->input.rho_u * locA_P2_stab[j][i] : 0.;
         return res +
-            system->A_BD.gamma * locAL_P2[3*j+l][3*i+k] +
+            localProblem.param->input.alpha * locM_P2[3*j+l][3*i+k] +
+            localProblem.param->input.gamma * locAL_P2[3*j+l][3*i+k] +
             locN_P2[3*j+l][3*i+k] +
-            system->A_BD.nu * locA_P2[3*j+l][3*i+k] +
-            system->A_BD.tau_u * locS_P2[3*j+l][3*i+k];
+            locH_P2[3*j+l][3*i+k] +
+            localProblem.param->input.nu * locA_P2[3*j+l][3*i+k] +
+            localProblem.param->input.tau_u * locS_P2[3*j+l][3*i+k];
     };
     for(int i = 0; i < 10; ++i) {
         const IdxT ii= numP2[i];
         if (ii==NoIdx) continue;
         // assemble rhs
-        for (int k = 0; k < 3; ++k) {
+        for (int k = 0; k < 3; ++k)
             system->fRHS.Data[ii + k] += locF_P2[3 * i + k];
-            system->alRHS.Data[ii + k] += locRhsAL_P2[3 * i + k];
-        }
         // assemble mtx
         for(int j = 0; j < 10; ++j) {
             const IdxT jj= numP2[j];
             if (jj==NoIdx) continue;
             // mLB_P2(ii/3, jj/3) += locLB_P2[j][i];
             // mLB_P2_stab(ii/3, jj/3) += locA_P2_stab[j][i];
-            mA_BD1(ii/3, jj/3) += A_BD(j, i, 0, 0);
-            mA_BD12(ii/3, jj/3) += A_BD(j, i, 0, 1);
-            mA_BD13(ii/3, jj/3) += A_BD(j, i, 0, 2);
-            mA_BD2(ii/3, jj/3) += A_BD(j, i, 1, 1);
-            mA_BD23(ii/3, jj/3) += A_BD(j, i, 1, 2);
-            mA_BD3(ii/3, jj/3) += A_BD(j, i, 2, 2);
+            if (system->A_BD.build) {
+                mA_BD1(ii / 3, jj / 3) += A_BD(j, i, 0, 0);
+                mA_BD12(ii / 3, jj / 3) += A_BD(j, i, 0, 1);
+                mA_BD13(ii / 3, jj / 3) += A_BD(j, i, 0, 2);
+                mA_BD2(ii / 3, jj / 3) += A_BD(j, i, 1, 1);
+                mA_BD23(ii / 3, jj / 3) += A_BD(j, i, 1, 2);
+                mA_BD3(ii / 3, jj / 3) += A_BD(j, i, 2, 2);
+            }
             for (int k = 0; k < 3; ++k)
                 for (int l = 0; l < 3; ++l) {
                     mA_P2(ii+k, jj+l) += locA_P2[3*j+l][3*i+k];
                     mAL_P2(ii+k, jj+l) += locAL_P2[3*j+l][3*i+k];
                     mN_P2(ii+k, jj+l) += locN_P2[3*j+l][3*i+k];
+                    mH_P2(ii+k, jj+l) += locH_P2[3*j+l][3*i+k];
                     mS_P2(ii+k, jj+l) += locS_P2[3*j+l][3*i+k];
-                    if(k == l) {
-                        mM_P2(ii+k, jj+l) += locM_P2[j][i];
+                    mM_P2(ii+k, jj+l) += locM_P2[3*j+l][3*i+k];
+                    if(k == l)
                         mA_P2_stab(ii+k, jj+l) += locA_P2_stab[j][i];
-                    } else {
-                        mM_P2(ii+k, jj+l) += 0.;
-                        mA_P2_stab(ii+k, jj+l) += 0.;
-                    }
                 }
         }
         for (int j=0; j < 4; ++j) {

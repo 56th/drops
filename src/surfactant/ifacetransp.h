@@ -917,6 +917,7 @@ struct SurfOseenParam {
     enum class Formulation { consistent, inconsistent };
     enum class PressureVolumestab { full, normal };
     struct {
+        double alpha, rho_u, tau_u, gamma, nu;
         double t = 0.;
         size_t numbOfVirtualSubEdges = 2;
         Formulation formulation = Formulation::consistent;
@@ -942,18 +943,17 @@ struct SurfOseenParam {
 
 struct SurfOseenSystem {
     struct {
-      double alpha, gamma, nu, tau_u, rho_u;
-      MatDescCL block[6];
+        bool build = false;
+        MatDescCL block[6];
     } A_BD; // block-diagonal preconditioner for velocity matrix
-    MatDescCL A, A_stab, N, M, S, // velocity stiffness, volume stabilization, convection, mass, and normal penalty mtx
+    MatDescCL A, A_stab, N, H, M, S, // velocity stiffness, volume stabilization, convection, surface velocity, mass, and normal penalty mtx
               // LB, LB_stab; // laplace-beltrami
               AL, // AL / grad-div stabilization mtx
               sumA, // accumulated from above
               A_p, M_p, C, // pressure stiffness (laplace-beltrami), pressure mass, and volume stabilization mtx
               B, Q; // divergence and rhs-curl-projection mtx
     VecDescCL fRHS, gRHS, // moment and continuity rhs
-              alRHS, // AL / grad-div stabilization rhs
-              w; // wind
+              w_T, u_N; // wind and surface speed
 };
 
 void SetupSurfOseen_P2P1(const MultiGridCL& MG_, const LevelsetP2CL&, SurfOseenSystem*, SurfOseenParam*);

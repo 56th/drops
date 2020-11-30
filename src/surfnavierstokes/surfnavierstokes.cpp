@@ -130,6 +130,10 @@ int main(int argc, char* argv[]) {
             logger.buf << "$\\nu$ = " << nu << '\n';
             logger.buf << "$\\gamma$ = " << gamma << " (AL / grad-div stabilization constant)\n";
             SurfOseenParam param;
+            param.input.gamma = gamma;
+            param.input.nu = nu;
+            param.input.tau_u = tau_u;
+            param.input.rho_u = rho_u;
             param.input.f = inpJSON.get<bool>("SurfNavStokes.IntegrateRHS") ? surfNavierStokesData.f_T : nullptr;
             param.input.g = inpJSON.get<bool>("SurfNavStokes.IntegrateRHS") ? surfNavierStokesData.m_g : nullptr;
             param.input.exactNormal = inpJSON.get<bool>("SurfNavStokes.ComputeNormalErr") ? surfNavierStokesData.surface.n : nullptr;
@@ -279,12 +283,13 @@ int main(int argc, char* argv[]) {
                 u_prev_prev.SetIdx(&ifaceVecP2idx);
                 surf_curl_u.SetIdx(&ifaceP1idx);
                 surf_curl_u_ext.SetIdx(&P1FEidx);
-                surfOseenSystem.w.SetIdx(&ifaceVecP2idx);
+                surfOseenSystem.u_N.SetIdx(&ifaceP2idx);
+                surfOseenSystem.w_T.SetIdx(&ifaceVecP2idx);
                 surfOseenSystem.fRHS.SetIdx(&ifaceVecP2idx);
-                surfOseenSystem.alRHS.SetIdx(&ifaceVecP2idx);
                 surfOseenSystem.A.SetIdx(&ifaceVecP2idx, &ifaceVecP2idx);
                 surfOseenSystem.AL.SetIdx(&ifaceVecP2idx, &ifaceVecP2idx);
                 surfOseenSystem.N.SetIdx(&ifaceVecP2idx, &ifaceVecP2idx);
+                surfOseenSystem.H.SetIdx(&ifaceVecP2idx, &ifaceVecP2idx);
                 surfOseenSystem.A_stab.SetIdx(&ifaceVecP2idx, &ifaceVecP2idx);
                 surfOseenSystem.B.SetIdx(&ifaceP1idx, &ifaceVecP2idx);
                 surfOseenSystem.Q.SetIdx(&ifaceP1idx, &ifaceVecP2idx);
@@ -355,35 +360,35 @@ int main(int argc, char* argv[]) {
             logger.log();
         logger.end();
         logger.beg("t = t_1");
+            param.input.t = stepSize;
+            logger.beg("initialize surface speed $u_N$");
+                // TODO: solve PDE for $u_N$ here . . .
+                InitScalar(mg, surfOseenSystem.u_N, surfNavierStokesData.surface.u_N, param.input.t);
+            logger.end();
             logger.beg("assemble");
                 InitVector(mg, u_prev, surfNavierStokesData.u_T, 0.);
-                param.input.t = stepSize;
                 auto setWind = [&](VectorCL const & wind) {
                     if (surfNavierStokesData.w_T) // Oseen (and Stokes) case
-                        InitVector(mg, surfOseenSystem.w, surfNavierStokesData.w_T, param.input.t);
-                    else surfOseenSystem.w.Data = wind; // Navier-Stokes case
+                        InitVector(mg, surfOseenSystem.w_T, surfNavierStokesData.w_T, param.input.t);
+                    else surfOseenSystem.w_T.Data = wind; // Navier-Stokes case
                 };
                 auto wind = u_prev.Data;
                 setWind(wind);
-                auto Pe = supnorm(surfOseenSystem.w.Data) / nu;
+                auto Pe = supnorm(surfOseenSystem.w_T.Data) / nu;
                 auto alpha = 1. / stepSize;
                 logger.buf
                     << "$\\alpha$ = " << alpha << '\n'
                     << "Pe = " << Pe;
                 logger.log();
-                surfOseenSystem.A_BD.alpha = alpha;
-                surfOseenSystem.A_BD.gamma = gamma;
-                surfOseenSystem.A_BD.nu = nu;
-                surfOseenSystem.A_BD.tau_u = tau_u;
-                surfOseenSystem.A_BD.rho_u = rho_u;
+                param.input.alpha = alpha;
                 SetupSurfOseen_P2P1(mg, lset, &surfOseenSystem, &param);
                 MatrixCL B_T;
                 transpose(surfOseenSystem.B.Data, B_T);
                 VectorCL I_p;
                 I_p.resize(m, 1.);
                 surfOseenSystem.gRHS.Data -= (dot(surfOseenSystem.gRHS.Data, I_p) / dot(I_p, I_p)) * I_p;
-                surfOseenSystem.fRHS.Data += (1. / stepSize) * (surfOseenSystem.M.Data * u_prev.Data) - gamma * surfOseenSystem.alRHS.Data;
-                surfOseenSystem.sumA.Data.LinComb(alpha, surfOseenSystem.M.Data, gamma, surfOseenSystem.AL.Data, 1., surfOseenSystem.N.Data, nu, surfOseenSystem.A.Data, tau_u, surfOseenSystem.S.Data, rho_u, surfOseenSystem.A_stab.Data);
+                surfOseenSystem.fRHS.Data += (1. / stepSize) * (surfOseenSystem.M.Data * u_prev.Data);
+                surfOseenSystem.sumA.Data.LinComb(alpha, surfOseenSystem.M.Data, gamma, surfOseenSystem.AL.Data, 1., surfOseenSystem.N.Data, 1., surfOseenSystem.H.Data, nu, surfOseenSystem.A.Data, tau_u, surfOseenSystem.S.Data, rho_u, surfOseenSystem.A_stab.Data);
                 surfOseenSystem.C.Data *= -rho_p;
                 MatrixCL S_M_tmp, S_L_tmp;
                 S_M_tmp.LinComb(1. / (gamma + nu), surfOseenSystem.M_p.Data, -1., surfOseenSystem.C.Data);
@@ -430,7 +435,8 @@ int main(int argc, char* argv[]) {
                 logger.beg("cast matrices");
                     auto A = static_cast<MT>(surfOseenSystem.sumA.Data);
                     auto printStat = [&](std::string const & name, MT const & A) {
-                        logger.buf << name << ": " << A.NumGlobalRows() << 'x' << A.NumGlobalCols() << ", " << A.NumGlobalNonzeros() << " nonzeros (" << (100. * A.NumGlobalNonzeros()) / (static_cast<double>(A.NumGlobalRows()) * A.NumGlobalCols()) << "%)";
+                        logger.buf << name << ": " << A.NumGlobalRows() << 'x' << A.NumGlobalCols() << ", " << A.NumGlobalNonzeros() << " nonzeros";
+                        if (A.NumGlobalNonzeros()) logger.buf << " (" << (100. * A.NumGlobalNonzeros()) / (static_cast<double>(A.NumGlobalRows()) * A.NumGlobalCols()) << "%)";
                         logger.log();
                     };
                     printStat("A", A);
@@ -521,6 +527,7 @@ int main(int argc, char* argv[]) {
                         if (!Amesos2::query(iterationA))
                             throw std::invalid_argument("solver " + iterationA + " is not available for Amesos2");
                         if (inpJSON.get<std::string>("Solver.Inner.A.Type") == "Full") {
+                            surfOseenSystem.A_BD.build = false;
                             logger.log("factorizing full velocity matrix");
                             amesosSolver = Amesos2::create<MT, MV>(iterationA, rcpFromRef(A));
                             logger.buf
@@ -548,6 +555,7 @@ int main(int argc, char* argv[]) {
                                 numItersA++;
                             };
                         } else {
+                            surfOseenSystem.A_BD.build = true;
                             logger.log("factorizing blocks A_{ii} of velocity matrix");
                             amesosSolverBlock[0] = Amesos2::create<MT, MV>(iterationA, rcpFromRef(A11));
                             logger.buf
@@ -746,13 +754,6 @@ int main(int argc, char* argv[]) {
                 if (inpJSON.get<bool>("Solver.UsePreviousFrameAsInitialGuess")) {
                     for (size_t i = 0; i < n; ++i) belosLHS[i] = u.Data[i];
                     for (size_t i = 0; i < m; ++i) belosLHS[n + i] = p.Data[i];
-//                    auto belosResidual = belosLHS;
-//                    belosMTX->Apply(belosLHS, belosResidual);
-//                    belosResidual.Update(1., belosRHS, -1.);
-//                    auto belosPreResidual = belosResidual;
-//                    belosPRE->Apply(belosResidual, belosPreResidual);
-//                    double belosPreResidualNorm;
-//                    belosPreResidual.Norm2(&belosPreResidualNorm);
                     auto rel_tol = inpJSON.get<double>("Solver.Outer.RelResTol") * b_norm / r0_norm;
                     belosParams->set("Convergence Tolerance", rel_tol);
                     belosSolver = belosFactory.create(inpJSON.get<std::string>("Solver.Outer.Iteration"), belosParams);
@@ -908,27 +909,31 @@ int main(int argc, char* argv[]) {
             std::stringstream header;
             header << "t = t_" << i << " (" << (100. * i) / numbOfSteps << "%)";
             logger.beg(header.str());
+                param.input.t = i * stepSize;
+                logger.beg("initialize surface speed $u_N$");
+                    // TODO: solve PDE for $u_N$ here . . .
+                    InitScalar(mg, surfOseenSystem.u_N, surfNavierStokesData.surface.u_N, param.input.t);
+                logger.end();
                 logger.beg("assemble");
                     u_prev_prev = u_prev;
                     u_prev = u;
-                    param.input.t = i * stepSize;
                     auto wind_prev = wind;
                     wind = u_prev.Data;
                     wind *= 2.;
                     wind -= u_prev_prev.Data;
                     setWind(wind);
-                    Pe = supnorm(surfOseenSystem.w.Data) / nu;
+                    Pe = supnorm(surfOseenSystem.w_T.Data) / nu;
                     alpha = 1.5 / stepSize;
                     logger.buf
                         << "$\\alpha$ = " << alpha << '\n'
                         << "Pe = " << Pe;
                     logger.log();
-                    surfOseenSystem.A_BD.alpha = alpha;
+                    param.input.alpha = alpha;
                     SetupSurfOseen_P2P1(mg, lset, &surfOseenSystem, &param);
                     transpose(surfOseenSystem.B.Data, B_T);
                     surfOseenSystem.gRHS.Data -= (dot(surfOseenSystem.gRHS.Data, I_p) / dot(I_p, I_p)) * I_p;
-                    surfOseenSystem.fRHS.Data += (2. / stepSize) * (surfOseenSystem.M.Data * u_prev.Data) - (.5 / stepSize) * (surfOseenSystem.M.Data * u_prev_prev.Data) - gamma * surfOseenSystem.alRHS.Data;
-                    surfOseenSystem.sumA.Data.LinComb(alpha, surfOseenSystem.M.Data, gamma, surfOseenSystem.AL.Data, 1., surfOseenSystem.N.Data, nu, surfOseenSystem.A.Data, tau_u, surfOseenSystem.S.Data, rho_u, surfOseenSystem.A_stab.Data);
+                    surfOseenSystem.fRHS.Data += (2. / stepSize) * (surfOseenSystem.M.Data * u_prev.Data) - (.5 / stepSize) * (surfOseenSystem.M.Data * u_prev_prev.Data);
+                    surfOseenSystem.sumA.Data.LinComb(alpha, surfOseenSystem.M.Data, gamma, surfOseenSystem.AL.Data, 1., surfOseenSystem.N.Data, 1., surfOseenSystem.H.Data, nu, surfOseenSystem.A.Data, tau_u, surfOseenSystem.S.Data, rho_u, surfOseenSystem.A_stab.Data);
                     surfOseenSystem.C.Data *= -rho_p;
                     S_M_tmp.LinComb(1. / (gamma + nu), surfOseenSystem.M_p.Data, -1., surfOseenSystem.C.Data);
                     S_L_tmp.LinComb(1. / alpha, surfOseenSystem.A_p.Data, -1., surfOseenSystem.C.Data);
@@ -994,7 +999,7 @@ int main(int argc, char* argv[]) {
                         factorize = "NoThenYes";
                         numItersA = numItersS_M = numItersS_L = 0;
                         runFactorization();
-                        logger.beg("linear solve w/ new factorization");
+                        logger.beg("linear solve w_T/ new factorization");
                             if (inpJSON.get<bool>("Solver.UsePreviousFrameAsInitialGuess")) {
                                 for (size_t i = 0; i < n; ++i) belosLHS[i] = u.Data[i];
                                 for (size_t i = 0; i < m; ++i) belosLHS[n + i] = p.Data[i];
