@@ -942,10 +942,6 @@ struct SurfOseenParam {
 };
 
 struct SurfOseenSystem {
-    struct {
-        bool build = false;
-        MatDescCL block[6];
-    } A_BD; // block-diagonal preconditioner for velocity matrix
     MatDescCL A, A_stab, N, H, M, S, // velocity stiffness, volume stabilization, convection, surface velocity, mass, and normal penalty mtx
               // LB, LB_stab; // laplace-beltrami
               AL, // AL / grad-div stabilization mtx
@@ -954,6 +950,10 @@ struct SurfOseenSystem {
               B, Q; // divergence and rhs-curl-projection mtx
     VecDescCL fRHS, gRHS, // moment and continuity rhs
               w_T, u_N; // wind and surface speed
+    struct {
+        bool build = false;
+        MatDescCL block[3][3];
+    } sumA_block; // blocks of A (for preconditioner)
 };
 
 void SetupSurfOseen_P2P1(const MultiGridCL& MG_, const LevelsetP2CL&, SurfOseenSystem*, SurfOseenParam*);

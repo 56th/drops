@@ -45,6 +45,7 @@
 #include "BelosSolverFactory.hpp"
 #include "BelosLinearProblem.hpp"
 #include "BelosEpetraAdapter.hpp"
+// #include "BelosStatusTestImpResNorm.hpp"
 // amesos2 (sparse-direct solvers)
 #include "Amesos2.hpp"
 #include "Amesos2_Version.hpp"
@@ -151,6 +152,7 @@ int main(int argc, char* argv[]) {
                 logger.buf << "using inconsistent penalty formulation\n";
             }
             SurfOseenSystem surfOseenSystem;
+            surfOseenSystem.sumA_block.build = inpJSON.get<std::string>("Solver.Inner.A.Type") != "Full";
             auto stab = inpJSON.get<std::string>("SurfNavStokes.PressureVolumestabType");
             if (stab == "full") {
                 param.input.stab = SurfOseenParam::PressureVolumestab::full;
@@ -358,6 +360,11 @@ int main(int argc, char* argv[]) {
             auto belosSolver = belosFactory.create(inpJSON.get<std::string>("Solver.Outer.Iteration"), belosParams);
             logger.buf << "outer solver: " << belosSolver->description();
             logger.log();
+            // StatusTestImpResNorm<ST, MV, OP> belosConvTest(inpJSON.get<double>("Solver.Outer.RelResTol"));
+            // belosConvTest.defineScaleForm(ScaleType::NormOfRHS, NormType::TwoNorm);
+            // belosSolver->setUserConvStatusTest(rcpFromRef(belosConvTest));
+            // logger.buf << "outer solver conv test: " << belosConvTest.description();
+            Epetra_Map mapVelocity(static_cast<int>(n), 0, comm), mapVelocityComp(static_cast<int>(n_i), 0, comm), mapVelocityPressure(static_cast<int>(n + m), 0, comm);
         logger.end();
         logger.beg("t = t_1");
             param.input.t = stepSize;
@@ -440,13 +447,46 @@ int main(int argc, char* argv[]) {
                         logger.log();
                     };
                     printStat("A", A);
-                    auto A11 = static_cast<MT>(surfOseenSystem.A_BD.block[0].Data);
-                    printStat("A_{ii}", A11);
-                    auto A22 = static_cast<MT>(surfOseenSystem.A_BD.block[1].Data);
-                    auto A33 = static_cast<MT>(surfOseenSystem.A_BD.block[2].Data);
-                    auto A12 = static_cast<MT>(surfOseenSystem.A_BD.block[3].Data);
-                    auto A13 = static_cast<MT>(surfOseenSystem.A_BD.block[4].Data);
-                    auto A23 = static_cast<MT>(surfOseenSystem.A_BD.block[5].Data);
+                    MT A_block[3][3] = {
+                            { static_cast<MT>(surfOseenSystem.sumA_block.block[0][0].Data), static_cast<MT>(surfOseenSystem.sumA_block.block[0][1].Data), static_cast<MT>(surfOseenSystem.sumA_block.block[0][2].Data) },
+                            { static_cast<MT>(surfOseenSystem.sumA_block.block[1][0].Data), static_cast<MT>(surfOseenSystem.sumA_block.block[1][1].Data), static_cast<MT>(surfOseenSystem.sumA_block.block[1][2].Data) },
+                            { static_cast<MT>(surfOseenSystem.sumA_block.block[2][0].Data), static_cast<MT>(surfOseenSystem.sumA_block.block[2][1].Data), static_cast<MT>(surfOseenSystem.sumA_block.block[2][2].Data) }
+                    };
+                    printStat("A_{ii}", A_block[0][0]);
+                    std::function<void()> checkA_block;
+                    auto readMVComponent = [&](size_t comp, MV const & source) {
+                        Epetra_Vector res(mapVelocityComp, false);
+                        for (size_t i = 0; i < n_i; ++i) res[i] = (*source(0))[3 * i + comp];
+                        return res;
+                    };
+                    auto writeMVComponent = [&](size_t comp, MV const & y, MV& Y, bool add = false) {
+                        if (add) for (size_t i = 0; i < n_i; ++i) (*Y(0))[3 * i + comp] += (*y(0))[i];
+                        else for (size_t i = 0; i < n_i; ++i) (*Y(0))[3 * i + comp] = (*y(0))[i];
+                    };
+                    if (surfOseenSystem.sumA_block.build) {
+                        checkA_block = [&]() {
+                            Epetra_Vector x(mapVelocity, false);
+                            x.Random();
+                            double xNorm; x.Norm2(&xNorm); x.Scale(1. / xNorm);
+                            auto A_x = x;
+                            A.Multiply(false, x, A_x);
+                            auto A_block_x = x;
+                            A_block_x.PutScalar(0.);
+                            Epetra_Vector x_block[3] = { readMVComponent(0, x), readMVComponent(1, x), readMVComponent(2, x) };
+                            for (size_t i : { 0, 1, 2 })
+                                for (size_t j : { 0, 1, 2 }) {
+                                    Epetra_Vector dummy(mapVelocity, true);
+                                    A_block[i][j].Multiply(false, x_block[j], dummy);
+                                    writeMVComponent(i, dummy, A_block_x, true);
+                                }
+                            A_x.Update(-1., A_block_x, 1.);
+                            A_x.Norm2(&xNorm);
+                            logger.buf << "multiplication using A vs. using blocks A_{ii} diff = " << xNorm;
+                            logger.log();
+                            if (xNorm > 1e-10) throw std::logic_error("multiplication using A vs. using blocks A_{ii} diff = " + std::to_string(xNorm));
+                        };
+                        checkA_block();
+                    }
                     auto B = static_cast<MT>(surfOseenSystem.B.Data);
                     printStat("B", B);
                     auto C = static_cast<MT>(surfOseenSystem.C.Data);
@@ -459,7 +499,6 @@ int main(int argc, char* argv[]) {
                 logger.beg("cast rhs vectors");
                     auto fRHS = static_cast<Epetra_Vector>(surfOseenSystem.fRHS.Data);
                     auto gRHS = static_cast<Epetra_Vector>(surfOseenSystem.gRHS.Data);
-                    Epetra_Map mapVelocity(static_cast<int>(n), 0, comm), mapVelocityComp(static_cast<int>(n_i), 0, comm), mapVelocityPressure(static_cast<int>(n + m), 0, comm);
                     Epetra_Vector belosLHS(mapVelocityPressure), belosRHS(mapVelocityPressure);
                     auto joinEpetraVectors = [&](Epetra_Vector const & a, Epetra_Vector const & b, MV& ab) {
                         for (size_t i = 0; i < n; ++i) (*ab(0))[i] = a[i];
@@ -514,20 +553,11 @@ int main(int argc, char* argv[]) {
                         }
                     }
                     std::function<void()> runFactorization;
-                    auto readMVComponent = [&](size_t comp, MV const & source) {
-                        Epetra_Vector res(mapVelocityComp, false);
-                        for (size_t i = 0; i < n_i; ++i) res[i] = (*source(0))[3 * i + comp];
-                        return res;
-                    };
-                    auto writeMVComponent = [&](size_t comp, MV const & y, MV& Y) {
-                        for (size_t i = 0; i < n_i; ++i) (*Y(0))[3 * i + comp] = (*y(0))[i];
-                    };
                     if (useAmesos) { // Amesos
                         logger.log("using Amesos2");
                         if (!Amesos2::query(iterationA))
                             throw std::invalid_argument("solver " + iterationA + " is not available for Amesos2");
-                        if (inpJSON.get<std::string>("Solver.Inner.A.Type") == "Full") {
-                            surfOseenSystem.A_BD.build = false;
+                        if (!surfOseenSystem.sumA_block.build) {
                             logger.log("factorizing full velocity matrix");
                             amesosSolver = Amesos2::create<MT, MV>(iterationA, rcpFromRef(A));
                             logger.buf
@@ -555,15 +585,13 @@ int main(int argc, char* argv[]) {
                                 numItersA++;
                             };
                         } else {
-                            surfOseenSystem.A_BD.build = true;
                             logger.log("factorizing blocks A_{ii} of velocity matrix");
-                            amesosSolverBlock[0] = Amesos2::create<MT, MV>(iterationA, rcpFromRef(A11));
+                            for (size_t i : { 0, 1, 2 })
+                                amesosSolverBlock[i] = Amesos2::create<MT, MV>(iterationA, rcpFromRef(A_block[i][i]));
                             logger.buf
                                     << "solver:      " << amesosSolverBlock[0]->name() << '\n'
                                     << "description: " << amesosSolverBlock[0]->description();
                             logger.log();
-                            amesosSolverBlock[1] = Amesos2::create<MT, MV>(iterationA, rcpFromRef(A22));
-                            amesosSolverBlock[2] = Amesos2::create<MT, MV>(iterationA, rcpFromRef(A33));
                             runFactorization = [&]() {
                                 logger.beg("factorization");
                                     #pragma omp parallel for
@@ -589,7 +617,6 @@ int main(int argc, char* argv[]) {
                             };
                             if (inpJSON.get<std::string>("Solver.Inner.A.Type") == "BlockTriangular")
                                 A_prec = [&](MV const &X, MV &Y) {
-                                    auto transA = false;
                                     // (1)
                                     auto x3 = readMVComponent(2, X);
                                     amesosSolverBlock[2]->setB(rcpFromRef(x3));
@@ -600,7 +627,7 @@ int main(int argc, char* argv[]) {
                                     // (2)
                                     auto A_y = y3;
                                     A_y.PutScalar(0.);
-                                    A23.Multiply(transA, y3, A_y);
+                                    A_block[1][2].Multiply(false, y3, A_y);
                                     auto x2 = readMVComponent(1, X);
                                     x2.Update(-1., A_y, 1.);
                                     amesosSolverBlock[1]->setB(rcpFromRef(x2));
@@ -610,11 +637,11 @@ int main(int argc, char* argv[]) {
                                     writeMVComponent(1, y2, Y);
                                     // (3)
                                     A_y.PutScalar(0.);
-                                    A12.Multiply(transA, y2, A_y);
+                                    A_block[0][1].Multiply(false, y2, A_y);
                                     auto x1 = readMVComponent(0, X);
                                     x1.Update(-1., A_y, 1.);
                                     A_y.PutScalar(0.);
-                                    A13.Multiply(transA, y3, A_y);
+                                    A_block[0][2].Multiply(false, y3, A_y);
                                     x1.Update(-1., A_y, 1.);
                                     amesosSolverBlock[0]->setB(rcpFromRef(x1));
                                     auto y1 = readMVComponent(0, Y);
@@ -942,13 +969,12 @@ int main(int argc, char* argv[]) {
                     logger.beg("cast matrices");
                         A = static_cast<MT>(surfOseenSystem.sumA.Data);
                         printStat("A", A);
-                        A11 = static_cast<MT>(surfOseenSystem.A_BD.block[0].Data);
-                        printStat("A_{ii}", A11);
-                        A22 = static_cast<MT>(surfOseenSystem.A_BD.block[1].Data);
-                        A33 = static_cast<MT>(surfOseenSystem.A_BD.block[2].Data);
-                        A12 = static_cast<MT>(surfOseenSystem.A_BD.block[3].Data);
-                        A13 = static_cast<MT>(surfOseenSystem.A_BD.block[4].Data);
-                        A23 = static_cast<MT>(surfOseenSystem.A_BD.block[5].Data);
+                        for (size_t i : { 0, 1, 2 })
+                            for (size_t j : { 0, 1, 2 })
+                                A_block[i][j] = static_cast<MT>(surfOseenSystem.sumA_block.block[i][j].Data);
+                        printStat("A_{ii}", A_block[0][0]);
+                        if (surfOseenSystem.sumA_block.build)
+                            checkA_block();
                         B = static_cast<MT>(surfOseenSystem.B.Data);
                         printStat("B", B);
                         C = static_cast<MT>(surfOseenSystem.C.Data);

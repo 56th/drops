@@ -1716,7 +1716,7 @@ class SurfOseenAccumulatorP2P1 : public TetraAccumulatorCL {
     LocalVelocitySetupFunction setupA_P2;
     using LocalPressureSetupFunction = void(LocalSurfOseen::*)(double[4][4], double);
     LocalPressureSetupFunction setupC_P1;
-    MatrixBuilderCL *mH_P2_, *mN_P2_, *mAL_P2_, *mA_P2_, *mA_P2_stab_, *mB_P1P2_, *mQ_P1P2_, *mM_P2_, *mS_P2_, *mM_P1_, *mC_P1_, *mA_P1_, *mA_BD1_, *mA_BD12_, *mA_BD13_, *mA_BD2_, *mA_BD23_, *mA_BD3_;
+    MatrixBuilderCL *mH_P2_, *mN_P2_, *mAL_P2_, *mA_P2_, *mA_P2_stab_, *mB_P1P2_, *mQ_P1P2_, *mM_P2_, *mS_P2_, *mM_P1_, *mC_P1_, *mA_P1_, *mA_block_[3][3];
     // *mLB_P2_, *mLB_stab_P2_;
     double locH_P2[30][30], locAL_P2[30][30], locN_P2[30][30], locA_P2[30][30], locA_P2_stab[10][10], locB_P1P2[4][30], locQ_P1P2[4][30], locM_P2[30][30], locS_P2[30][30], locM_P1[4][4], locC_P1[4][4], locA_P1[4][4];
     // locLB_P2[10][10];
@@ -1766,14 +1766,10 @@ void SurfOseenAccumulatorP2P1::begin_accumulation() {
     mC_P1_ = new MatrixBuilderCL(&system->C.Data, num_unks_p1_scalar, num_unks_p1_scalar);
     mA_P1_ = new MatrixBuilderCL(&system->A_p.Data, num_unks_p1_scalar, num_unks_p1_scalar);
     size_t num_unks_p2_scalar = num_unks_p2 / 3;
-    if (system->A_BD.build) {
-        mA_BD1_ = new MatrixBuilderCL(&system->A_BD.block[0].Data, num_unks_p2_scalar, num_unks_p2_scalar);
-        mA_BD2_ = new MatrixBuilderCL(&system->A_BD.block[1].Data, num_unks_p2_scalar, num_unks_p2_scalar);
-        mA_BD3_ = new MatrixBuilderCL(&system->A_BD.block[2].Data, num_unks_p2_scalar, num_unks_p2_scalar);
-        mA_BD12_ = new MatrixBuilderCL(&system->A_BD.block[3].Data, num_unks_p2_scalar, num_unks_p2_scalar);
-        mA_BD13_ = new MatrixBuilderCL(&system->A_BD.block[4].Data, num_unks_p2_scalar, num_unks_p2_scalar);
-        mA_BD23_ = new MatrixBuilderCL(&system->A_BD.block[5].Data, num_unks_p2_scalar, num_unks_p2_scalar);
-    }
+    if (system->sumA_block.build)
+        for (size_t i : { 0, 1, 2 })
+            for (size_t j : { 0, 1, 2 })
+                mA_block_[i][j] = new MatrixBuilderCL(&system->sumA_block.block[i][j].Data, num_unks_p2_scalar, num_unks_p2_scalar);
     // mLB_P2_ = new MatrixBuilderCL(&system->LB.Data, num_unks_p2_scalar, num_unks_p2_scalar);
     // mLB_stab_P2_ = new MatrixBuilderCL(&system->LB_stab.Data, num_unks_p2_scalar, num_unks_p2_scalar);
     system->fRHS.Data.resize(num_unks_p2, 0.);
@@ -1805,20 +1801,12 @@ void SurfOseenAccumulatorP2P1::finalize_accumulation() {
     delete mC_P1_;
     mA_P1_->Build();
     delete mA_P1_;
-    if (system->A_BD.build) {
-        mA_BD1_->Build();
-        delete mA_BD1_;
-        mA_BD12_->Build();
-        delete mA_BD12_;
-        mA_BD13_->Build();
-        delete mA_BD13_;
-        mA_BD2_->Build();
-        delete mA_BD2_;
-        mA_BD23_->Build();
-        delete mA_BD23_;
-        mA_BD3_->Build();
-        delete mA_BD3_;
-    }
+    if (system->sumA_block.build)
+        for (size_t i : { 0, 1, 2 })
+            for (size_t j : { 0, 1, 2 }) {
+                mA_block_[i][j]->Build();
+                delete mA_block_[i][j];
+            }
     // mLB_P2_->Build();
     // delete mLB_P2_;
     // mLB_stab_P2_->Build();
@@ -1873,23 +1861,17 @@ void SurfOseenAccumulatorP2P1::update_global_system() {
     auto& mM_P1 = *mM_P1_;
     auto& mC_P1  = *mC_P1_;
     auto& mA_P1  = *mA_P1_;
-    auto& mA_BD1 = *mA_BD1_;
-    auto& mA_BD12 = *mA_BD12_;
-    auto& mA_BD13 = *mA_BD13_;
-    auto& mA_BD2 = *mA_BD2_;
-    auto& mA_BD23 = *mA_BD23_;
-    auto& mA_BD3 = *mA_BD3_;
     // auto& mLB_P2 = *mLB_P2_;
     // auto& mLB_P2_stab = *mLB_stab_P2_;
-    auto A_BD = [&](size_t j, size_t i, size_t l, size_t k) {
-        auto res = l == k ? localProblem.param->input.rho_u * locA_P2_stab[j][i] : 0.;
+    auto A_BD = [&](size_t j, size_t i, size_t ib, size_t jb) {
+        auto res = ib == jb ? localProblem.param->input.rho_u * locA_P2_stab[j][i] : 0.;
         return res +
-            localProblem.param->input.alpha * locM_P2[3*j+l][3*i+k] +
-            localProblem.param->input.gamma * locAL_P2[3*j+l][3*i+k] +
-            locN_P2[3*j+l][3*i+k] +
-            locH_P2[3*j+l][3*i+k] +
-            localProblem.param->input.nu * locA_P2[3*j+l][3*i+k] +
-            localProblem.param->input.tau_u * locS_P2[3*j+l][3*i+k];
+            localProblem.param->input.alpha * locM_P2[3*j + ib][3 * i + jb] +
+            localProblem.param->input.gamma * locAL_P2[3*j + ib][3 * i + jb] +
+            locN_P2[3*j + ib][3 * i + jb] +
+            locH_P2[3*j + ib][3 * i + jb] +
+            localProblem.param->input.nu * locA_P2[3*j + ib][3 * i + jb] +
+            localProblem.param->input.tau_u * locS_P2[3*j + ib][3 * i + jb];
     };
     for(int i = 0; i < 10; ++i) {
         const IdxT ii= numP2[i];
@@ -1903,14 +1885,10 @@ void SurfOseenAccumulatorP2P1::update_global_system() {
             if (jj==NoIdx) continue;
             // mLB_P2(ii/3, jj/3) += locLB_P2[j][i];
             // mLB_P2_stab(ii/3, jj/3) += locA_P2_stab[j][i];
-            if (system->A_BD.build) {
-                mA_BD1(ii / 3, jj / 3) += A_BD(j, i, 0, 0);
-                mA_BD12(ii / 3, jj / 3) += A_BD(j, i, 0, 1);
-                mA_BD13(ii / 3, jj / 3) += A_BD(j, i, 0, 2);
-                mA_BD2(ii / 3, jj / 3) += A_BD(j, i, 1, 1);
-                mA_BD23(ii / 3, jj / 3) += A_BD(j, i, 1, 2);
-                mA_BD3(ii / 3, jj / 3) += A_BD(j, i, 2, 2);
-            }
+            if (system->sumA_block.build)
+                for (size_t ib : { 0, 1, 2 })
+                    for (size_t jb : { 0, 1, 2 })
+                        (*mA_block_[ib][jb])(ii / 3, jj / 3) += A_BD(j, i, jb, ib);
             for (int k = 0; k < 3; ++k)
                 for (int l = 0; l < 3; ++l) {
                     mA_P2(ii+k, jj+l) += locA_P2[3*j+l][3*i+k];
