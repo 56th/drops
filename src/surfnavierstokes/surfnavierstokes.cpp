@@ -830,6 +830,7 @@ int main(int argc, char* argv[]) {
                 tJSON.put("Solver.Outer.ResidualNorm.b", b_norm);
                 tJSON.put("Solver.Outer.ResidualNorm.r_0", r0_norm);
                 tJSON.put("Solver.Outer.ResidualNorm.r_i/b", std::get<2>(res) / b_norm);
+                tJSON.put("Solver.Outer.ResidualNorm.r_i/r_0", std::get<2>(res) / r0_norm);
                 tJSON.put("Solver.Outer.ResidualNorm.SolverRelative", belosSolver->achievedTol());
                 tJSON.put("Solver.Outer.TotalIters", belosSolver->getNumIters());
                 tJSON.put("Solver.Outer.DOF", n + m);
@@ -1025,11 +1026,12 @@ int main(int argc, char* argv[]) {
                         factorize = "NoThenYes";
                         numItersA = numItersS_M = numItersS_L = 0;
                         runFactorization();
-                        logger.beg("linear solve w_T/ new factorization");
+                        logger.beg("linear solve w/ new factorization");
                             if (inpJSON.get<bool>("Solver.UsePreviousFrameAsInitialGuess")) {
                                 for (size_t i = 0; i < n; ++i) belosLHS[i] = u.Data[i];
                                 for (size_t i = 0; i < m; ++i) belosLHS[n + i] = p.Data[i];
                             } else belosLHS.PutScalar(0.);
+                            belosSolver->setProblem(rcpFromRef(belosProblem));
                             belosSolverResult = belosSolver->solve();
                             if (belosSolverResult == Belos::Converged) logger.log("belos converged");
                             else logger.wrn("belos did not converge");
