@@ -47,6 +47,11 @@
         "Bubble" : {
           "r0" : 1.0,
           "a"  : 0.1
+        },
+        "TorusVarTube" : {
+          "R" : 1.0,
+          "r_0" : 0.3 ,
+          "r_1" : 0.5
         }
       },
       "TestName":                 "KelvinHelmholtzCristophTorus",

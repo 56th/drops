@@ -2,6 +2,10 @@ set(HOME surfnavierstokes)
 
 exec_ser(${HOME} geom-boundary geom-builder geom-simplex geom-multigrid geom-deformation num-unknowns geom-topo num-fe misc-problem levelset-levelset levelset-marking_strategy levelset-adaptriang misc-scopetimer misc-progressaccu misc-utils out-output num-discretize misc-params num-interfacePatch levelset-fastmarch surfactant-ifacetransp num-fe out-ensightOut levelset-surfacetension out-vtkOut geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature misc-dynamicload misc-funcmap misc-scopetimer)
 
+# hermite interpolation
+add_library(${HOME}-hermite STATIC ../hermite_cubic/hermite_cubic.cpp)
+target_link_libraries(${HOME} ${HOME}-hermite)
+
 # logger
 add_library(${HOME}-logger STATIC ${LOGGER_PATH}/SingletonLogger.cpp)
 target_link_libraries(${HOME} ${HOME}-logger)

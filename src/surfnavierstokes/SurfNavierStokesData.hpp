@@ -7,6 +7,7 @@
 
 #include "../num/discretize.h"
 // #include "surfnavierstokes_funcs.h"
+#include "hermite_cubic/hermite_cubic.hpp"
 
 namespace DROPS {
 
@@ -23,6 +24,13 @@ namespace DROPS {
         Surface surface;
         std::string description;
     };
+
+    double arctan(double x, double y) {
+        if (x > 0 && y >= 0) return std::atan(y/x);
+        if (x > 0 && y < 0)  return std::atan(y/x) + 2. * M_PI;
+        if (x < 0)           return std::atan(y/x) + M_PI;
+        return sign(y) * M_PI / 2.;
+    }
 
     SurfNavierStokesData SurfNavierStokesDataFactory(std::string const & test, double nu, ParamCL const & param) {
         SurfNavierStokesData data;
@@ -69,6 +77,33 @@ namespace DROPS {
                 auto den = std::sqrt(p[0] * p[0] + p[1] * p[1] + p[2] * p[2]);
                 Point3DCL v(p[0] / den, p[1] / den, p[2] / den);
                 return v;
+            };
+        }
+        else if (test.find("TorusVarTube") != std::string::npos) {
+            auto r_0 = param.get<double>("SurfNavStokes.IC.TorusVarTube.r_0");
+            auto r_1 = param.get<double>("SurfNavStokes.IC.TorusVarTube.r_1");
+            auto R   = param.get<double>("SurfNavStokes.IC.TorusVarTube.R");
+            data.description =
+                    "torus w/ const distance $R$ from the center of the tube to the center of the torus and\n"
+                    "      w/ variable tube radius $" + std::to_string(r_0) + " =: r_0 <= r(\\xi) <= r_1 =: " + std::to_string(r_1) + ", \\xi \\in [0, \\2 pi]\n"
+                    "$\\phi = (x^2 + y^2 + z^2 + R^2 - r(\\xi)^2)^2 - 4 R^2 (x^2 + y^2)$\n";
+            data.surface.u_N = [](Point3DCL const &, double) {
+                return 0.;
+            };
+            data.surface.phi = [=](Point3DCL const & p, double) {
+                // auto xi = arctan(p[0], std::fabs(p[1]));
+                // auto r = r_0 * (M_PI - xi) / M_PI + r_1 * xi / M_PI;
+                // auto xi = arctan(p[0],p[1]);
+                // auto r = r_1 + (r_0 - r_1) / (M_PI * M_PI) * (xi - M_PI) * (xi - M_PI);
+                // auto xi = arctan(p[0], p[1]);
+                // auto r = (r_1 - r_0) / M_PI * std::sqrt(M_PI * M_PI - (xi - M_PI) * (xi - M_PI)) + r_0;
+                auto xi = arctan(p[0], std::fabs(p[1]));
+                double r, dr, d2r, d3r;
+                hermite_cubic_value(0., r_0, 0., M_PI, r_1, 0., 1, &xi, &r, &dr, &d2r, &d3r);
+                return std::pow(norm_sq(p) + R * R - r * r, 2.) - 4. * R * R * (std::pow(p[0], 2.) + std::pow(p[1], 2.));
+            };
+            data.surface.e = [](Point3DCL const &p, double) { // TODO: correct using distance func
+                return p;
             };
         }
         else if (test.find("Torus") != std::string::npos) {
@@ -229,13 +264,6 @@ namespace DROPS {
             data.exactSoln = false;
             auto eta = [=](Point3DCL const & p) {
                 return -0.3183098861837907*std::asin(p[2]/std::sqrt(std::pow(p[0],2) + std::pow(p[1],2) + std::pow(p[2],2)));
-            };
-            auto arctan = [](double x, double y) {
-                auto pi = 3.1415926535897932;
-                if (x > 0 && y >= 0) return std::atan(y/x);
-                if (x > 0 && y < 0)  return std::atan(y/x) + 2. * pi;
-                if (x < 0)           return std::atan(y/x) + pi;
-                return sign(y) * pi / 2.;
             };
             auto xi = [=](Point3DCL const & p) {
                 return 0.15915494309189535*arctan(p[0],p[1]);
