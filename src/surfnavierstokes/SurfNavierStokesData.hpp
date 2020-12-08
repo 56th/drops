@@ -97,9 +97,10 @@ namespace DROPS {
                 // auto r = r_1 + (r_0 - r_1) / (M_PI * M_PI) * (xi - M_PI) * (xi - M_PI);
                 // auto xi = arctan(p[0], p[1]);
                 // auto r = (r_1 - r_0) / M_PI * std::sqrt(M_PI * M_PI - (xi - M_PI) * (xi - M_PI)) + r_0;
-                auto xi = arctan(p[0], std::fabs(p[1]));
-                double r, dr, d2r, d3r;
-                hermite_cubic_value(0., r_0, 0., M_PI, r_1, 0., 1, &xi, &r, &dr, &d2r, &d3r);
+                // auto xi = arctan(p[0], std::fabs(p[1]));
+                // double r, dr, d2r, d3r;
+                // hermite_cubic_value(0., r_0, 0., M_PI, r_1, 0., 1, &xi, &r, &dr, &d2r, &d3r);
+                auto r = r_0 + .5 * (r_1 - r_0) * (1. - p[0] / std::sqrt(p[0] * p[0] + p[1] * p[1]));
                 return std::pow(norm_sq(p) + R * R - r * r, 2.) - 4. * R * R * (std::pow(p[0], 2.) + std::pow(p[1], 2.));
             };
             data.surface.e = [](Point3DCL const &p, double) { // TODO: correct using distance func
