@@ -14,20 +14,35 @@
     #include "vtkPointData.h"
 #endif
 #include "geom/multigrid.h"
+#include "surfactant/ifacetransp.h"
 
 namespace DROPS {
     class VTKWriter {
     public:
-        struct VTKVar {
-            enum class Type { P2, vecP2, P1, vecP1 };
+        class VTKVar {
+        public:
             std::string name;
-            VectorCL* value;
-            Type type;
+            VTKVar(std::string const & name, VecDescCL& vec) : name(name), vec(vec) {}
+            FiniteElementT update(MultiGridCL const & mg) {
+                if (vec.RowIdx->extIdx) {
+                    vecExt.SetIdx(vec.RowIdx->extIdx);
+                    Extend(mg, vec, vecExt);
+                    return vecExt.RowIdx->GetFE();
+                }
+                return vec.RowIdx->GetFE();
+            }
+            VectorCL& value() {
+                if (vec.RowIdx->extIdx) return vecExt.Data;
+                return vec.Data;
+            }
+        private:
+            VecDescCL& vec;
+            VecDescCL vecExt;
         };
     private:
         bool binary;
         std::vector<VTKVar> vars;
-        MultiGridCL const * mg;
+        MultiGridCL const & mg;
         std::string path;
         std::unordered_map<VertexCL const *, size_t> vertexIndex;
         std::unordered_map<EdgeCL const *, size_t> edgeIndex;
@@ -36,21 +51,21 @@ namespace DROPS {
             vtkSmartPointer<vtkUnstructuredGrid> unstructuredGrid = vtkSmartPointer<vtkUnstructuredGrid>::New();
         #endif
     public:
-        VTKWriter(std::string const & path_, MultiGridCL const & mg_, bool binary_ = true) : path(path_), mg(&mg_), binary(binary_) {
+        VTKWriter(std::string const & path, MultiGridCL const & mg, bool binary = true) : path(path), mg(mg), binary(binary) {
             #ifdef _VTK
                 size_t n = 0;
                 auto points = vtkSmartPointer<vtkPoints>::New();
-                for (auto it = mg->GetTriangVertexBegin(); it != mg->GetTriangVertexEnd(); ++it) {
+                for (auto it = mg.GetTriangVertexBegin(); it != mg.GetTriangVertexEnd(); ++it) {
                     points->InsertNextPoint(it->GetCoord()[0], it->GetCoord()[1], it->GetCoord()[2]);
                     vertexIndex[&*it] = n++;
                 }
-                for (auto it = mg->GetTriangEdgeBegin(); it != mg->GetTriangEdgeEnd(); ++it) {
+                for (auto it = mg.GetTriangEdgeBegin(); it != mg.GetTriangEdgeEnd(); ++it) {
                     auto p = GetBaryCenter(*it);
                     points->InsertNextPoint(p[0], p[1], p[2]);
                     edgeIndex[&*it] = n++;
                 }
                 auto cellArray = vtkSmartPointer<vtkCellArray>::New();
-                for (auto it = mg->GetTetrasBegin(); it != mg->GetTetrasEnd(); ++it) {
+                for (auto it = mg.GetTetrasBegin(); it != mg.GetTetrasEnd(); ++it) {
                     auto tetra = vtkSmartPointer<vtkLagrangeTetra>::New();
                     tetra->GetPointIds()->SetNumberOfIds(10);
                     tetra->GetPoints()->SetNumberOfPoints(10);
@@ -83,20 +98,21 @@ namespace DROPS {
                 // ...
                 // (2) update vars
                 auto n = unstructuredGrid->GetNumberOfPoints();
-                for (auto const & var : vars) {
-                    if(var.type == VTKVar::Type::P2) {
-                        if (var.value->size() != n)
+                for (auto& var : vars) {
+                    auto type = var.update(mg);
+                    if (type == P2_FE) {
+                        if (var.value().size() != n)
                             throw std::invalid_argument(funcName + ": inconsistent number of d.o.f. for P2 interpolant");
                         auto array = vtkSmartPointer<vtkDoubleArray>::New();
-                        array->SetArray(&var.value->operator[](0), n, 1);
+                        array->SetArray(&var.value()[0], n, 1);
                         array->SetName(var.name.c_str());
                         unstructuredGrid->GetPointData()->AddArray(array);
                     }
-                    else if (var.type == VTKVar::Type::P1) {
+                    else if (type == P1_FE) {
                         auto  array = vtkSmartPointer<vtkDoubleArray>::New();
                         std::vector<double> value;
-                        value.assign(&var.value->operator[](0), &var.value->operator[](0) + var.value->size());
-                        for (auto it = mg->GetTriangEdgeBegin(); it != mg->GetTriangEdgeEnd(); ++it) {
+                        value.assign(&var.value()[0], &var.value()[0] + var.value().size());
+                        for (auto it = mg.GetTriangEdgeBegin(); it != mg.GetTriangEdgeEnd(); ++it) {
                             auto i1 = vertexIndex[it->GetVertex(0)];
                             auto i2 = vertexIndex[it->GetVertex(1)];
                             value.push_back(.5 * (value[i1] + value[i2]));
@@ -108,19 +124,19 @@ namespace DROPS {
                         array->SetName(var.name.c_str());
                         unstructuredGrid->GetPointData()->AddArray(array);
                     }
-                    else if (var.type == VTKVar::Type::vecP2) {
-                        if (var.value->size() != 3 * n)
+                    else if (type == vecP2_FE) {
+                        if (var.value().size() != 3 * n)
                             throw std::invalid_argument(funcName + ": inconsistent number of d.o.f. for vecP2 interpolant");
                         auto array = vtkSmartPointer<vtkDoubleArray>::New();
                         array->SetNumberOfComponents(3); // cf. https://vtk.org/Wiki/VTK/Examples/Cxx/PolyData/PolyDataCellNormals
-                        array->SetArray(&var.value->operator[](0), 3 * n, 1);
+                        array->SetArray(&var.value()[0], 3 * n, 1);
                         array->SetName(var.name.c_str());
                         unstructuredGrid->GetPointData()->AddArray(array);
                     }
-                    else if (var.type == VTKVar::Type::vecP1) {
+                    else if (type == vecP1_FE) {
                         std::vector<double> value;
-                        value.assign(&var.value->operator[](0), &var.value->operator[](0) + var.value->size());
-                        for (auto it = mg->GetTriangEdgeBegin(); it != mg->GetTriangEdgeEnd(); ++it) {
+                        value.assign(&var.value()[0], &var.value()[0] + var.value().size());
+                        for (auto it = mg.GetTriangEdgeBegin(); it != mg.GetTriangEdgeEnd(); ++it) {
                             auto i1 = 3 * vertexIndex[it->GetVertex(0)];
                             auto i2 = 3 * vertexIndex[it->GetVertex(1)];
                             value.push_back(.5 * (value[i1] + value[i2]));
@@ -138,7 +154,7 @@ namespace DROPS {
                         unstructuredGrid->GetPointData()->AddArray(array);
                     }
                     else
-                        throw std::logic_error(funcName + ": export for " + typeid(var.type).name() + " not implemented");
+                        throw std::logic_error(funcName + ": export for " + typeid(type).name() + " not implemented");
                 }
                 // (3) write
                 auto writer = vtkSmartPointer<vtkXMLUnstructuredGridWriter>::New();
