@@ -55,6 +55,7 @@
       },
       "UseTangentialMassMatrix":  false,
       "TestName":                 "KelvinHelmholtzCristophSphere",
+      "BDF":                      2,
       "PressureVolumestabType":   "Normal",
       "NormalPenaltyPower":       -2,
       "NormalPenaltyFactor":      1,

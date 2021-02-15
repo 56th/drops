@@ -112,7 +112,6 @@ int main(int argc, char* argv[]) {
             auto finalTime    = inpJSON.get<double>("Time.FinalTime");
             auto stepSize     = finalTime / numSteps;
             auto everyStep = inpJSON.get<int>("Output.EveryStep");
-            logger.buf << "$\\Delta t$ = " << stepSize << '\n';
             auto testName = inpJSON.get<std::string>("SurfNavStokes.TestName");
             auto surfNavierStokesData = SurfNavierStokesDataFactory(testName, inpJSON);
             FESystem surfOseenSystem;
@@ -134,12 +133,15 @@ int main(int argc, char* argv[]) {
             auto useInnerIters = inpJSON.get<bool>("Solver.Inner.Use");
             auto usePrevGuess = inpJSON.get<bool>("Solver.UsePreviousFrameAsInitialGuess");
             auto BDF = inpJSON.get<size_t>("SurfNavStokes.BDF");
+            if (BDF != 1 && BDF != 2) throw std::invalid_argument("use BDF = 1 or 2");
             logger.buf
                 << surfNavierStokesData.description
+                << "$\\Delta t$ = " << stepSize << '\n'
+                << "BDF: " << BDF << '\n'
                 << "$\\nu$ = " << nu << '\n'
                 << "$\\gamma$ = " << gamma << " (AL / grad-div stabilization constant)\n"
-                << "penalty formulation type: " << formulation << "\n"
-                << "pressure volume stabilization type: " << stab << "\n";
+                << "penalty formulation type: " << formulation << '\n'
+                << "pressure volume stabilization type: " << stab << '\n';
             logger.log();
         logger.end();
         logger.beg("build mesh");
@@ -595,7 +597,7 @@ int main(int argc, char* argv[]) {
                     if (surfNavierStokesData.w_T) InitVector(mg, w_T, surfNavierStokesData.w_T, t); // Oseen (and Stokes) case
                     else w_T.Data = 2. * u.Data - u_prev.Data; // Navier-Stokes case
                     Pe = supnorm(w_T.Data) / nu;
-                    alpha = i == 1 ? 1. / stepSize : 1.5 / stepSize;
+                    alpha = i == 1 || BDF == 1 ? 1. / stepSize : 1.5 / stepSize;
                     logger.buf
                         << "$\\alpha$ = " << alpha << '\n'
                         << "Pe = " << Pe;
@@ -604,7 +606,7 @@ int main(int argc, char* argv[]) {
                     surfOseenSystem.vectors = { &vF, &vG };
                     setupFESystem(mg, surfOseenSystem);
                     vG.Data -= (dot(vG.Data, I_p) / dot(I_p, I_p)) * I_p;
-                    if (i == 1) vF.Data += (1. / stepSize) * (mM.Data * u.Data);
+                    if (i == 1 || BDF == 1) vF.Data += (1. / stepSize) * (mM.Data * u.Data);
                     else vF.Data += (2. / stepSize) * (mM.Data * u.Data) - (.5 / stepSize) * (mM.Data * u_prev.Data);
                     A_sum.LinComb(alpha, mM.Data, gamma, mAL.Data, 1., mN.Data, 1., mH.Data, nu, mA.Data, tau_u, mS.Data, rho_u, mC.Data);
                     u_prev = u;
