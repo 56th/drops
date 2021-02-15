@@ -905,64 +905,340 @@ class LocalInterfaceMassP1CL
     LocalInterfaceMassP1CL (double alpha= 1.) : alpha_( alpha) {}
 };
 
-
-
 /// \brief The routine sets up the Laplace-Beltrami-matrix in mat on the interface defined by ls.
 ///        It belongs to the FE induced by standard P1-elements.
 ///
 /// D is the diffusion-coefficient
 void SetupLBP1 (const MultiGridCL& mg, MatDescCL* mat, const VecDescCL& ls, const BndDataCL<>& lsbnd, double D);
 
-struct SurfOseenParam {
-    enum class Formulation { consistent, inconsistent };
-    enum class PressureVolumestab { full, normal };
-    struct {
-        double alpha, rho_u, tau_u, gamma, nu;
-        double t = 0.;
+class LocalAssembler {
+public:
+    struct LocalAssemblerParams {
         size_t numbOfVirtualSubEdges = 2;
-        Formulation formulation = Formulation::consistent;
-        PressureVolumestab stab = PressureVolumestab::full;
-        bool usePatchNormal = true;
-        InstatVectorFunction exactNormal = nullptr;
-        InstatMatrixFunction exactShape  = nullptr;
-        InstatScalarFunction exactDistance = nullptr;
-        InstatScalarFunction levelSet = nullptr;
-        InstatVectorFunction f = nullptr; // moment rhs
-        InstatScalarFunction g = nullptr; // - continuity eqn rhs
-    } input;
-    struct {
+        double t = 0.;
+        VecDescCL levelSet;
         struct {
-            double patch = 0.;
-            double lvset = 0.;
-        } normalErrSq;
-        double shapeErrSq = 0.;
-        double maxGammaDist = 0.;
-        size_t numbOfCutTetras = 0;
-    } output;
+            double nu = 1, gamma = 0;
+            VecDescCL w_T, u_N;
+            InstatVectorFunction f_T = nullptr; // moment rhs
+            InstatScalarFunction m_g = nullptr; // - continuity eqn rhs
+        } surfOseenParams;
+    };
+    using LinearForm = double(LocalAssembler::*)(size_t);
+    using BilinearForm = double(LocalAssembler::*)(size_t, size_t);
+    LocalP2CL<> levelSetTet;
+private:
+    LocalAssemblerParams const & params;
+    TetraCL const & tet;
+    SMatrixCL<3, 3> T;
+    double absDet;
+    QuadDomain2DCL qDomain;
+    QuadDomainCL q3Domain;
+    GridFunctionCL<> qHatP2[10], qHatP1[4], qLsGradNorm, qSurfSpeed, qG;
+    GridFunctionCL<Point3DCL> qGradP2[10], qSurfGradP2[10], q3DGradP2[10], qGradP1[4], qSurfGradP1[4], q3DGradP1[4], qNormal, q3DNormal, qWind, qSurfSpeedSurfGrad, qF, qHatP2CrossN[30];
+    GridFunctionCL<SMatrixCL<3,3>> qP, qH, qE[30];
+    using GridFunctionBuilder = void(LocalAssembler::*)();
+    template<class T>
+    void require(GridFunctionCL<T> const & function, GridFunctionBuilder builder) {
+        if (!function.size()) (this->*builder)();
+        if (!function.size()) throw std::logic_error(__func__ + std::string(": invalid builder"));
+    }
+    std::pair<size_t, size_t> ind(size_t i) {
+        auto is = i / 3; // scalar shape index
+        auto in = i - 3 * is; // nonzero vect component
+        return { is, in };
+    }
+    GridFunctionCL<Point3DCL> getGradP2(GridFunctionCL<> const & f) {
+        require(qGradP2[0], &LocalAssembler::buildGradP2);
+        auto res = f[0] * qGradP2[0];
+        for (size_t i = 1; i < 10 ; ++i) res += f[i] * qGradP2[i];
+        return res;
+    }
+    GridFunctionCL<Point3DCL> get3DGradP2(GridFunctionCL<> const & f) {
+        require(q3DGradP2[0], &LocalAssembler::buildGradP2);
+        auto res = f[0] * q3DGradP2[0];
+        for (size_t i = 1; i < 10 ; ++i) res += f[i] * q3DGradP2[i];
+        return res;
+    }
+    GridFunctionCL<Point3DCL> getSurfGradP2(GridFunctionCL<> const & f) {
+        require(qSurfGradP2[0], &LocalAssembler::buildSurfGradP2);
+        auto res = f[0] * qSurfGradP2[0];
+        for (size_t i = 1; i < 10; ++i) res += f[i] * qSurfGradP2[i];
+        return res;
+    }
+    SMatrixCL<3,3> getHessP2(GridFunctionCL<> const & f) {
+        SMatrixCL<3,3> hessP2[10];
+        P2DiscCL::GetHessians(hessP2, T);
+        auto res = f[0] * hessP2[0];
+        for (size_t i = 1; i < 10 ; ++i) res += f[i] * hessP2[i];
+        return res;
+    }
+    // builders
+    void buildHatP1() {
+        LocalP1CL<> hatP1[4];
+        P1DiscCL::GetP1Basis(hatP1);
+        for (size_t i = 0; i < 4; ++i)
+            resize_and_evaluate_on_vertexes(hatP1[i], qDomain, qHatP1[i]);
+    }
+    void buildGradP1() {
+        Point3DCL gradP1[4];
+        P1DiscCL::GetGradients(gradP1, T);
+        for (size_t i = 0; i < 4; ++i) {
+            qGradP1[i].resize(qDomain.vertex_size());
+            qGradP1[i] = gradP1[i];
+            q3DGradP1[i].resize(q3Domain.vertex_size());
+            q3DGradP1[i] = gradP1[i];
+        }
+    }
+    void buildSurfGradP1() {
+        require(qNormal, &LocalAssembler::buildNormal);
+        require(qGradP1[0], &LocalAssembler::buildGradP1);
+        for (size_t i = 0; i < 4; ++i) qSurfGradP1[i] = qGradP1[i] - dot(qGradP1[i], qNormal) * qNormal;
+    }
+    void buildHatP2() {
+        LocalP2CL<> hatP2[10];
+        P2DiscCL::GetP2Basis(hatP2);
+        for (size_t i = 0; i < 10; ++i)
+            resize_and_evaluate_on_vertexes(hatP2[i], qDomain, qHatP2[i]);
+    }
+    void buildGradP2() {
+        LocalP1CL<Point3DCL> gradRefP2[10], gradP2[10];
+        P2DiscCL::GetGradientsOnRef(gradRefP2);
+        P2DiscCL::GetGradients(gradP2, gradRefP2, T);
+        for (size_t i = 0; i < 10; ++i) {
+            resize_and_evaluate_on_vertexes(gradP2[i], qDomain, qGradP2[i]);
+            resize_and_evaluate_on_vertexes(gradP2[i], q3Domain, q3DGradP2[i]);
+        }
+    }
+    void buildSurfGradP2() {
+        require(qNormal, &LocalAssembler::buildNormal);
+        require(qGradP2[0], &LocalAssembler::buildGradP2);
+        for (size_t i = 0; i < 10; ++i) qSurfGradP2[i] = qGradP2[i] - dot(qGradP2[i], qNormal) * qNormal;
+    }
+    void buildNormal() {
+        qNormal = getGradP2(levelSetTet);
+        qLsGradNorm = sqrt(dot(qNormal, qNormal));
+        qNormal = qNormal / qLsGradNorm;
+        q3DNormal = get3DGradP2(levelSetTet);
+        q3DNormal = q3DNormal / sqrt(dot(q3DNormal, q3DNormal));
+    }
+    void buildProjector() {
+        require(qNormal, &LocalAssembler::buildNormal);
+        qP.resize(qDomain.vertex_size());
+        qP = eye<3, 3>() - outer_product(qNormal, qNormal);
+    }
+    void buildShapeOp() {
+        require(qLsGradNorm, &LocalAssembler::buildNormal);
+        require(qP, &LocalAssembler::buildProjector);
+        qH.resize(qDomain.vertex_size());
+        qH = getHessP2(levelSetTet);
+        qH = qP * (qH / qLsGradNorm) * qP;
+    }
+    void buildRateOfStrainTensor() {
+        require(qGradP2[0], &LocalAssembler::buildGradP2);
+        require(qP, &LocalAssembler::buildProjector);
+        auto qVectGrad = [&](size_t vecShapeIndex, GridFunctionCL<Point3DCL>* P1OrP2grad) {
+            GridFunctionCL<SMatrixCL<3,3>> res(SMatrixCL<3,3>(), qDomain.vertex_size());
+            auto && [ scaShapeIndex, row ] = ind(vecShapeIndex);
+            for (size_t i = 0; i < res.size(); ++i) {
+                SMatrixCL<3, 3> mtx(0.);
+                mtx.col(row, P1OrP2grad[scaShapeIndex][i]);
+                assign_transpose(res[i], mtx);
+            }
+            return res;
+        };
+        for (size_t i = 0; i < 30; ++i)
+            qE[i] = qP * sym_part(qVectGrad(i, qGradP2)) * qP;
+    }
+    void buildHatP2CrossN() { // compute velocity shape func cross normal vector
+        require(qHatP2[0], &LocalAssembler::buildHatP2);
+        require(qNormal, &LocalAssembler::buildNormal);
+        auto qHatCrossN = [&](size_t vecShapeIndex, GridFunctionCL<>* P1OrP2Hat) {
+            GridFunctionCL<Point3DCL> phi(Point3DCL(0., 0., 0.), qDomain.vertex_size());
+            auto && [ is, in ] = ind(vecShapeIndex);
+            for (size_t i = 0; i < phi.size(); ++i)
+                phi[i][in] = P1OrP2Hat[is][i];
+            return cross_product(qNormal, phi);
+        };
+        for (size_t i = 0; i < 30; ++i)
+            qHatP2CrossN[i] = qHatCrossN(i, qHatP2);
+    }
+    void buildWind() {
+        require(qNormal, &LocalAssembler::buildNormal);
+        require(qSurfSpeed, &LocalAssembler::buildSurfSpeed);
+        LocalP2CL<Point3DCL> windTet;
+        windTet.assign(tet, params.surfOseenParams.w_T, BndDataCL<Point3DCL>());
+        resize_and_evaluate_on_vertexes(windTet, qDomain, qWind);
+        qWind += qSurfSpeed * qNormal;
+    }
+    void buildSurfSpeed() {
+        LocalP2CL<> uNTet;
+        uNTet.assign(tet, params.surfOseenParams.u_N, BndDataCL<>());
+        resize_and_evaluate_on_vertexes(uNTet, qDomain, qSurfSpeed);
+        qSurfSpeedSurfGrad = getSurfGradP2(uNTet);
+    }
+    void buildF() {
+        resize_and_evaluate_on_vertexes(params.surfOseenParams.f_T, tet, qDomain, params.t, qF);
+    }
+    void buildG() {
+        require(qH, &LocalAssembler::buildShapeOp);
+        require(qSurfSpeed, &LocalAssembler::buildSurfSpeed);
+        resize_and_evaluate_on_vertexes(params.surfOseenParams.m_g, tet, qDomain, params.t, qG);
+        qG += qSurfSpeed * trace(qH);
+    }
+public:
+    LocalAssembler(TetraCL const & tet, LocalAssemblerParams const & params) : tet(tet), params(params) {
+        levelSetTet.assign(tet, params.levelSet, BndDataCL<>());
+        auto const & lattice = PrincipalLatticeCL::instance(params.numbOfVirtualSubEdges);
+        GridFunctionCL<> levelSetTetLat(lattice.vertex_size());
+        evaluate_on_vertexes(levelSetTet, lattice, Addr(levelSetTetLat));
+        SurfacePatchCL spatch;
+        spatch.make_patch<MergeCutPolicyCL>(lattice, levelSetTetLat);
+        make_CompositeQuad5Domain2D(qDomain, spatch, tet);
+        make_SimpleQuadDomain<Quad5DataCL>(q3Domain, AllTetraC);
+        GetTrafoTr(T, absDet, tet);
+        absDet = std::fabs(absDet);
+    }
+    // local matrices
+    double A_vecP2P2(size_t i, size_t j) {
+        require(qE[0], &LocalAssembler::buildRateOfStrainTensor);
+        return quad_2D(contract(qE[j], qE[i]), qDomain);
+    }
+    double A_consistent_vecP2P2(size_t i, size_t j) {
+        require(qHatP2[0], &LocalAssembler::buildHatP2);
+        require(qNormal, &LocalAssembler::buildNormal);
+        require(qH, &LocalAssembler::buildShapeOp);
+        require(qE[0], &LocalAssembler::buildRateOfStrainTensor);
+        auto && [ is, in ] = ind(i);
+        auto && [ js, jn ] = ind(j);
+        auto e_in = std_basis<3>(in + 1);
+        auto e_jn = std_basis<3>(jn + 1);
+        return quad_2D(contract(qE[j] - (qHatP2[js] * dot(e_jn, qNormal)) * qH, qE[i] - (qHatP2[is] * dot(e_in, qNormal)) * qH), qDomain);
+    }
+    double M_vecP2P2(size_t i, size_t j) {
+        require(qHatP2[0], &LocalAssembler::buildHatP2);
+        auto && [ is, in ] = ind(i);
+        auto && [ js, jn ] = ind(j);
+        if (in != jn) return 0.;
+        return quad_2D(qHatP2[js] * qHatP2[is], qDomain);
+    }
+    double M_t_vecP2P2(size_t i, size_t j) {
+        require(qHatP2[0], &LocalAssembler::buildHatP2);
+        require(qP, &LocalAssembler::buildProjector);
+        auto && [ is, in ] = ind(i);
+        auto && [ js, jn ] = ind(j);
+        return quad_2D(qHatP2[js] * take(qP, jn, in) * qHatP2[is], qDomain);
+    }
+    double N_vecP2P2(size_t i, size_t j) {
+        require(qHatP2[0], &LocalAssembler::buildHatP2);
+        require(qGradP2[0], &LocalAssembler::buildGradP2);
+        require(qP, &LocalAssembler::buildProjector);
+        require(qWind, &LocalAssembler::buildWind);
+        auto && [ is, in ] = ind(i);
+        auto && [ js, jn ] = ind(j);
+        return quad_2D(dot(qWind, qGradP2[js]) * qHatP2[is] * take(qP, in, jn), qDomain);
+    }
+    double AL_vecP2P2(size_t i, size_t j) {
+        require(qE[0], &LocalAssembler::buildRateOfStrainTensor);
+        return quad_2D(trace(qE[j]) * trace(qE[i]), qDomain);
+    }
+    double H_vecP2P2(size_t i, size_t j) {
+        require(qHatP2[0], &LocalAssembler::buildHatP2);
+        require(qH, &LocalAssembler::buildShapeOp);
+        require(qSurfSpeed, &LocalAssembler::buildSurfSpeed);
+        auto && [ is, in ] = ind(i);
+        auto && [ js, jn ] = ind(j);
+        return quad_2D(qHatP2[js] * qSurfSpeed * take(qH, jn, in) * qHatP2[is], qDomain);
+    }
+    double S_vecP2P2(size_t i, size_t j) {
+        require(qHatP2[0], &LocalAssembler::buildHatP2);
+        require(qNormal, &LocalAssembler::buildNormal);
+        auto && [ is, in ] = ind(i);
+        auto && [ js, jn ] = ind(j);
+        auto e_in = std_basis<3>(in + 1);
+        auto e_jn = std_basis<3>(jn + 1);
+        return quad_2D(qHatP2[js] * dot(e_jn, qNormal) * qHatP2[is] * dot(e_in, qNormal), qDomain);
+    }
+    double C_n_vecP2P2(size_t i, size_t j) {
+        require(q3DGradP2[0], &LocalAssembler::buildGradP2);
+        require(q3DNormal, &LocalAssembler::buildNormal);
+        auto && [ is, in ] = ind(i);
+        auto && [ js, jn ] = ind(j);
+        if (in != jn) return 0.;
+        return quad(dot(q3DNormal, q3DGradP2[js]) * dot(q3DNormal, q3DGradP2[is]), absDet, q3Domain, AllTetraC);
+    }
+    double F_vecP2(size_t i) {
+        require(qHatP2[0], &LocalAssembler::buildHatP2);
+        require(qF, &LocalAssembler::buildF);
+        require(qG, &LocalAssembler::buildG);
+        require(qSurfSpeed, &LocalAssembler::buildSurfSpeed);
+        require(qSurfSpeedSurfGrad, &LocalAssembler::buildSurfSpeed);
+        require(qE[0], &LocalAssembler::buildRateOfStrainTensor);
+        require(qH, &LocalAssembler::buildShapeOp);
+        auto && [ is, in ] = ind(i);
+        auto e_in = std_basis<3>(in + 1);
+        return quad_2D(
+                (dot(e_in, qF) + qSurfSpeed * dot(e_in, qSurfSpeedSurfGrad)) * qHatP2[is] -
+                params.surfOseenParams.nu * qSurfSpeed * contract(qH, qE[i]) -
+                params.surfOseenParams.gamma * qG * trace(qE[i]),
+            qDomain);
+    }
+    double B_P1vecP2(size_t i, size_t j) {
+        require(qSurfGradP1[0], &LocalAssembler::buildSurfGradP1);
+        require(qHatP2[0], &LocalAssembler::buildHatP2);
+        auto && [ js, jn ] = ind(j);
+        auto e_jn = std_basis<3>(jn + 1);
+        return quad_2D(qHatP2[js] * dot(e_jn, qSurfGradP1[i]), qDomain);
+    }
+    double Q_P1vecP2(size_t i, size_t j) { // rhs-curl-projection mtx
+        require(qSurfGradP1[0], &LocalAssembler::buildSurfGradP1);
+        require(qHatP2CrossN[0], &LocalAssembler::buildHatP2CrossN);
+        return quad_2D(dot(qHatP2CrossN[j], qSurfGradP1[i]), qDomain);
+    }
+    double A_P1P1(size_t i, size_t j) {
+        require(qSurfGradP1[0], &LocalAssembler::buildSurfGradP1);
+        return quad_2D(dot(qSurfGradP1[j], qSurfGradP1[i]), qDomain);
+    }
+    double C_n_P1P1(size_t i, size_t j) {
+        require(q3DGradP1[0], &LocalAssembler::buildGradP1);
+        require(q3DNormal, &LocalAssembler::buildNormal);
+        return quad(dot(q3DNormal, q3DGradP1[j]) * dot(q3DNormal, q3DGradP1[i]), absDet, q3Domain, AllTetraC);
+    }
+    double C_full_P1P1(size_t i, size_t j) {
+        require(q3DGradP1[0], &LocalAssembler::buildGradP1);
+        return quad(dot(q3DGradP1[j], q3DGradP1[i]), absDet, q3Domain, AllTetraC);
+    }
+    double M_P1P1(size_t i, size_t j) {
+        require(qHatP1[0], &LocalAssembler::buildHatP1);
+        return quad_2D(qHatP1[j] * qHatP1[i], qDomain);
+    }
+    double G_P1(size_t i) {
+        require(qHatP1[0], &LocalAssembler::buildHatP1);
+        require(qG, &LocalAssembler::buildG);
+        return quad_2D(qG * qHatP1[i], qDomain);
+    }
 };
 
-struct SurfOseenSystem {
-    MatDescCL A, A_stab, N, H, M, S, // velocity stiffness, volume stabilization, convection, surface velocity, mass, and normal penalty mtx
-              // LB, LB_stab; // laplace-beltrami
-              AL, // AL / grad-div stabilization mtx
-              sumA, // accumulated from above
-              A_p, M_p, C, // pressure stiffness (laplace-beltrami), pressure mass, and volume stabilization mtx
-              B, Q; // divergence and rhs-curl-projection mtx
-    VecDescCL fRHS, gRHS, // moment and continuity rhs
-              w_T, u_N; // wind and surface speed
-    struct {
-        bool build = false;
-        MatDescCL block[3][3];
-    } sumA_block; // blocks of A (for preconditioner)
+struct FEMatDescCL : MatDescCL {
+    LocalAssembler::BilinearForm form;
+    FEMatDescCL(IdxDescCL* r, IdxDescCL* c, LocalAssembler::BilinearForm form) : MatDescCL(r, c), form(form) {}
 };
 
-void SetupSurfOseen_P2P1(const MultiGridCL& MG_, const LevelsetP2CL&, SurfOseenSystem*, SurfOseenParam*);
-void SetupStokesIF_P1P1      (const MultiGridCL& MG_, MatDescCL* A_P1, MatDescCL* A_P1_stab, MatDescCL* B_P1P1, MatDescCL* M_P1, MatDescCL* S_P1, MatDescCL* L_P1P1, MatDescCL* L_P1P1_stab, MatDescCL* M_ScalarP1, MatDescCL* A_ScalarP1_stab, const VecDescCL& lset, const LsetBndDataCL& lset_bnd, SurfOseenParam*);
-void SetupNavierStokesIF_P1P1(const MultiGridCL& MG_, MatDescCL* A_P1, MatDescCL* A_P1_stab, MatDescCL* B_P1P1, MatDescCL* Omega_P1P1, MatDescCL* N_P1, MatDescCL* NT_P1, MatDescCL* M_P1, MatDescCL* D_P1, MatDescCL* S_P1, MatDescCL* L_P1P1, MatDescCL* L_P1P1_stab, MatDescCL* M_ScalarP1, MatDescCL* A_ScalarP1_stab, MatDescCL* Schur_normalP1_stab, const LevelsetP2CL& lset, const VecDescCL& velocity, const BndDataCL<Point3DCL>& velocity_bnd, SurfOseenParam*);
-void SetupStokesIF_P1P2      (const MultiGridCL& MG_, MatDescCL* A_P1, MatDescCL* A_P1_stab, MatDescCL* B_P2P1, MatDescCL* M_P1, MatDescCL* S_P1, MatDescCL* L_P2P1, MatDescCL* L_P2P1_stab, MatDescCL* M_ScalarP2, MatDescCL* A_ScalarP2_stab, const VecDescCL& lset, const LsetBndDataCL& lset_bnd, SurfOseenParam*);
-void SetupStokesIF_P2P2      (const MultiGridCL& MG_, MatDescCL* A_P2, MatDescCL* A_P2_stab, MatDescCL* B_P2P2, MatDescCL* M_P2, MatDescCL* S_P2, MatDescCL* L_P2P2, MatDescCL* L_P2P2_stab, MatDescCL* M_ScalarP2, MatDescCL* A_ScalarP2_stab, const VecDescCL& lset, const LsetBndDataCL& lset_bnd, SurfOseenParam*);
+struct FEVecDescCL : VecDescCL {
+    LocalAssembler::LinearForm form;
+    FEVecDescCL(IdxDescCL* r, LocalAssembler::LinearForm form) : VecDescCL(r), form(form) {}
+};
+
+struct FESystem {
+    std::vector<FEMatDescCL*> matrices;
+    std::vector<FEVecDescCL*> vectors;
+    LocalAssembler::LocalAssemblerParams params;
+};
+
+void setupFESystem(MultiGridCL const &, FESystem&);
 
 void SetupCahnHilliardIF_P1P1( const MultiGridCL& MG_,  MatDescCL* M_P1, MatDescCL* NormalStab_P1, MatDescCL* TangentStab_P1, MatDescCL* VolumeStab_P1, MatDescCL* L_P1P1 ,MatDescCL* LM_P1P1 ,MatDescCL* Gprimeprime_P1P1 , const VecDescCL& lset, const LsetBndDataCL& lset_bnd, const VecDescCL& velocity, const BndDataCL<Point3DCL>& velocity_bnd,const VecDescCL& volume_fraction, const BndDataCL<>& volume_fraction_bnd);
+
     double Mobility_function(double x,double t=0);
     double Diffusion_function(double x,double t=0);
     double Density_function(double x,double t=0);
@@ -1252,9 +1528,9 @@ class LocalLaplaceBeltramiP1CL
         }
         /*void setup (const TetraCL& t, const InterfaceCommonDataP1CL& cdata) {
 
-            QuadDomainCL q3Ddomain;
+            QuadDomainCL q3Domain;
 
-            make_SimpleQuadDomain<Quad5DataCL> (q3Ddomain, AllTetraC);
+            make_SimpleQuadDomain<Quad5DataCL> (q3Domain, AllTetraC);
 
             make_CompositeQuad5Domain2D( qdom, cdata.surf, t);
             //resize_and_evaluate_on_vertexes( concentr_loc, qdom, qconcentr);
@@ -1278,7 +1554,7 @@ class LocalLaplaceBeltramiP1CL
 
             for (int i= 0; i < 4; ++i)
                 for(int j= 0; j < 4; ++j) {
-                    coup[i][j]= quad( dot(grad[i],grad[j]), q3Ddomain);
+                    coup[i][j]= quad( dot(grad[i],grad[j]), q3Domain);
                 }*//*
             for(int i=0; i<4; ++i)
                 U_Grad[i]=dot( qnormal, Quad5CL<Point3DCL>( grad[i]));

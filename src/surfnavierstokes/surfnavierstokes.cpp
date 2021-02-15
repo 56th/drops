@@ -79,6 +79,7 @@ int main(int argc, char* argv[]) {
                 logger.log();
             }
         logger.end();
+        std::cout << std::scientific;
         logger.beg("read input .json");
             ParamCL inpJSON;
             read_parameter_file_from_cmdline(inpJSON, argc, argv, "../../param/surfnavierstokes/No_Bnd_Condition.json");
@@ -97,8 +98,6 @@ int main(int argc, char* argv[]) {
                 logger.buf << inpJSON;
                 logger.log();
             }
-        logger.end();
-        logger.beg("set up test case");
             auto h = inpJSON.get<Point3DCL>("Mesh.E1")[0] / inpJSON.get<double>("Mesh.N1") * std::pow(2., -inpJSON.get<double>("Mesh.AdaptRef.FinestLevel"));
             auto tau_u_order  = inpJSON.get<double>("SurfNavStokes.NormalPenaltyPower");
             auto tau_u_factor = inpJSON.get<double>("SurfNavStokes.NormalPenaltyFactor");
@@ -109,63 +108,39 @@ int main(int argc, char* argv[]) {
             auto rho_p_order  = inpJSON.get<double>("SurfNavStokes.PressureVolumestabPower");
             auto rho_p_factor = inpJSON.get<double>("SurfNavStokes.PressureVolumestabFactor");
             auto rho_p        = rho_p_factor  * pow(h, rho_p_order); // constant for pressure stabilisation
-            auto numbOfSteps  = inpJSON.get<size_t>("Time.NumbOfSteps");
+            auto numSteps     = inpJSON.get<size_t>("Time.NumbOfSteps");
             auto finalTime    = inpJSON.get<double>("Time.FinalTime");
-            auto stepSize     = finalTime / numbOfSteps;
+            auto stepSize     = finalTime / numSteps;
             auto everyStep = inpJSON.get<int>("Output.EveryStep");
             logger.buf << "$\\Delta t$ = " << stepSize << '\n';
-            // parse FE types and some other parameters from json file
-            auto FE = inpJSON.get<std::string>("SurfNavStokes.FE");
-            if (FE != "P2P1")
-                throw std::invalid_argument("TODO: refactor P1P1 assembly");
-            auto velFE = FE.substr(0,2);
-            auto preFE = FE.substr(2,2);
-            logger.buf
-                << "velocity FE = " << velFE << '\n'
-                << "pressure FE = " << preFE << '\n';
             auto testName = inpJSON.get<std::string>("SurfNavStokes.TestName");
-            auto nu = inpJSON.get<double>("SurfNavStokes.nu");
-            auto gamma = inpJSON.get<double>("SurfNavStokes.gamma");
-            auto surfNavierStokesData = SurfNavierStokesDataFactory(testName, nu, inpJSON);
-            logger.buf << surfNavierStokesData.description;
-            logger.buf << "$\\nu$ = " << nu << '\n';
-            logger.buf << "$\\gamma$ = " << gamma << " (AL / grad-div stabilization constant)\n";
-            SurfOseenParam param;
-            param.input.gamma = gamma;
-            param.input.nu = nu;
-            param.input.tau_u = tau_u;
-            param.input.rho_u = rho_u;
-            param.input.f = inpJSON.get<bool>("SurfNavStokes.IntegrateRHS") ? surfNavierStokesData.f_T : nullptr;
-            param.input.g = inpJSON.get<bool>("SurfNavStokes.IntegrateRHS") ? surfNavierStokesData.m_g : nullptr;
-            param.input.exactNormal = inpJSON.get<bool>("SurfNavStokes.ComputeNormalErr") ? surfNavierStokesData.surface.n : nullptr;
-            param.input.exactShape = inpJSON.get<bool>("SurfNavStokes.ComputeShapeErr") ? surfNavierStokesData.surface.H : nullptr;
-            param.input.numbOfVirtualSubEdges = inpJSON.get<size_t>("SurfNavStokes.NumbOfVirtualSubEdges");
-            param.input.usePatchNormal = inpJSON.get<bool>("SurfNavStokes.UsePatchNormals");
-            if (param.input.usePatchNormal)  logger.log("using patch normals in surf integrands");
-            auto formulation = inpJSON.get<std::string>("SurfNavStokes.Formulation");
-            if (formulation == "consistent") {
-                param.input.formulation = SurfOseenParam::Formulation::consistent;
-                logger.buf << "using consistent penalty formulation\n";
-            }
-            else {
-                param.input.formulation = SurfOseenParam::Formulation::inconsistent;
-                logger.buf << "using inconsistent penalty formulation\n";
-            }
-            SurfOseenSystem surfOseenSystem;
-            surfOseenSystem.sumA_block.build = inpJSON.get<std::string>("Solver.Inner.A.Type") != "Full";
-            auto stab = inpJSON.get<std::string>("SurfNavStokes.PressureVolumestabType");
-            if (stab == "full") {
-                param.input.stab = SurfOseenParam::PressureVolumestab::full;
-                logger.buf << "using full pressure volume stabilization\n";
-            }
-            else {
-                param.input.stab = SurfOseenParam::PressureVolumestab::normal;
-                logger.buf << "using normal pressure volume stabilization\n";
-            }
-            if (gamma == 0.)
-                surfOseenSystem.AL.assemble = false;
+            auto surfNavierStokesData = SurfNavierStokesDataFactory(testName, inpJSON);
+            FESystem surfOseenSystem;
+            auto& gamma = surfOseenSystem.params.surfOseenParams.gamma;
+            auto& nu = surfOseenSystem.params.surfOseenParams.nu;
+            auto& t = surfOseenSystem.params.t;
+            auto& w_T = surfOseenSystem.params.surfOseenParams.w_T;
+            auto& u_N = surfOseenSystem.params.surfOseenParams.u_N;
+            auto& levelSet = surfOseenSystem.params.levelSet;
+            nu = inpJSON.get<double>("SurfNavStokes.nu");
+            if (nu <= 0.) throw std::invalid_argument("viscosity must be non-negative");
+            gamma = inpJSON.get<double>("SurfNavStokes.gamma");
+            surfOseenSystem.params.numbOfVirtualSubEdges = inpJSON.get<size_t>("SurfNavStokes.NumbOfVirtualSubEdges");
+            surfOseenSystem.params.surfOseenParams.m_g = surfNavierStokesData.m_g;
+            surfOseenSystem.params.surfOseenParams.f_T = surfNavierStokesData.f_T;
+            auto formulation = inpJSON.get<std::string>("SurfNavStokes.Formulation") == "Consistent" ? "Consistent" : "Inonsistent";
+            auto stab = inpJSON.get<std::string>("SurfNavStokes.PressureVolumestabType") == "Normal" ? "Normal" : "Full";
+            auto useTangMassMat = inpJSON.get<bool>("SurfNavStokes.UseTangentialMassMatrix");
+            auto useInnerIters = inpJSON.get<bool>("Solver.Inner.Use");
+            auto usePrevGuess = inpJSON.get<bool>("Solver.UsePreviousFrameAsInitialGuess");
+            auto BDF = inpJSON.get<size_t>("SurfNavStokes.BDF");
+            logger.buf
+                << surfNavierStokesData.description
+                << "$\\nu$ = " << nu << '\n'
+                << "$\\gamma$ = " << gamma << " (AL / grad-div stabilization constant)\n"
+                << "penalty formulation type: " << formulation << "\n"
+                << "pressure volume stabilization type: " << stab << "\n";
             logger.log();
-            auto reFactorizeTol = inpJSON.get<double>("Solver.Inner.A.ReFactorizeTol");
         logger.end();
         logger.beg("build mesh");
             logger.beg("build initial bulk mesh");
@@ -181,27 +156,12 @@ int main(int argc, char* argv[]) {
                 shift /= shift.norm();
                 auto shiftNorm = fabs(inpJSON.get<double>("Levelset.ShiftNorm", 0.));
                 shift *= shiftNorm;
-                mg.Transform([&](Point3DCL const & p) {
-                    return p - shift;
-                });
-                logger.buf << "surface shift = " << shift;
+                mg.Transform([&](Point3DCL const & p) { return p - shift; });
+                logger.buf << "surface shift: " << shift;
                 logger.log();
             logger.end();
             logger.beg("refine towards the surface");
                 AdapTriangCL adap(mg);
-                /*if (testName == "KelvinHelmholtzCristophSphere") {
-                    logger.beg("refine around equator");
-                        auto delta_0 = inpJSON.get<double>("SurfNavStokes.IC.KelvinHelmholtzCristophSphere.Delta_0");
-                        auto refEquator = [&](Point3DCL const & p, double t) {
-                            if (std::fabs(p[2]) > delta_0) return std::numeric_limits<double>::max();
-                            return 0.;
-                        };
-                        DistMarkingStrategyCL markerEquator(refEquator, inpJSON.get<double>("Mesh.AdaptRef.Width"), inpJSON.get<int>("Mesh.AdaptRef.CoarsestLevel"), inpJSON.get<int>("Mesh.AdaptRef.CoarsestLevel") + 1);
-                        adap.set_marking_strategy(&markerEquator);
-                        adap.MakeInitialTriang();
-                    logger.end();
-                }*/
-                // adaptive mesh refinement based on level set function
                 DistMarkingStrategyCL markerLset(surfNavierStokesData.surface.phi, inpJSON.get<double>("Mesh.AdaptRef.Width"), inpJSON.get<int>("Mesh.AdaptRef.CoarsestLevel"), inpJSON.get<int>("Mesh.AdaptRef.FinestLevel"));
                 adap.set_marking_strategy(&markerLset);
                 adap.MakeInitialTriang();
@@ -212,478 +172,173 @@ int main(int argc, char* argv[]) {
                     << "numb of tetras = " << numbOfTetras;
                 logger.log();
             logger.end();
+            BndDataCL<double> lsetBnd(0); read_BndData(lsetBnd, mg, inpJSON.get_child("Levelset.BndData"));
+            BndDataCL<Point3DCL> vecBnd(0); read_BndData(vecBnd, mg, inpJSON.get_child("Stokes.VelocityBndData"));
+            BndDataCL<double> scaBnd(0); read_BndData(scaBnd, mg, inpJSON.get_child("Stokes.PressureBndData"));
         logger.end();
         logger.beg("interpolate level-set");
-            InstatScalarFunction sigma(0);
-            SurfaceTensionCL sf(sigma, 0);
-            BndDataCL<double> lsbnd(0);
-            read_BndData(lsbnd, mg, inpJSON.get_child("Levelset.BndData"));
-            std::shared_ptr<LevelsetP2CL> lsetPtr(LevelsetP2CL::Create(mg, lsbnd, sf));
-            auto& lset = *lsetPtr;
-            lset.CreateNumbering(mg.GetLastLevel(), &lset.idx);
-            lset.Phi.SetIdx(&lset.idx);
-            lset.Init(surfNavierStokesData.surface.phi);
+            MLIdxDescCL lstIdx(P2_FE);
+            lstIdx.CreateNumbering(mg.GetLastLevel(), mg, lsetBnd);
+            levelSet.SetIdx(&lstIdx);
+            InitScalar(mg, levelSet, surfNavierStokesData.surface.phi, 0.);
         logger.end();
-        logger.beg("build FE spaces");
-            BndDataCL<Point3DCL> vbnd(0);
-            read_BndData(vbnd, mg, inpJSON.get_child("Stokes.VelocityBndData"));
-            BndDataCL<double> pbnd(0);
-            read_BndData(pbnd, mg, inpJSON.get_child("Stokes.PressureBndData"));
-            IdxDescCL ifaceVecP2idx(vecP2IF_FE, vbnd);
-            IdxDescCL ifaceVecP1idx(vecP1IF_FE, vbnd);
-            IdxDescCL ifaceP1idx(P1IF_FE, pbnd);
-            IdxDescCL ifaceP2idx(P2IF_FE, pbnd);
-            IdxDescCL vecP2idx(vecP2_FE, vbnd);
-            IdxDescCL vecP1idx(vecP1_FE, vbnd);
-            IdxDescCL P1FEidx(P1_FE, pbnd);
-            IdxDescCL P2FEidx(P2_FE, pbnd);
-            ifaceVecP2idx.GetXidx().SetBound(inpJSON.get<double>("SurfTransp.OmitBound"));
-            auto numbOfActiveTetrasP2 = ifaceVecP2idx.CreateNumbering(mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData());
-            ifaceVecP1idx.GetXidx().SetBound(inpJSON.get<double>("SurfTransp.OmitBound"));
-            auto numbOfActiveTetrasP1 = ifaceVecP1idx.CreateNumbering(mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData());
-            if (numbOfActiveTetrasP2 != numbOfActiveTetrasP1) {
-                std::stringstream err;
-                err << "inconsistent numb of cut tetras for P2 and P1: " << numbOfActiveTetrasP2 << " vs. " << numbOfActiveTetrasP1;
-                throw std::logic_error(err.str());
+        logger.beg("set up FE spaces");
+            IdxDescCL velExtIdx(vecP2_FE, vecBnd); {
+                velExtIdx.GetXidx().SetBound(inpJSON.get<double>("SurfTransp.OmitBound"));
+                velExtIdx.CreateNumbering(mg.GetLastLevel(), mg);                
             }
-            logger.buf << "numb of active (cut) tetras is: " << numbOfActiveTetrasP1 << " (" << (100. * numbOfActiveTetrasP1) / numbOfTetras << "%)\n";
-            logger.log();
-            ifaceP1idx.GetXidx().SetBound(inpJSON.get<double>("SurfTransp.OmitBound"));
-            ifaceP1idx.CreateNumbering(mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData());
-            ifaceP2idx.GetXidx().SetBound(inpJSON.get<double>("SurfTransp.OmitBound"));
-            ifaceP2idx.CreateNumbering(mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData());
-            vecP2idx.GetXidx().SetBound(inpJSON.get<double>("SurfTransp.OmitBound"));
-            vecP2idx.CreateNumbering(mg.GetLastLevel(), mg);
-            vecP1idx.GetXidx().SetBound(inpJSON.get<double>("SurfTransp.OmitBound"));
-            vecP1idx.CreateNumbering(mg.GetLastLevel(), mg);
-            P1FEidx.GetXidx().SetBound(inpJSON.get<double>("SurfTransp.OmitBound"));
-            P1FEidx.CreateNumbering(mg.GetLastLevel(), mg);
-            P2FEidx.GetXidx().SetBound(inpJSON.get<double>("SurfTransp.OmitBound"));
-            P2FEidx.CreateNumbering(mg.GetLastLevel(), mg);
-            logger.buf
-                    << "numb of d.o.f. vector interface P2: " << ifaceVecP2idx.NumUnknowns() << '\n'
-                    << "numb of d.o.f. vector interface P1: " << ifaceVecP1idx.NumUnknowns() << '\n'
-                    << "numb of d.o.f. scalar interface P2: " << ifaceP2idx.NumUnknowns() << '\n'
-                    << "numb of d.o.f. scalar interface P1: " << ifaceP1idx.NumUnknowns() << '\n'
-                    << "numb of d.o.f. vector P2: " << vecP2idx.NumUnknowns() << '\n'
-                    << "numb of d.o.f. vector P1: " << vecP1idx.NumUnknowns() << '\n'
-                    << "numb of d.o.f. scalar P2: " << P2FEidx.NumUnknowns() << '\n'
-                    << "numb of d.o.f. scalar P1: " << P1FEidx.NumUnknowns();
-            logger.log();
-            VecDescCL u_star, u_star_ext, u, u_ext, u_prev, u_prev_prev, surf_curl_u, surf_curl_u_ext, p_star, p_star_ext, p, p_ext;
-            size_t n, m, n_i;
-            if (FE == "P2P1") {
-                n = ifaceVecP2idx.NumUnknowns();
-                n_i = n / 3;
-                if (!n_i) throw std::invalid_argument("numb of velocity d.o.f. is not multiple of 3");
-                m = ifaceP1idx.NumUnknowns();
-                u.SetIdx(&ifaceVecP2idx);
-                u_ext.SetIdx(&vecP2idx);
-                u_star.SetIdx(&ifaceVecP2idx);
-                u_star_ext.SetIdx(&vecP2idx);
-                u_prev.SetIdx(&ifaceVecP2idx);
-                u_prev_prev.SetIdx(&ifaceVecP2idx);
-                surf_curl_u.SetIdx(&ifaceP1idx);
-                surf_curl_u_ext.SetIdx(&P1FEidx);
-                surfOseenSystem.u_N.SetIdx(&ifaceP2idx);
-                surfOseenSystem.w_T.SetIdx(&ifaceVecP2idx);
-                surfOseenSystem.fRHS.SetIdx(&ifaceVecP2idx);
-                surfOseenSystem.A.SetIdx(&ifaceVecP2idx, &ifaceVecP2idx);
-                surfOseenSystem.AL.SetIdx(&ifaceVecP2idx, &ifaceVecP2idx);
-                surfOseenSystem.N.SetIdx(&ifaceVecP2idx, &ifaceVecP2idx);
-                surfOseenSystem.H.SetIdx(&ifaceVecP2idx, &ifaceVecP2idx);
-                surfOseenSystem.A_stab.SetIdx(&ifaceVecP2idx, &ifaceVecP2idx);
-                surfOseenSystem.B.SetIdx(&ifaceP1idx, &ifaceVecP2idx);
-                surfOseenSystem.Q.SetIdx(&ifaceP1idx, &ifaceVecP2idx);
-                surfOseenSystem.M.SetIdx(&ifaceVecP2idx, &ifaceVecP2idx);
-                surfOseenSystem.S.SetIdx(&ifaceVecP2idx, &ifaceVecP2idx);
+            IdxDescCL velIdx(vecP2IF_FE, vecBnd); {
+                velIdx.extIdx = &velExtIdx;
+                velIdx.GetXidx().SetBound(inpJSON.get<double>("SurfTransp.OmitBound"));
+                auto numbOfActiveTetras = velIdx.CreateNumbering(mg.GetLastLevel(), mg, &levelSet, &lsetBnd);
+                logger.buf
+                    << "numb of active (cut) tetras is: " << numbOfActiveTetras << " ("
+                    << (100. * numbOfActiveTetras) / numbOfTetras << "%)\n";
+                logger.log();
             }
-            else throw std::invalid_argument(FE + ": unknown FE pair");
-            p.SetIdx(&ifaceP1idx);
-            p_ext.SetIdx(&P1FEidx);
-            p_star.SetIdx(&ifaceP1idx);
-            p_star_ext.SetIdx(&P1FEidx);
-            surfOseenSystem.gRHS.SetIdx(&ifaceP1idx);
-            surfOseenSystem.M_p.SetIdx(&ifaceP1idx, &ifaceP1idx);
-            surfOseenSystem.A_p.SetIdx(&ifaceP1idx, &ifaceP1idx);
-            surfOseenSystem.C.SetIdx(&ifaceP1idx, &ifaceP1idx);
-            logger.beg("interpolate initial data");
-                InitVector(mg, u_star, surfNavierStokesData.u_T, 0.);
-                InitScalar(mg, p_star, surfNavierStokesData.p, 0.);
-                u = u_star;
-                p = p_star;
+            IdxDescCL preExtIdx(P1_FE, scaBnd); {
+                preExtIdx.GetXidx().SetBound(inpJSON.get<double>("SurfTransp.OmitBound"));
+                preExtIdx.CreateNumbering(mg.GetLastLevel(), mg);                
+            }
+            IdxDescCL preIdx(P1IF_FE, scaBnd); {
+                preIdx.extIdx = &preExtIdx;
+                preIdx.GetXidx().SetBound(inpJSON.get<double>("SurfTransp.OmitBound"));
+                preIdx.CreateNumbering(mg.GetLastLevel(), mg, &levelSet, &lsetBnd);
+            }
+            IdxDescCL speedIdx(P2IF_FE, scaBnd); {
+                speedIdx.GetXidx().SetBound(inpJSON.get<double>("SurfTransp.OmitBound"));
+                speedIdx.CreateNumbering(mg.GetLastLevel(), mg, &levelSet, &lsetBnd);
+            }
+            size_t n = velIdx.NumUnknowns();
+            auto n_i = n / 3;
+            size_t m = preIdx.NumUnknowns();
+            logger.beg("set up FE system");
+                u_N.SetIdx(&speedIdx);
+                w_T.SetIdx(&velIdx);
+                FEMatDescCL
+                    mM(&velIdx, &velIdx, useTangMassMat ? &LocalAssembler::M_t_vecP2P2 : &LocalAssembler::M_vecP2P2),
+                    mAL(&velIdx, &velIdx, &LocalAssembler::AL_vecP2P2),
+                    mN(&velIdx, &velIdx, &LocalAssembler::N_vecP2P2),
+                    mH(&velIdx, &velIdx, &LocalAssembler::H_vecP2P2),
+                    mA(&velIdx, &velIdx, formulation == "Consistent" ? &LocalAssembler::A_consistent_vecP2P2 : &LocalAssembler::A_vecP2P2),
+                    mS(&velIdx, &velIdx, &LocalAssembler::S_vecP2P2),
+                    mC(&velIdx, &velIdx, &LocalAssembler::C_n_vecP2P2),
+                    mB(&preIdx, &velIdx, &LocalAssembler::B_P1vecP2),
+                    mQ(&preIdx, &velIdx, &LocalAssembler::Q_P1vecP2),
+                    mM_p(&preIdx, &preIdx, &LocalAssembler::M_P1P1),
+                    mC_p(&preIdx, &preIdx, stab == "Normal" ? &LocalAssembler::C_n_P1P1 : &LocalAssembler::C_full_P1P1),
+                    mA_p(&preIdx, &preIdx, &LocalAssembler::A_P1P1);
+                FEVecDescCL
+                    vF(&velIdx, &LocalAssembler::F_vecP2),
+                    vG(&preIdx, &LocalAssembler::G_P1);
+                VecDescCL
+                    u_star(&velIdx), u(&velIdx), u_prev(&velIdx), surf_curl_u(&preIdx),
+                    p_star(&preIdx), p(&preIdx);
             logger.end();
         logger.end();
         logger.beg("set up vtk");
             VTKWriter vtkWriter(dirName + "/vtk/" + testName, mg, inpJSON.get<bool>("Output.Binary"));
-            auto writeVTK = [&](double t) {
-                Extend(mg, u_star, u_star_ext);
-                Extend(mg, u, u_ext);
-                Extend(mg, surf_curl_u, surf_curl_u_ext);
-                Extend(mg, p_star, p_star_ext);
-                Extend(mg, p, p_ext);
-                vtkWriter.write(t);
-            };
+            vtkWriter.add({ "level-set", levelSet });
             if (everyStep > 0) {
-                VTKWriter::VTKVar vtkLevelSet;
-                vtkLevelSet.name = "level-set";
-                vtkLevelSet.value = &lset.Phi.Data;
-                vtkLevelSet.type = VTKWriter::VTKVar::Type::P2;
-                vtkWriter
-                    .add(vtkLevelSet)
-                    .add(VTKWriter::VTKVar({ "u_h", &u_ext.Data, VTKWriter::VTKVar::Type::vecP2 }))
-                    .add(VTKWriter::VTKVar({ "w_h", &surf_curl_u_ext.Data, VTKWriter::VTKVar::Type::P1 }))
-                    .add(VTKWriter::VTKVar({ "p_h", &p_ext.Data, VTKWriter::VTKVar::Type::P1 }));
-                if (surfNavierStokesData.exactSoln)
-                    vtkWriter
-                        .add(VTKWriter::VTKVar({ "u_*", &u_star_ext.Data, VTKWriter::VTKVar::Type::vecP2 }))
-                        .add(VTKWriter::VTKVar({ "p_*", &p_star_ext.Data, VTKWriter::VTKVar::Type::P1 }));
+                if (inpJSON.get<bool>("Output.Velocity")) {
+                    vtkWriter.add({ "u_h", u });
+                    if (surfNavierStokesData.exactSoln) vtkWriter.add({ "u_*", u_star });
+                }
+                if (inpJSON.get<bool>("Output.Vorticity")) vtkWriter.add({ "w_h", surf_curl_u });
+                if (inpJSON.get<bool>("Output.Pressure")) {
+                    vtkWriter.add({ "p_h", p });
+                    if (surfNavierStokesData.exactSoln) vtkWriter.add({ "p_*", p_star });
+                }
             }
         logger.end();
         logger.beg("set up linear solver");
+            using SV = Epetra_Vector;
             using MV = Epetra_MultiVector;
             using OP = Epetra_Operator;
             using MT = Epetra_CrsMatrix;
             using ST = double;
             using namespace Teuchos;
             using namespace Belos;
-            RCP<ParameterList> belosParams = parameterList();
+            auto belosParams = parameterList();
             belosParams->set("Num Blocks", inpJSON.get<int>("Solver.Outer.KrylovSubspaceSize"));
             belosParams->set("Maximum Iterations", inpJSON.get<int>("Solver.Outer.MaxIter"));
             belosParams->set("Convergence Tolerance", inpJSON.get<double>("Solver.Outer.RelResTol"));
             belosParams->set( "Output Frequency", inpJSON.get<int>("Solver.Outer.OutputFrequency"));
-            belosParams->set("Verbosity", Belos::Errors + Belos::Warnings + Belos::StatusTestDetails + Belos::TimingDetails + Belos::FinalSummary + Belos::IterationDetails);
-            belosParams->set<int>("Output Style", Belos::Brief);
+            belosParams->set("Verbosity", Errors + Warnings + StatusTestDetails + TimingDetails + FinalSummary + IterationDetails);
+            belosParams->set<int>("Output Style", Brief);
             SolverFactory<ST, MV, OP> belosFactory;
             logger.buf << "available iterations: " << belosFactory.supportedSolverNames();
             logger.log();
             auto belosSolver = belosFactory.create(inpJSON.get<std::string>("Solver.Outer.Iteration"), belosParams);
             logger.buf << "outer solver: " << belosSolver->description();
             logger.log();
-            // StatusTestImpResNorm<ST, MV, OP> belosConvTest(inpJSON.get<double>("Solver.Outer.RelResTol"));
-            // belosConvTest.defineScaleForm(ScaleType::NormOfRHS, NormType::TwoNorm);
-            // belosSolver->setUserConvStatusTest(rcpFromRef(belosConvTest));
-            // logger.buf << "outer solver conv test: " << belosConvTest.description();
-            Epetra_Map mapVelocity(static_cast<int>(n), 0, comm), mapVelocityComp(static_cast<int>(n_i), 0, comm), mapVelocityPressure(static_cast<int>(n + m), 0, comm);
-        logger.end();
-        logger.beg("t = t_1");
-            param.input.t = stepSize;
-            logger.beg("initialize surface speed $u_N$");
-                // TODO: solve PDE for $u_N$ here . . .
-                InitScalar(mg, surfOseenSystem.u_N, surfNavierStokesData.surface.u_N, param.input.t);
-            logger.end();
-            logger.beg("assemble");
-                InitVector(mg, u_prev, surfNavierStokesData.u_T, 0.);
-                auto setWind = [&](VectorCL const & wind) {
-                    if (surfNavierStokesData.w_T) // Oseen (and Stokes) case
-                        InitVector(mg, surfOseenSystem.w_T, surfNavierStokesData.w_T, param.input.t);
-                    else surfOseenSystem.w_T.Data = wind; // Navier-Stokes case
-                };
-                auto wind = u_prev.Data;
-                setWind(wind);
-                auto Pe = supnorm(surfOseenSystem.w_T.Data) / nu;
-                auto alpha = 1. / stepSize;
-                logger.buf
-                    << "$\\alpha$ = " << alpha << '\n'
-                    << "Pe = " << Pe;
-                logger.log();
-                param.input.alpha = alpha;
-                SetupSurfOseen_P2P1(mg, lset, &surfOseenSystem, &param);
-                MatrixCL B_T;
-                transpose(surfOseenSystem.B.Data, B_T);
-                VectorCL I_p;
-                I_p.resize(m, 1.);
-                surfOseenSystem.gRHS.Data -= (dot(surfOseenSystem.gRHS.Data, I_p) / dot(I_p, I_p)) * I_p;
-                surfOseenSystem.fRHS.Data += (1. / stepSize) * (surfOseenSystem.M.Data * u_prev.Data);
-                surfOseenSystem.sumA.Data.LinComb(alpha, surfOseenSystem.M.Data, gamma, surfOseenSystem.AL.Data, 1., surfOseenSystem.N.Data, 1., surfOseenSystem.H.Data, nu, surfOseenSystem.A.Data, tau_u, surfOseenSystem.S.Data, rho_u, surfOseenSystem.A_stab.Data);
-                surfOseenSystem.C.Data *= -rho_p;
-                MatrixCL S_M_tmp, S_L_tmp;
-                S_M_tmp.LinComb(1. / (gamma + nu), surfOseenSystem.M_p.Data, -1., surfOseenSystem.C.Data);
-                S_L_tmp.LinComb(1. / alpha, surfOseenSystem.A_p.Data, -1., surfOseenSystem.C.Data);
-            auto assembleTime = logger.end();
-            logger.beg("t_0: project surface vorticity and export initial data to vtk");
-                // mtx
-                MatrixCL M_tmp;
-                M_tmp.LinComb(1., surfOseenSystem.M_p.Data, -1., surfOseenSystem.C.Data);
-                auto M = static_cast<MT>(M_tmp);
-                // rhs
-                auto Q_times_u = surfOseenSystem.Q.Data * u.Data;
-                auto Q_times_u_view_0 = static_cast<Epetra_Vector>(Q_times_u);
-                // solver
-                auto belosParamsW = parameterList();
-                belosParamsW->set("Maximum Iterations", 1000);
-                belosParamsW->set("Convergence Tolerance", 1e-8);
-                belosParamsW->set( "Output Frequency", 10);
-                belosParamsW->set("Verbosity", Belos::Errors + Belos::Warnings + Belos::StatusTestDetails);
-                belosParamsW->set<int>("Output Style", Belos::Brief);
-                auto belosSolverW = belosFactory.create("CG", belosParamsW);
-                // solve
-                Epetra_Map mapPressure(static_cast<int>(m), 0, comm);
-                Epetra_Vector surf_curl_u_epetra(mapPressure);
-                surf_curl_u_epetra.PutScalar(0.);
-                LinearProblem<ST, MV, OP> belosProblemW(rcpFromRef(M), rcpFromRef(surf_curl_u_epetra), rcpFromRef(Q_times_u_view_0));
-                belosProblemW.setProblem();
-                belosSolverW->setProblem(rcpFromRef(belosProblemW));
-                auto belosSolverResultW = belosSolverW->solve();
-                if (myRank == 0) {
-                    if (belosSolverResultW == Belos::Converged)
-                        logger.log("belos converged");
-                    else
-                        logger.wrn("belos did not converge");
-                }
-                for (size_t i = 0; i < m; ++i) surf_curl_u.Data[i] = surf_curl_u_epetra[i];
-                if (everyStep > 0) {
-                    logger.beg("write vtk");
-                       writeVTK(0.);
-                    logger.end();
-                }
-            logger.end();
-            logger.beg("convert to Epetra");
-                logger.beg("cast matrices");
-                    auto A = static_cast<MT>(surfOseenSystem.sumA.Data);
-                    auto printStat = [&](std::string const & name, MT const & A) {
-                        logger.buf << name << ": " << A.NumGlobalRows() << 'x' << A.NumGlobalCols() << ", " << A.NumGlobalNonzeros() << " nonzeros";
-                        if (A.NumGlobalNonzeros()) logger.buf << " (" << (100. * A.NumGlobalNonzeros()) / (static_cast<double>(A.NumGlobalRows()) * A.NumGlobalCols()) << "%)";
-                        logger.log();
-                    };
-                    printStat("A", A);
-                    MT A_block[3][3] = {
-                            { static_cast<MT>(surfOseenSystem.sumA_block.block[0][0].Data), static_cast<MT>(surfOseenSystem.sumA_block.block[0][1].Data), static_cast<MT>(surfOseenSystem.sumA_block.block[0][2].Data) },
-                            { static_cast<MT>(surfOseenSystem.sumA_block.block[1][0].Data), static_cast<MT>(surfOseenSystem.sumA_block.block[1][1].Data), static_cast<MT>(surfOseenSystem.sumA_block.block[1][2].Data) },
-                            { static_cast<MT>(surfOseenSystem.sumA_block.block[2][0].Data), static_cast<MT>(surfOseenSystem.sumA_block.block[2][1].Data), static_cast<MT>(surfOseenSystem.sumA_block.block[2][2].Data) }
-                    };
-                    printStat("A_{ii}", A_block[0][0]);
-                    std::function<void()> checkA_block;
-                    auto readMVComponent = [&](size_t comp, MV const & source) {
-                        Epetra_Vector res(mapVelocityComp, false);
-                        for (size_t i = 0; i < n_i; ++i) res[i] = (*source(0))[3 * i + comp];
-                        return res;
-                    };
-                    auto writeMVComponent = [&](size_t comp, MV const & y, MV& Y, bool add = false) {
-                        if (add) for (size_t i = 0; i < n_i; ++i) (*Y(0))[3 * i + comp] += (*y(0))[i];
-                        else for (size_t i = 0; i < n_i; ++i) (*Y(0))[3 * i + comp] = (*y(0))[i];
-                    };
-                    if (surfOseenSystem.sumA_block.build) {
-                        checkA_block = [&]() {
-                            Epetra_Vector x(mapVelocity, false);
-                            x.Random();
-                            double xNorm; x.Norm2(&xNorm); x.Scale(1. / xNorm);
-                            auto A_x = x;
-                            A.Multiply(false, x, A_x);
-                            auto A_block_x = x;
-                            A_block_x.PutScalar(0.);
-                            Epetra_Vector x_block[3] = { readMVComponent(0, x), readMVComponent(1, x), readMVComponent(2, x) };
-                            for (size_t i : { 0, 1, 2 })
-                                for (size_t j : { 0, 1, 2 }) {
-                                    Epetra_Vector dummy(mapVelocity, true);
-                                    A_block[i][j].Multiply(false, x_block[j], dummy);
-                                    writeMVComponent(i, dummy, A_block_x, true);
-                                }
-                            A_x.Update(-1., A_block_x, 1.);
-                            A_x.Norm2(&xNorm);
-                            logger.buf << "multiplication using A vs. using blocks A_{ii} diff = " << xNorm;
-                            logger.log();
-                            if (xNorm > 1e-10) throw std::logic_error("multiplication using A vs. using blocks A_{ii} diff = " + std::to_string(xNorm));
-                        };
-                        checkA_block();
-                    }
-                    auto B = static_cast<MT>(surfOseenSystem.B.Data);
-                    printStat("B", B);
-                    auto C = static_cast<MT>(surfOseenSystem.C.Data);
-                    printStat("C := -rho_p (pressure volume stabilization mtx)", C);
-                    auto S_M = static_cast<MT>(S_M_tmp);
-                    printStat("S_M := (\\nu + \\gamma)^{-1} M_p - C", S_M);
-                    auto S_L = static_cast<MT>(S_L_tmp);
-                    printStat("S_L := \\alpha^{-1} L_p - C", S_L);
-                logger.end();
-                logger.beg("cast rhs vectors");
-                    auto fRHS = static_cast<Epetra_Vector>(surfOseenSystem.fRHS.Data);
-                    auto gRHS = static_cast<Epetra_Vector>(surfOseenSystem.gRHS.Data);
-                    Epetra_Vector belosLHS(mapVelocityPressure), belosRHS(mapVelocityPressure);
-                    auto joinEpetraVectors = [&](Epetra_Vector const & a, Epetra_Vector const & b, MV& ab) {
-                        for (size_t i = 0; i < n; ++i) (*ab(0))[i] = a[i];
-                        for (size_t i = 0; i < m; ++i) (*ab(0))[i + n] = b[i];
-                    };
-                    joinEpetraVectors(fRHS, gRHS, belosRHS);
-                logger.end();
-                RCP<OP> belosMTX = rcp(new Epetra_OperatorApply([&](MV const & X, MV& Y) {
-                    double* view;
-                    X(0)->ExtractView(&view);
-                    Epetra_Vector x1(Epetra_DataAccess::View, mapVelocity, view);
-                    Epetra_Vector x2(Epetra_DataAccess::View, mapPressure, view + n);
-                    Y(0)->ExtractView(&view);
-                    Epetra_Vector y11(Epetra_DataAccess::View, mapVelocity, view);
-                    auto y12 = y11;
-                    Epetra_Vector y21(Epetra_DataAccess::View, mapPressure, view + n);
-                    auto y22 = y21;
-                    // y1
-                    A.Multiply(false, x1, y11);
-                    B.Multiply(true, x2, y12);
-                    y11.Update(1., y12, 1.);
-                    // y2
-                    B.Multiply(false, x1, y21);
-                    C.Multiply(false, x2, y22);
-                    y21.Update(1., y22, 1.);
-                }));
-            logger.end();
-            logger.beg("build preconditioners");
+            Epetra_Map mapVelocity(static_cast<int>(n), 0, comm), mapVelocityComp(static_cast<int>(n_i), 0, comm), mapVelocityPressure(static_cast<int>(n + m), 0, comm), mapPressure(static_cast<int>(m), 0, comm);
+            SV belosLHS(mapVelocityPressure), belosRHS(mapVelocityPressure);
+            MT A(Epetra_DataAccess::Copy, mapVelocity, 0, true), B(Epetra_DataAccess::Copy, mapPressure, 0, true), C(Epetra_DataAccess::Copy, mapPressure, 0, true), S_L(Epetra_DataAccess::Copy, mapPressure, 0, true), S_M(Epetra_DataAccess::Copy, mapPressure, 0, true);
+            RCP<OP> belosMTX = rcp(new Epetra_OperatorApply([&](MV const & X, MV& Y) {
+                double* view;
+                X(0)->ExtractView(&view);
+                SV x1(Epetra_DataAccess::View, mapVelocity, view);
+                SV x2(Epetra_DataAccess::View, mapPressure, view + n);
+                Y(0)->ExtractView(&view);
+                SV y11(Epetra_DataAccess::View, mapVelocity, view);
+                auto y12 = y11;
+                SV y21(Epetra_DataAccess::View, mapPressure, view + n);
+                auto y22 = y21;
+                // y1
+                A.Multiply(false, x1, y11);
+                B.Multiply(true, x2, y12);
+                y11.Update(1., y12, 1.);
+                // y2
+                B.Multiply(false, x1, y21);
+                C.Multiply(false, x2, y22);
+                y21.Update(1., y22, 1.);
+            }));
+            logger.beg("set up preconditioners");
                 auto identity = [](MV const & X, MV& Y) {
                     double* view;
                     Y(0)->ExtractView(&view);
                     X(0)->ExtractCopy(view);
                 };
                 logger.beg("diffusion-convection-reaction block");
-                    Epetra_OperatorApply::ApplyType invA = identity, A_prec = identity;
                     size_t numItersA = 0;
+                    Epetra_OperatorApply::ApplyType invA = identity;
                     logger.log(inpJSON.get<std::string>("Solver.Inner.A.Comment"));
                     auto iterationA = inpJSON.get<std::string>("Solver.Inner.A.Iteration");
-                    // amesos2
-                    RCP<Amesos2::Solver<MT, MV>> amesosSolver, amesosSolverBlock[3];
-                    // belos
-                    auto belosParamsA = parameterList();
-                    decltype(belosSolver) belosSolverA;
-                    // choose
+                    if (!Amesos2::query(iterationA)) throw std::invalid_argument("solver " + iterationA + " is not available for Amesos2");
+                    logger.log("factorizing full velocity matrix");
+                    auto amesosSolver = Amesos2::create<MT, MV>(iterationA, rcpFromRef(A));
+                    logger.buf
+                        << "solver:      " << amesosSolver->name() << '\n'
+                        << "description: " << amesosSolver->description();
+                    logger.log();
                     auto factorizationTime = 0.;
-                    std::string factorize = "Yes";
-                    auto useAmesos = false; {
-                        auto pos = iterationA.find("Amesos2_");
-                        if (pos != std::string::npos) {
-                            iterationA.erase(pos, std::string("Amesos2_").length());
-                            useAmesos = true;
-                        }
-                    }
-                    std::function<void()> runFactorization;
-                    if (useAmesos) { // Amesos
-                        logger.log("using Amesos2");
-                        if (!Amesos2::query(iterationA))
-                            throw std::invalid_argument("solver " + iterationA + " is not available for Amesos2");
-                        if (!surfOseenSystem.sumA_block.build) {
-                            logger.log("factorizing full velocity matrix");
-                            amesosSolver = Amesos2::create<MT, MV>(iterationA, rcpFromRef(A));
-                            logger.buf
-                                    << "solver:      " << amesosSolver->name() << '\n'
-                                    << "description: " << amesosSolver->description();
-                            logger.log();
-                            runFactorization = [&]() {
-                                logger.beg("factorization");
-                                    logger.beg("symbolic factorization");
-                                        amesosSolver->symbolicFactorization();
-                                    logger.end();
-                                    logger.beg("numeric factorization");
-                                        amesosSolver->numericFactorization();
-                                        auto amesosStatus = amesosSolver->getStatus();
-                                        logger.buf << "numb of nonzeros in L + U = " << amesosStatus.getNnzLU() << " ("
-                                                   << (100. * amesosStatus.getNnzLU()) / (static_cast<double>(n) * n) << "%)";
-                                        logger.log();
-                                    logger.end();
-                                factorizationTime = logger.end();
-                            };
-                            invA = [&](MV const &X, MV &Y) {
-                                amesosSolver->setB(rcpFromRef(X));
-                                amesosSolver->setX(rcpFromRef(Y));
-                                amesosSolver->solve();
-                                numItersA++;
-                            };
-                        } else {
-                            logger.log("factorizing blocks A_{ii} of velocity matrix");
-                            for (size_t i : { 0, 1, 2 })
-                                amesosSolverBlock[i] = Amesos2::create<MT, MV>(iterationA, rcpFromRef(A_block[i][i]));
-                            logger.buf
-                                    << "solver:      " << amesosSolverBlock[0]->name() << '\n'
-                                    << "description: " << amesosSolverBlock[0]->description();
-                            logger.log();
-                            runFactorization = [&]() {
-                                logger.beg("factorization");
-                                    #pragma omp parallel for
-                                    for (size_t i = 0; i < 3; ++i) {
-                                        amesosSolverBlock[i]->symbolicFactorization();
-                                        amesosSolverBlock[i]->numericFactorization();
-                                    }
-                                    auto amesosStatus = amesosSolverBlock[0]->getStatus();
-                                    logger.buf << "numb of nonzeros in L_{ii} + U_{ii} = " << amesosStatus.getNnzLU() << " ("
-                                               << (100. * amesosStatus.getNnzLU()) / (static_cast<double>(n) * n) << "%)";
-                                    logger.log();
-                                factorizationTime = logger.end();
-                            };
-                            A_prec = [&](MV const &X, MV &Y) {
-                                for (size_t i : { 0, 1, 2 }) {
-                                    auto x = readMVComponent(i, X);
-                                    auto y = readMVComponent(i, Y);
-                                    amesosSolverBlock[i]->setB(rcpFromRef(x));
-                                    amesosSolverBlock[i]->setX(rcpFromRef(y));
-                                    amesosSolverBlock[i]->solve();
-                                    writeMVComponent(i, y, Y);
-                                }
-                            };
-                            if (inpJSON.get<std::string>("Solver.Inner.A.Type") == "BlockTriangular")
-                                A_prec = [&](MV const &X, MV &Y) {
-                                    // (1)
-                                    auto x3 = readMVComponent(2, X);
-                                    amesosSolverBlock[2]->setB(rcpFromRef(x3));
-                                    auto y3 = readMVComponent(2, Y);
-                                    amesosSolverBlock[2]->setX(rcpFromRef(y3));
-                                    amesosSolverBlock[2]->solve();
-                                    writeMVComponent(2, y3, Y);
-                                    // (2)
-                                    auto A_y = y3;
-                                    A_y.PutScalar(0.);
-                                    A_block[1][2].Multiply(false, y3, A_y);
-                                    auto x2 = readMVComponent(1, X);
-                                    x2.Update(-1., A_y, 1.);
-                                    amesosSolverBlock[1]->setB(rcpFromRef(x2));
-                                    auto y2 = readMVComponent(1, Y);
-                                    amesosSolverBlock[1]->setX(rcpFromRef(y2));
-                                    amesosSolverBlock[1]->solve();
-                                    writeMVComponent(1, y2, Y);
-                                    // (3)
-                                    A_y.PutScalar(0.);
-                                    A_block[0][1].Multiply(false, y2, A_y);
-                                    auto x1 = readMVComponent(0, X);
-                                    x1.Update(-1., A_y, 1.);
-                                    A_y.PutScalar(0.);
-                                    A_block[0][2].Multiply(false, y3, A_y);
-                                    x1.Update(-1., A_y, 1.);
-                                    amesosSolverBlock[0]->setB(rcpFromRef(x1));
-                                    auto y1 = readMVComponent(0, Y);
-                                    amesosSolverBlock[0]->setX(rcpFromRef(y1));
-                                    amesosSolverBlock[0]->solve();
-                                    writeMVComponent(0, y1, Y);
-                                };
-                            invA = [&](MV const &X, MV &Y) {
-                                Y.PutScalar(0.);
-                                auto dY = Y;
-                                for (size_t i = 0; i < inpJSON.get<size_t>("Solver.Inner.A.MaxIter"); ++i) {
-                                    auto r = Y;
-                                    A.Multiply(false, Y, r);
-                                    r.Update(1., X, -1.);
-                                    A_prec(r, dY);
-                                    Y.Update(1., dY, 1.);
-                                }
-                                numItersA++;
-                            };
-                        }
-                        runFactorization();
-                    } else { // Belos
-                        logger.log("using Belos");
-                        belosParamsA->set("Maximum Iterations", inpJSON.get<int>("Solver.Inner.A.MaxIter"));
-                        belosParamsA->set("Convergence Tolerance", inpJSON.get<double>("Solver.Inner.A.RelResTol"));
-                        belosSolverA = belosFactory.create(iterationA, belosParamsA);
-                        logger.buf << "inner solver: " << belosSolverA->description();
-                        logger.log();
-                        invA = [&](MV const &X, MV &Y) {
-                            Y.PutScalar(0.);
-                            LinearProblem<ST, MV, OP> belosProblemA(rcpFromRef(A), rcpFromRef(Y), rcpFromRef(X));
-                            belosProblemA.setProblem();
-                            belosSolverA->setProblem(rcpFromRef(belosProblemA));
-                            belosSolverA->solve();
-                            numItersA += belosSolverA->getNumIters();
-                        };
-                    }
+                    auto runFactorization = [&]() {
+                        logger.beg("factorization");
+                            logger.beg("symbolic factorization");
+                                amesosSolver->symbolicFactorization();
+                            logger.end();
+                            logger.beg("numeric factorization");
+                                amesosSolver->numericFactorization();
+                                auto amesosStatus = amesosSolver->getStatus();
+                                logger.buf
+                                    << "numb of nonzeros in L + U = " << amesosStatus.getNnzLU() << " ("
+                                    << (100. * amesosStatus.getNnzLU()) / (static_cast<double>(n) * n) << "%)";
+                                logger.log();
+                            logger.end();
+                        factorizationTime = logger.end();
+                    };
+                    invA = [&](MV const &X, MV &Y) {
+                        amesosSolver->setB(rcpFromRef(X));
+                        amesosSolver->setX(rcpFromRef(Y));
+                        amesosSolver->solve();
+                        numItersA++;
+                    };
                 logger.end();
                 logger.beg("schur complement block");
-                    Epetra_OperatorApply::ApplyType invS = identity;
                     size_t numItersS_M = 0, numItersS_L = 0;
-                    RCP<ParameterList> belosParamsS = parameterList();
+                    Epetra_OperatorApply::ApplyType invS = identity;
+                    auto belosParamsS = parameterList();
                     belosParamsS->set("Maximum Iterations", inpJSON.get<int>("Solver.Inner.S.MaxIter"));
                     belosParamsS->set("Convergence Tolerance", inpJSON.get<double>("Solver.Inner.S.RelResTol"));
                     auto belosSolverS_M = belosFactory.create(inpJSON.get<std::string>("Solver.Inner.S.Iteration"), belosParamsS);
@@ -696,8 +351,7 @@ int main(int argc, char* argv[]) {
                         auto& Y_M = Y;
                         auto  Y_L = Y;
                         // normalized rhs
-                        auto X_nrm = X;
-                        {
+                        auto X_nrm = X; {
                             double mean;
                             X_nrm.MeanValue(&mean);
                             for (size_t i = 0; i < m; ++i) (*X_nrm(0))[i] -= mean;
@@ -708,8 +362,7 @@ int main(int argc, char* argv[]) {
                         belosSolverS_M->setProblem(rcpFromRef(belosProblemS_M));
                         belosSolverS_M->solve();
                         numItersS_M += belosSolverS_M->getNumIters();
-                        // Y_L
-                        // TODO: make parallel
+                        // Y_L (TODO: make parallel)
                         if (inpJSON.get<bool>("Solver.Inner.S.S_L")) {
                             LinearProblem<ST, MV, OP> belosProblemS_L(rcpFromRef(S_L), rcpFromRef(Y_L), rcpFromRef(X_nrm));
                             belosProblemS_L.setProblem();
@@ -728,11 +381,11 @@ int main(int argc, char* argv[]) {
                     belosPRE = rcp(new Epetra_OperatorApply([&](MV const & X, MV& Y) {
                         double* view;
                         X(0)->ExtractView(&view);
-                        Epetra_Vector x1(Epetra_DataAccess::View, mapVelocity, view);
-                        Epetra_Vector x2(Epetra_DataAccess::View, mapPressure, view + n);
+                        SV x1(Epetra_DataAccess::View, mapVelocity, view);
+                        SV x2(Epetra_DataAccess::View, mapPressure, view + n);
                         Y(0)->ExtractView(&view);
-                        Epetra_Vector y1(Epetra_DataAccess::View, mapVelocity, view);
-                        Epetra_Vector y2(Epetra_DataAccess::View, mapPressure, view + n);
+                        SV y1(Epetra_DataAccess::View, mapVelocity, view);
+                        SV y2(Epetra_DataAccess::View, mapPressure, view + n);
                         #ifdef _OPENMP
                             #pragma omp parallel num_threads(2)
                             {
@@ -755,12 +408,12 @@ int main(int argc, char* argv[]) {
                     belosPRE = rcp(new Epetra_OperatorApply([&](MV const & X, MV& Y) {
                         double* view;
                         X(0)->ExtractView(&view);
-                        Epetra_Vector x1(Epetra_DataAccess::View, mapVelocity, view);
-                        Epetra_Vector x2(Epetra_DataAccess::View, mapPressure, view + n);
+                        SV x1(Epetra_DataAccess::View, mapVelocity, view);
+                        SV x2(Epetra_DataAccess::View, mapPressure, view + n);
                         Y(0)->ExtractView(&view);
-                        Epetra_Vector y1(Epetra_DataAccess::View, mapVelocity, view);
+                        SV y1(Epetra_DataAccess::View, mapVelocity, view);
                         auto y1_tmp = y1;
-                        Epetra_Vector y2(Epetra_DataAccess::View, mapPressure, view + n);
+                        SV y2(Epetra_DataAccess::View, mapPressure, view + n);
                         // y2
                         invS(x2, y2);
                         // y1
@@ -770,270 +423,240 @@ int main(int argc, char* argv[]) {
                     }));
                 }
             logger.end();
-            logger.beg("linear solve");
-                auto residual = [&](VectorCL const & u, VectorCL const & p) {
-                    auto velResSq = norm_sq(surfOseenSystem.sumA.Data * u + B_T * p - surfOseenSystem.fRHS.Data);
-                    auto preResSq = norm_sq(surfOseenSystem.B.Data * u + surfOseenSystem.C.Data * p - surfOseenSystem.gRHS.Data);
-                    return std::tuple<double, double, double>(sqrt(velResSq), sqrt(preResSq), sqrt(velResSq + preResSq));
-                };
-                auto b_norm = sqrt(norm_sq(surfOseenSystem.fRHS.Data) + norm_sq(surfOseenSystem.gRHS.Data));
-                auto r0_norm = std::get<2>(residual(u.Data, p.Data));
-                if (inpJSON.get<bool>("Solver.UsePreviousFrameAsInitialGuess")) {
-                    for (size_t i = 0; i < n; ++i) belosLHS[i] = u.Data[i];
-                    for (size_t i = 0; i < m; ++i) belosLHS[n + i] = p.Data[i];
-                    auto rel_tol = inpJSON.get<double>("Solver.Outer.RelResTol") * b_norm / r0_norm;
-                    belosParams->set("Convergence Tolerance", rel_tol);
-                    belosSolver = belosFactory.create(inpJSON.get<std::string>("Solver.Outer.Iteration"), belosParams);
-                } else belosLHS.PutScalar(0.);
-                LinearProblem<ST, MV, OP> belosProblem(belosMTX, rcpFromRef(belosLHS), rcpFromRef(belosRHS));
-                if (inpJSON.get<bool>("Solver.Inner.Use")) belosProblem.setRightPrec(belosPRE);
-                belosProblem.setProblem();
-                belosSolver->setProblem(rcpFromRef(belosProblem));
-                std::cout << std::scientific;
-                auto belosSolverResult = belosSolver->solve();
-                if (myRank == 0) {
-                    if (belosSolverResult == Belos::Converged) logger.log("belos converged");
-                    else logger.wrn("belos did not converge");
-                }
-            auto solveTime = logger.end();
-            double solveWastedTime = 0.;
-            logger.beg("convert from Epetra");
-                for (size_t i = 0; i < n; ++i) u.Data[i] = belosLHS[i];
-                for (size_t i = 0; i < m; ++i) p.Data[i] = belosLHS[n + i];
-                p.Data -= dot(surfOseenSystem.M_p.Data * p.Data, I_p) / dot(surfOseenSystem.M_p.Data * I_p, I_p) * I_p;
+            LinearProblem<ST, MV, OP> belosProblem(belosMTX, rcpFromRef(belosLHS), rcpFromRef(belosRHS));
+            if (useInnerIters) belosProblem.setRightPrec(belosPRE);
+        logger.end();
+        t = 0.;
+        logger.beg("t = t_0 = 0");
+            logger.beg("assemble");
+                surfOseenSystem.matrices = { &mM, &mA, &mAL, &mS, &mC, &mM_p, &mC_p, &mA_p, &mB, &mQ };
+                setupFESystem(mg, surfOseenSystem);
+                mC_p.Data *= -rho_p;
+                MatrixCL B_T, A_sum;
+                transpose(mB.Data, B_T);
+                VectorCL I_p(1., m);
+            auto assembleTime = logger.end();
+            logger.beg("interpolate initial data");
+                InitVector(mg, u, surfNavierStokesData.u_T, t);
+                InitScalar(mg, p, surfNavierStokesData.p, t);
+                p.Data -= dot(mM_p.Data * p.Data, I_p) / dot(mM_p.Data * I_p, I_p) * I_p;
+                u_prev = u;
             logger.end();
             logger.beg("project surface vorticity");
-                Q_times_u = surfOseenSystem.Q.Data * u.Data;
-                auto Q_times_u_view_1 = static_cast<Epetra_Vector>(Q_times_u);
-                surf_curl_u_epetra.PutScalar(0.);
-                belosProblemW = LinearProblem<ST, MV, OP>(rcpFromRef(M), rcpFromRef(surf_curl_u_epetra), rcpFromRef(Q_times_u_view_1));
-                belosProblemW.setProblem();
-                belosSolverW->setProblem(rcpFromRef(belosProblemW));
-                belosSolverResultW = belosSolverW->solve();
-                if (myRank == 0) {
-                    if (belosSolverResultW == Belos::Converged)
-                        logger.log("belos converged");
-                    else
-                        logger.wrn("belos did not converge");
-                }
-                for (size_t i = 0; i < m; ++i) surf_curl_u.Data[i] = surf_curl_u_epetra[i];
+                auto belosParamsW = parameterList();
+                belosParamsW->set("Maximum Iterations", 1000);
+                belosParamsW->set("Convergence Tolerance", 1e-8);
+                belosParamsW->set("Output Frequency", 10);
+                belosParamsW->set("Verbosity", Errors + Warnings + StatusTestDetails);
+                belosParamsW->set<int>("Output Style", Brief);
+                auto belosSolverW = belosFactory.create("CG", belosParamsW);
+                ReturnType belosSolverResultW;
+                auto projectVorticity = [&]() {
+                    auto mtx = static_cast<MT>(MatrixCL(1., mM_p.Data, -1., mC_p.Data));
+                    auto rhs = static_cast<SV>(mQ.Data * u.Data);
+                    auto sln = static_cast<SV>(surf_curl_u.Data);
+                    sln.PutScalar(0.);
+                    LinearProblem<ST, MV, OP> belosProblemW(rcpFromRef(mtx), rcpFromRef(sln), rcpFromRef(rhs));
+                    belosProblemW.setProblem();
+                    belosSolverW->setProblem(rcpFromRef(belosProblemW));
+                    belosSolverResultW = belosSolverW->solve();
+                    if (belosSolverResultW == Converged) logger.log("belos converged");
+                    else logger.wrn("belos did not converge");
+                    for (size_t i = 0; i < m; ++i) surf_curl_u.Data[i] = sln[i];
+                };
+                projectVorticity();
             auto projectTime = logger.end();
-        auto stepTime = logger.end();
-        logger.beg("output");
-            auto exportStats = [&](size_t i) {
-                std::ofstream stats(dirName + "/stats/t_" + std::to_string(i) + ".json");
-                ParamCL tJSON;
-                auto res = residual(u.Data, p.Data);
-                tJSON.put("Solver.Outer.ResidualNorm.TrueAbsolute.Velocity", std::get<0>(res));
-                tJSON.put("Solver.Outer.ResidualNorm.TrueAbsolute.Pressure", std::get<1>(res));
-                tJSON.put("Solver.Outer.ResidualNorm.TrueAbsolute.Full", std::get<2>(res));
-                tJSON.put("Solver.Outer.ResidualNorm.b", b_norm);
-                tJSON.put("Solver.Outer.ResidualNorm.r_0", r0_norm);
-                tJSON.put("Solver.Outer.ResidualNorm.r_i/b", std::get<2>(res) / b_norm);
-                tJSON.put("Solver.Outer.ResidualNorm.r_i/r_0", std::get<2>(res) / r0_norm);
-                tJSON.put("Solver.Outer.ResidualNorm.SolverRelative", belosSolver->achievedTol());
-                tJSON.put("Solver.Outer.TotalIters", belosSolver->getNumIters());
-                tJSON.put("Solver.Outer.DOF", n + m);
-                tJSON.put("Solver.Outer.Converged", belosSolverResult == Belos::Converged);
-                tJSON.put("Solver.ProjectVorticity.TotalIters", belosSolverW->getNumIters());
-                tJSON.put("Solver.ProjectVorticity.Converged", belosSolverResultW == Belos::Converged);
-                tJSON.put("Solver.ProjectVorticity.ResidualNormRelative", belosSolverW->achievedTol());
-                tJSON.put("ElapsedTime.LinearSolve", solveTime);
-                tJSON.put("ElapsedTime.LinearSolveWasted", solveWastedTime);
-                tJSON.put("ElapsedTime.Assemble", assembleTime);
-                tJSON.put("ElapsedTime.ProjectVorticity", projectTime);
-                tJSON.put("ElapsedTime.Factorization", factorizationTime);
-                tJSON.put("ElapsedTime.TimeStep", stepTime);
-                tJSON.put("Solver.Inner.A.Factorize", factorize);
-                tJSON.put("Solver.Inner.A.TotalIters", numItersA);
-                tJSON.put("Solver.Inner.A.MeanIters", static_cast<double>(numItersA) / belosSolver->getNumIters());
-                tJSON.put("Solver.Inner.A.DOF", n);
-                tJSON.put("Solver.Inner.S.TotalIters.S_M", numItersS_M);
-                tJSON.put("Solver.Inner.S.TotalIters.S_L", numItersS_L);
-                tJSON.put("Solver.Inner.S.MeanIters.S_M", static_cast<double>(numItersS_M) / belosSolver->getNumIters());
-                tJSON.put("Solver.Inner.S.MeanIters.S_L", static_cast<double>(numItersS_L) / belosSolver->getNumIters());
-                tJSON.put("Solver.Inner.S.DOF", m);
-                auto t = i * stepSize;
-                tJSON.put("Time", t);
-                tJSON.put("h", h);
-                tJSON.put("Peclet", Pe);
-                tJSON.put("MeshDepParams.rho_p", rho_p);
-                tJSON.put("MeshDepParams.rho_u", rho_u);
-                tJSON.put("MeshDepParams.tau_u", tau_u);
-                auto velL2 = sqrt(dot(u.Data, surfOseenSystem.M.Data * u.Data));
-                auto preL2 = sqrt(dot(p.Data, surfOseenSystem.M_p.Data * p.Data));
-                tJSON.put("Integral.PressureL2", preL2);
-                tJSON.put("Integral.VelocityL2", velL2);
-                tJSON.put("Integral.VelocitySurfaceDivergenceL2", sqrt(dot(u.Data, surfOseenSystem.AL.Data * u.Data)));
-                tJSON.put("Integral.KineticEnergy", .5 * velL2 * velL2);
-                if (surfNavierStokesData.exactSoln) {
-                    InitVector(mg, u_star, surfNavierStokesData.u_T, t);
-                    InitScalar(mg, p_star, surfNavierStokesData.p, t);
-                    res = residual(u_star.Data, p_star.Data);
-                    tJSON.put("Solver.Outer.ResidualNorm.ExactSolnAbsolute.Velocity", std::get<0>(res));
-                    tJSON.put("Solver.Outer.ResidualNorm.ExactSolnAbsolute.Pressure", std::get<1>(res));
-                    tJSON.put("Solver.Outer.ResidualNorm.ExactSolnAbsolute.Full", std::get<2>(res));
-                    VectorCL u_star_minus_u = u_star.Data - u.Data, p_star_minus_p = p_star.Data - p.Data;
-                    auto velL2err = dot(u_star_minus_u, surfOseenSystem.M.Data * u_star_minus_u);
-                    auto velNormalL2 = dot(u.Data, surfOseenSystem.S.Data * u.Data);
-                    auto velTangenL2 = sqrt(velL2err - velNormalL2);
-                    velL2err = sqrt(velL2err);
-                    velNormalL2 = sqrt(velNormalL2);
-                    auto velH1err = sqrt(dot(u_star_minus_u, surfOseenSystem.A.Data * u_star_minus_u));
-                    auto preL2err = sqrt(dot(p_star_minus_p, surfOseenSystem.M_p.Data * p_star_minus_p));
-                    tJSON.put("Integral.Error.VelocityL2", velL2err);
-                    tJSON.put("Integral.Error.VelocityTangentialL2", velTangenL2);
-                    tJSON.put("Integral.Error.VelocityNormalL2", velNormalL2);
-                    tJSON.put("Integral.Error.VelocityH1", velH1err);
-                    tJSON.put("Integral.Error.PressureL2", preL2err);
-                }
-                if (inpJSON.get<bool>("SurfNavStokes.ExportMatrices")) {
-                    std::string format = inpJSON.get<std::string>("SurfNavStokes.ExportMatricesFormat") == "mtx" ? ".mtx" : ".mat";
-                    auto expFunc = format == ".mtx" ? &MatrixCL::exportMTX : &MatrixCL::exportMAT;
-                    auto expMat = [&](MatrixCL& A, std::string const a, std::string const & b) {
-                        logger.beg(a);
-                            logger.buf << "size: " << A.num_rows() << "x" << A.num_cols();
+            logger.beg("output");
+                double Pe, alpha, b_norm, r0_norm, solveTime, solveWastedTime;
+                ReturnType belosSolverResult;
+                auto residual = [&](VectorCL const & u, VectorCL const & p) {
+                    auto velResSq = norm_sq(A_sum * u + B_T * p - vF.Data);
+                    auto preResSq = norm_sq(mB.Data * u + mC_p.Data * p - vG.Data);
+                    return std::tuple<double, double, double>(sqrt(velResSq), sqrt(preResSq), sqrt(velResSq + preResSq));
+                };
+                auto exportStats = [&](size_t i) {
+                    std::ofstream stats(dirName + "/stats/t_" + std::to_string(i) + ".json");
+                    ParamCL tJSON;
+                    tJSON.put("Time", t);
+                    tJSON.put("h", h);
+                    tJSON.put("nu", nu);
+                    tJSON.put("gamma", gamma);
+                    tJSON.put("MeshDepParams.rho_p", rho_p);
+                    tJSON.put("MeshDepParams.rho_u", rho_u);
+                    tJSON.put("MeshDepParams.tau_u", tau_u);
+                    tJSON.put("ElapsedTime.Assemble", assembleTime);
+                    tJSON.put("ElapsedTime.ProjectVorticity", projectTime);
+                    tJSON.put("Solver.ProjectVorticity.TotalIters", belosSolverW->getNumIters());
+                    tJSON.put("Solver.ProjectVorticity.Converged", belosSolverResultW == Converged);
+                    tJSON.put("Solver.ProjectVorticity.ResidualNormRelative", belosSolverW->achievedTol());
+                    auto surfArea = dot(I_p, mM_p.Data * I_p);
+                    tJSON.put("Integral.SurfacaArea", surfArea);
+                    tJSON.put("Integral.PressureMean", dot(I_p, mM_p.Data * p.Data) / surfArea);
+                    tJSON.put("Integral.PressureL2", sqrt(dot(p.Data, mM_p.Data * p.Data)));
+                    auto velL2Sq = dot(u.Data, mM.Data * u.Data);
+                    tJSON.put("Integral.KineticEnergy", .5 * velL2Sq);
+                    tJSON.put("Integral.VelocityL2", sqrt(velL2Sq));
+                    tJSON.put("Integral.VelocitySurfaceDivergenceL2", sqrt(dot(u.Data, mAL.Data * u.Data)));
+                    tJSON.put("Integral.VelocityNormalL2", sqrt(dot(u.Data, mS.Data * u.Data)));
+                    auto vorL2Sq = dot(surf_curl_u.Data, mM_p.Data * surf_curl_u.Data);
+                    tJSON.put("Integral.Enstrophy", .5 * vorL2Sq);
+                    tJSON.put("Integral.SurfaceVorticityL2", sqrt(vorL2Sq));
+                    auto vorH1Sq = dot(surf_curl_u.Data, mA_p.Data * surf_curl_u.Data);
+                    tJSON.put("Integral.Palinstrophy", .5 * vorH1Sq);
+                    tJSON.put("Integral.SurfaceVorticityH1", sqrt(vorH1Sq));
+                    if (surfNavierStokesData.exactSoln) {
+                        InitVector(mg, u_star, surfNavierStokesData.u_T, t);
+                        InitScalar(mg, p_star, surfNavierStokesData.p, t);
+                        p_star.Data -= dot(mM_p.Data * p_star.Data, I_p) / dot(mM_p.Data * I_p, I_p) * I_p;
+                        tJSON.put("Integral.Exact.PressureMean", dot(I_p, mM_p.Data * p_star.Data) / surfArea);
+                        tJSON.put("Integral.Exact.PressureL2", sqrt(dot(p_star.Data, mM_p.Data * p_star.Data)));
+                        auto velL2Sq = dot(u_star.Data, mM.Data * u_star.Data);
+                        tJSON.put("Integral.Exact.KineticEnergy", .5 * velL2Sq);
+                        tJSON.put("Integral.Exact.VelocityL2", sqrt(velL2Sq));
+                        tJSON.put("Integral.Exact.VelocitySurfaceDivergenceL2", sqrt(dot(u_star.Data, mAL.Data * u_star.Data)));
+                        tJSON.put("Integral.Exact.VelocityNormalL2", sqrt(dot(u_star.Data, mS.Data * u_star.Data)));
+                        auto u_diff = u_star.Data - u.Data;
+                        tJSON.put("Integral.Error.VelocityL2", sqrt(dot(u_diff, mM.Data * u_diff)));
+                        tJSON.put("Integral.Error.VelocityH1", sqrt(dot(u_diff, mA.Data * u_diff)));
+                        auto p_diff = p_star.Data - p.Data;
+                        tJSON.put("Integral.Error.PressureL2", sqrt(dot(p_diff, mM_p.Data * p_diff)));
+                        if (i > 0) {
+                            auto && [velRes, preRes, fullRes] = residual(u_star.Data, p_star.Data);
+                            tJSON.put("Solver.Outer.ResidualNorm.ExactSolnAbsolute.Velocity", velRes);
+                            tJSON.put("Solver.Outer.ResidualNorm.ExactSolnAbsolute.Pressure", preRes);
+                            tJSON.put("Solver.Outer.ResidualNorm.ExactSolnAbsolute.Full", fullRes);
+                        }
+                    }
+                    if (i > 0) {
+                        auto && [velRes, preRes, fullRes] = residual(u.Data, p.Data);
+                        tJSON.put("Solver.Outer.ResidualNorm.TrueAbsolute.Velocity", velRes);
+                        tJSON.put("Solver.Outer.ResidualNorm.TrueAbsolute.Pressure", preRes);
+                        tJSON.put("Solver.Outer.ResidualNorm.TrueAbsolute.Full", fullRes);
+                        tJSON.put("Solver.Outer.ResidualNorm.b", b_norm);
+                        tJSON.put("Solver.Outer.ResidualNorm.r_0", r0_norm);
+                        tJSON.put("Solver.Outer.ResidualNorm.r_i/b", fullRes / b_norm);
+                        tJSON.put("Solver.Outer.ResidualNorm.r_i/r_0", fullRes / r0_norm);
+                        tJSON.put("Solver.Outer.ResidualNorm.SolverRelative", belosSolver->achievedTol());
+                        tJSON.put("Solver.Outer.TotalIters", belosSolver->getNumIters());
+                        tJSON.put("Solver.Outer.DOF", n + m);
+                        tJSON.put("Solver.Outer.Converged", belosSolverResult == Converged);
+                        tJSON.put("ElapsedTime.LinearSolve", solveTime);
+                        tJSON.put("ElapsedTime.LinearSolveWasted", solveWastedTime);
+                        tJSON.put("ElapsedTime.Factorization", factorizationTime);
+                        tJSON.put("Solver.Inner.A.TotalIters", numItersA);
+                        tJSON.put("Solver.Inner.A.MeanIters", static_cast<double>(numItersA) / belosSolver->getNumIters());
+                        tJSON.put("Solver.Inner.A.DOF", n);
+                        tJSON.put("Solver.Inner.S.TotalIters.S_M", numItersS_M);
+                        tJSON.put("Solver.Inner.S.TotalIters.S_L", numItersS_L);
+                        tJSON.put("Solver.Inner.S.MeanIters.S_M", static_cast<double>(numItersS_M) / belosSolver->getNumIters());
+                        tJSON.put("Solver.Inner.S.MeanIters.S_L", static_cast<double>(numItersS_L) / belosSolver->getNumIters());
+                        tJSON.put("Solver.Inner.S.DOF", m);
+                        tJSON.put("Peclet", Pe);
+                        tJSON.put("MassMatrixCoef", alpha);
+                        if (inpJSON.get<bool>("SurfNavStokes.ExportMatrices")) {
+                            std::string format = inpJSON.get<std::string>("SurfNavStokes.ExportMatricesFormat") == "mtx" ? ".mtx" : ".mat";
+                            auto expFunc = format == ".mtx" ? &MatrixCL::exportMTX : &MatrixCL::exportMAT;
+                            auto expMat = [&](MatrixCL &A, std::string const a, std::string const &b) {
+                                logger.beg(a);
+                                logger.buf << "size: " << A.num_rows() << "x" << A.num_cols();
+                                logger.log();
+                                (A.*expFunc)(dirName + "/matrices/" + b + format);
+                                tJSON.put("Matrices." + a, "../matrices/" + b + format);
+                                logger.end();
+                            };
+                            expMat(mA_p.Data, "PressureStiffness", "A_p");
                             logger.log();
-                            (A.*expFunc)(dirName + "/matrices/" + b + format);
-                            tJSON.put("Matrices." + a, "../matrices/" + b + format);
-                        logger.end();
-                    };
-                    // MatrixCL K;
-                    // K.LinComb(1., surfOseenSystem.A.Data, tau_u, surfOseenSystem.S.Data, rho_u, surfOseenSystem.A_stab.Data);
-                    // expMat(K, "VelocityKornMatrix", "A");
-                    // expMat(surfOseenSystem.M.Data, "VelocityMassMatrix", "M");
-                    // expMat(surfOseenSystem.sumA.Data, "DiffusionConvectionReaction", "A");
-                    // expMat(surfOseenSystem.B.Data, "Divergence", "B");
-                    // expMat(surfOseenSystem.C.Data, "PressureVolumeStab", "C");
-                    expMat(surfOseenSystem.A_p.Data, "PressureStiffness", "A_p");
-                    logger.log();
-                }
-                if (everyStep > 0 && (i-1) % everyStep == 0) {
-                    logger.beg("write vtk");
-                        writeVTK(t);
-                    auto vtkTime = logger.end();
+                        }
+                    }
+                    auto vtkTime = 0.;
+                    if (everyStep > 0 && (i == 0 || i == numSteps || (i - 1) % everyStep == 0)) {
+                        logger.beg("write vtk");
+                            vtkWriter.write(t);
+                        vtkTime = logger.end();
+                    }
                     tJSON.put("ElapsedTime.VTK", vtkTime);
-                }
-                stats << tJSON;
-                logger.buf << tJSON;
-                logger.log();
-            };
-            exportStats(1);
+                    stats << tJSON;
+                    logger.buf << tJSON;
+                    logger.log();
+                    numItersA = numItersS_M = numItersS_L = 0;
+                    factorizationTime = solveWastedTime = 0.;
+                };
+                exportStats(0);
+            logger.end();
         logger.end();
-        // no need to re-assemble these matrices:
-        surfOseenSystem.A.assemble = false;
-        surfOseenSystem.A_stab.assemble = false;
-        surfOseenSystem.B.assemble = false;
-        surfOseenSystem.M.assemble = false;
-        surfOseenSystem.S.assemble = false;
-        surfOseenSystem.M_p.assemble = false;
-        surfOseenSystem.C.assemble = false;
-        // surfOseenSystem.LB.assemble = false;
-        // surfOseenSystem.LB_stab.assemble = false;
-        for (size_t i = 2; i <= numbOfSteps; ++i) {
-            numItersA = 0;
-            numItersS_M = 0;
-            numItersS_L = 0;
-            std::stringstream header;
-            header << "t = t_" << i << " (" << (100. * i) / numbOfSteps << "%)";
+        for (size_t i = 1; i <= numSteps; ++i) {
+            t = i * stepSize;
+            std::stringstream header; header << "t = t_" << i << " = " << t << " (" << (100. * i) / numSteps << "%)";
             logger.beg(header.str());
-                param.input.t = i * stepSize;
                 logger.beg("initialize surface speed $u_N$");
-                    // TODO: solve PDE for $u_N$ here . . .
-                    InitScalar(mg, surfOseenSystem.u_N, surfNavierStokesData.surface.u_N, param.input.t);
+                    InitScalar(mg, u_N, surfNavierStokesData.surface.u_N, t);
                 logger.end();
                 logger.beg("assemble");
-                    u_prev_prev = u_prev;
-                    u_prev = u;
-                    auto wind_prev = wind;
-                    wind = u_prev.Data;
-                    wind *= 2.;
-                    wind -= u_prev_prev.Data;
-                    setWind(wind);
-                    Pe = supnorm(surfOseenSystem.w_T.Data) / nu;
-                    alpha = 1.5 / stepSize;
+                    if (surfNavierStokesData.w_T) InitVector(mg, w_T, surfNavierStokesData.w_T, t); // Oseen (and Stokes) case
+                    else w_T.Data = 2. * u.Data - u_prev.Data; // Navier-Stokes case
+                    Pe = supnorm(w_T.Data) / nu;
+                    alpha = i == 1 ? 1. / stepSize : 1.5 / stepSize;
                     logger.buf
                         << "$\\alpha$ = " << alpha << '\n'
                         << "Pe = " << Pe;
                     logger.log();
-                    param.input.alpha = alpha;
-                    SetupSurfOseen_P2P1(mg, lset, &surfOseenSystem, &param);
-                    transpose(surfOseenSystem.B.Data, B_T);
-                    surfOseenSystem.gRHS.Data -= (dot(surfOseenSystem.gRHS.Data, I_p) / dot(I_p, I_p)) * I_p;
-                    surfOseenSystem.fRHS.Data += (2. / stepSize) * (surfOseenSystem.M.Data * u_prev.Data) - (.5 / stepSize) * (surfOseenSystem.M.Data * u_prev_prev.Data);
-                    surfOseenSystem.sumA.Data.LinComb(alpha, surfOseenSystem.M.Data, gamma, surfOseenSystem.AL.Data, 1., surfOseenSystem.N.Data, 1., surfOseenSystem.H.Data, nu, surfOseenSystem.A.Data, tau_u, surfOseenSystem.S.Data, rho_u, surfOseenSystem.A_stab.Data);
-                    surfOseenSystem.C.Data *= -rho_p;
-                    S_M_tmp.LinComb(1. / (gamma + nu), surfOseenSystem.M_p.Data, -1., surfOseenSystem.C.Data);
-                    S_L_tmp.LinComb(1. / alpha, surfOseenSystem.A_p.Data, -1., surfOseenSystem.C.Data);
+                    surfOseenSystem.matrices = { &mN, &mH };
+                    surfOseenSystem.vectors = { &vF, &vG };
+                    setupFESystem(mg, surfOseenSystem);
+                    vG.Data -= (dot(vG.Data, I_p) / dot(I_p, I_p)) * I_p;
+                    if (i == 1) vF.Data += (1. / stepSize) * (mM.Data * u.Data);
+                    else vF.Data += (2. / stepSize) * (mM.Data * u.Data) - (.5 / stepSize) * (mM.Data * u_prev.Data);
+                    A_sum.LinComb(alpha, mM.Data, gamma, mAL.Data, 1., mN.Data, 1., mH.Data, nu, mA.Data, tau_u, mS.Data, rho_u, mC.Data);
+                    u_prev = u;
                 assembleTime = logger.end();
                 logger.beg("convert to Epetra");
-                    logger.beg("cast matrices");
-                        A = static_cast<MT>(surfOseenSystem.sumA.Data);
+                        A = static_cast<MT>(A_sum);
+                        auto printStat = [&](std::string const & name, MT const & A) {
+                            logger.buf << name << ": " << A.NumGlobalRows() << 'x' << A.NumGlobalCols() << ", " << A.NumGlobalNonzeros() << " nonzeros";
+                            if (A.NumGlobalNonzeros()) logger.buf << " (" << (100. * A.NumGlobalNonzeros()) / (static_cast<double>(A.NumGlobalRows()) * A.NumGlobalCols()) << "%)";
+                            logger.log();
+                        };
                         printStat("A", A);
-                        for (size_t i : { 0, 1, 2 })
-                            for (size_t j : { 0, 1, 2 })
-                                A_block[i][j] = static_cast<MT>(surfOseenSystem.sumA_block.block[i][j].Data);
-                        printStat("A_{ii}", A_block[0][0]);
-                        if (surfOseenSystem.sumA_block.build)
-                            checkA_block();
-                        B = static_cast<MT>(surfOseenSystem.B.Data);
+                        B = static_cast<MT>(mB.Data);
                         printStat("B", B);
-                        C = static_cast<MT>(surfOseenSystem.C.Data);
+                        C = static_cast<MT>(mC_p.Data);
                         printStat("C := -rho_p (pressure volume stabilization mtx)", C);
-                        S_M = static_cast<MT>(S_M_tmp);
+                        S_M = static_cast<MT>(MatrixCL(1. / (gamma + nu), mM_p.Data, -1., mC_p.Data));
                         printStat("S_M := (\\nu + \\gamma)^{-1} M_p - C", S_M);
-                        S_L = static_cast<MT>(S_L_tmp);
+                        S_L = static_cast<MT>(MatrixCL(1. / alpha, mA_p.Data, -1., mC_p.Data));
                         printStat("S_L := \\alpha^{-1} L_p - C", S_L);
-                    logger.end();
-                    logger.beg("cast rhs vectors");
-                        fRHS = static_cast<Epetra_Vector>(surfOseenSystem.fRHS.Data);
-                        gRHS = static_cast<Epetra_Vector>(surfOseenSystem.gRHS.Data);
-                        joinEpetraVectors(fRHS, gRHS, belosRHS);
-                    logger.end();
+                        belosRHS = static_cast<SV>(vF.Data.append(vG.Data));
                 logger.end();
-                factorizationTime = 0.;
-                factorize = "No";
-                if (useAmesos) {
-                    if (reFactorizeTol >= 0. && norm(wind - wind_prev) > reFactorizeTol * std::max(norm(wind), norm(wind_prev))) {
-                        factorize = "Yes";
-                        runFactorization();
-                    }
-                    else logger.log("using factorization from prev step");
-                }
                 logger.beg("linear solve");
-                    b_norm = sqrt(norm_sq(surfOseenSystem.fRHS.Data) + norm_sq(surfOseenSystem.gRHS.Data));
-                    r0_norm = std::get<2>(residual(u.Data, p.Data));
-                    if (inpJSON.get<bool>("Solver.UsePreviousFrameAsInitialGuess")) {
-                        auto rel_tol = inpJSON.get<double>("Solver.Outer.RelResTol") * b_norm / r0_norm;
-                        belosParams->set("Convergence Tolerance", rel_tol);
+                    b_norm = sqrt(norm_sq(vF.Data) + norm_sq(vG.Data));
+                    if (usePrevGuess) {
+                        r0_norm = std::get<2>(residual(u.Data, p.Data));
+                        belosLHS = static_cast<SV>(u.Data.append(p.Data));
+                        belosParams->set("Convergence Tolerance", inpJSON.get<double>("Solver.Outer.RelResTol") * b_norm / r0_norm);
                         belosSolver = belosFactory.create(inpJSON.get<std::string>("Solver.Outer.Iteration"), belosParams);
-                    } else belosLHS.PutScalar(0.);
-                    belosProblem = LinearProblem<ST, MV, OP>(belosMTX, rcpFromRef(belosLHS), rcpFromRef(belosRHS));
-                    if (inpJSON.get<bool>("Solver.Inner.Use")) belosProblem.setRightPrec(belosPRE);
+                    } else {
+                        r0_norm = b_norm;
+                        belosLHS.PutScalar(0.);
+                    }
+                    if (useInnerIters && i == 1) runFactorization();
                     belosProblem.setProblem();
                     belosSolver->setProblem(rcpFromRef(belosProblem));
-                    std::cout << std::scientific;
                     belosSolverResult = belosSolver->solve();
                 solveTime = logger.end();
-                if (belosSolverResult == Belos::Converged) {
-                    logger.log("belos converged");
-                    solveWastedTime = 0.;
-                }
+                if (belosSolverResult == Converged) logger.log("belos converged");
                 else {
                     logger.wrn("belos did not converge");
-                    solveWastedTime = solveTime;
-                    if (inpJSON.get<bool>("Solver.Inner.Use") && useAmesos && factorize == "No") {
-                        factorize = "NoThenYes";
+                    if (useInnerIters && i > 1) {
+                        solveWastedTime = solveTime;
                         numItersA = numItersS_M = numItersS_L = 0;
                         runFactorization();
                         logger.beg("linear solve w/ new factorization");
-                            if (inpJSON.get<bool>("Solver.UsePreviousFrameAsInitialGuess")) {
-                                for (size_t i = 0; i < n; ++i) belosLHS[i] = u.Data[i];
-                                for (size_t i = 0; i < m; ++i) belosLHS[n + i] = p.Data[i];
-                            } else belosLHS.PutScalar(0.);
+                            if (usePrevGuess) belosLHS = static_cast<SV>(u.Data.append(p.Data));
+                            else belosLHS.PutScalar(0.);
+                            belosProblem.setProblem();
                             belosSolver->setProblem(rcpFromRef(belosProblem));
                             belosSolverResult = belosSolver->solve();
-                            if (belosSolverResult == Belos::Converged) logger.log("belos converged");
+                            if (belosSolverResult == Converged) logger.log("belos converged");
                             else logger.wrn("belos did not converge");
                         solveTime = logger.end();
                     }
@@ -1041,27 +664,14 @@ int main(int argc, char* argv[]) {
                 logger.beg("convert from Epetra");
                     for (size_t i = 0; i < n; ++i) u.Data[i] = belosLHS[i];
                     for (size_t i = 0; i < m; ++i) p.Data[i] = belosLHS[n + i];
-                    p.Data -= dot(surfOseenSystem.M_p.Data * p.Data, I_p) / dot(surfOseenSystem.M_p.Data * I_p, I_p) * I_p;
+                    p.Data -= dot(mM_p.Data * p.Data, I_p) / dot(mM_p.Data * I_p, I_p) * I_p;
                 logger.end();
                 logger.beg("project surface vorticity");
-                    Q_times_u = surfOseenSystem.Q.Data * u.Data;
-                    auto Q_times_u_view_curr = static_cast<Epetra_Vector>(Q_times_u);
-                    surf_curl_u_epetra.PutScalar(0.);
-                    belosProblemW = LinearProblem<ST, MV, OP>(rcpFromRef(M), rcpFromRef(surf_curl_u_epetra), rcpFromRef(Q_times_u_view_curr));
-                    belosProblemW.setProblem();
-                    belosSolverW->setProblem(rcpFromRef(belosProblemW));
-                    belosSolverResultW = belosSolverW->solve();
-                    if (myRank == 0) {
-                        if (belosSolverResultW == Belos::Converged)
-                            logger.log("belos converged");
-                        else
-                            logger.wrn("belos did not converge");
-                    }
-                    for (size_t i = 0; i < m; ++i) surf_curl_u.Data[i] = surf_curl_u_epetra[i];
+                    projectVorticity();
                 projectTime = logger.end();
-            stepTime = logger.end();
-            logger.beg("output");
-                exportStats(i);
+                logger.beg("output");
+                    exportStats(i);
+                logger.end();
             logger.end();
         }
         #ifdef HAVE_MPI

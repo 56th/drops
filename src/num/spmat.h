@@ -96,17 +96,25 @@ class VectorBaseCL: public std::valarray<T>
             #endif
             Epetra_Map map(static_cast<int>(this->size()), 0, comm);
             double* view = const_cast<double*>(&(*this)[0]);
-            Epetra_Vector result(View, map, view);
+            Epetra_Vector result(Copy, map, view);
             return result;
         }
     #endif
-#ifdef VALARRAY_BUG
-    VectorBaseCL (size_t s)             : base_type( T(),s) {}
-#else
-    VectorBaseCL (size_t s)             : base_type( s)     {}
-#endif
+    #ifdef VALARRAY_BUG
+        VectorBaseCL (size_t s)             : base_type( T(),s) {}
+    #else
+        VectorBaseCL (size_t s)             : base_type( s)     {}
+    #endif
     VectorBaseCL (T c, size_t s)        : base_type( c, s)  {}
     VectorBaseCL (const T* tp, size_t s): base_type( tp, s) {}
+
+    VectorBaseCL& append(VectorBaseCL const & v) {
+        base_type res(this->size() + v.size());
+        for (size_t i = 0; i < this->size(); ++i) res[i] = (*this)[i];
+        for (size_t i = 0; i < v.size(); ++i) res[this->size() + i] = v[i];
+        *this = res;
+        return *this;
+    }
 
 DROPS_DEFINE_VALARRAY_DERIVATIVE( VectorBaseCL, T, base_type)
 
@@ -699,6 +707,10 @@ public:
 
     SparseMatBaseCL(); ///< empty zero-matrix
     SparseMatBaseCL(const SparseMatBaseCL&);
+    template <typename ...Args>
+    SparseMatBaseCL(double a, SparseMatBaseCL const & A, double b, SparseMatBaseCL const & B, Args... args) : SparseMatBaseCL(A) {
+        LinComb(a, A, b, B, args...);
+    }
     ~SparseMatBaseCL();
     SparseMatBaseCL(size_t rows, size_t cols, size_t nnz); ///< the fields are allocated, but not initialized
     SparseMatBaseCL(const std::valarray<T>&); ///< Creates a square diagonal matrix.

@@ -13,7 +13,7 @@ namespace DROPS {
 
     struct SurfNavierStokesData {
         bool exactSoln;
-        InstatVectorFunction u_T, f_T, w_T = nullptr; // w_T = nullptr for the Navier-Stokes case
+        InstatVectorFunction u_T, f_T, w_T = nullptr; // w = nullptr for the Navier-Stokes case
         InstatScalarFunction p, m_g; // m_g is "-g"
         struct Surface {
             InstatScalarFunction phi, u_N;
@@ -32,8 +32,9 @@ namespace DROPS {
         return sign(y) * M_PI / 2.;
     }
 
-    SurfNavierStokesData SurfNavierStokesDataFactory(std::string const & test, double nu, ParamCL const & param) {
+    SurfNavierStokesData SurfNavierStokesDataFactory(std::string const & test, ParamCL const & param) {
         SurfNavierStokesData data;
+        auto nu = param.get<double>("SurfNavStokes.nu");
         if (test.find("Sphere") != std::string::npos) {
             data.description = "phi = x^2 + y^2 + z^2 - 1\n";
             data.surface.u_N = [](Point3DCL const &, double) {
@@ -91,15 +92,6 @@ namespace DROPS {
                 return 0.;
             };
             data.surface.phi = [=](Point3DCL const & p, double) {
-                // auto xi = arctan(p[0], std::fabs(p[1]));
-                // auto r = r_0 * (M_PI - xi) / M_PI + r_1 * xi / M_PI;
-                // auto xi = arctan(p[0],p[1]);
-                // auto r = r_1 + (r_0 - r_1) / (M_PI * M_PI) * (xi - M_PI) * (xi - M_PI);
-                // auto xi = arctan(p[0], p[1]);
-                // auto r = (r_1 - r_0) / M_PI * std::sqrt(M_PI * M_PI - (xi - M_PI) * (xi - M_PI)) + r_0;
-                // auto xi = arctan(p[0], std::fabs(p[1]));
-                // double r, dr, d2r, d3r;
-                // hermite_cubic_value(0., r_0, 0., M_PI, r_1, 0., 1, &xi, &r, &dr, &d2r, &d3r);
                 auto r = r_0 + .5 * (r_1 - r_0) * (1. - p[0] / std::sqrt(p[0] * p[0] + p[1] * p[1]));
                 return std::pow(norm_sq(p) + R * R - r * r, 2.) - 4. * R * R * (std::pow(p[0], 2.) + std::pow(p[1], 2.));
             };
@@ -229,36 +221,6 @@ namespace DROPS {
                     return v;
                 };
             }
-        }
-        else if (test == "KelvinHelmholtzSphere") {
-            data.exactSoln = false;
-            data.description += "u_0 = Kelvin-Helmholtz, p = 0\n";
-            auto ang = [](double x, double y) {
-                auto pi = 3.1415926535897932;
-                if (x > 0 && y >= 0) return std::atan(y/x);
-                if (x > 0 && y < 0)  return std::atan(y/x) + 2. * pi;
-                if (x < 0)           return std::atan(y/x) + pi;
-                return sign(y) * pi / 2.;
-            };
-            auto freq = param.get<double>("SurfNavStokes.IC." + test + ".Frequency");
-            auto ampl = param.get<double>("SurfNavStokes.IC." + test + ".Amplitude");
-            data.u_T = [=](Point3DCL const & p, double) {
-                Point3DCL v(0., 0., 0.);
-                auto x = p / norm(p);
-                if (x[2] < ampl * std::sin(freq * ang(x[0], x[1]))) return v;
-                v[0] = -x[1];
-                v[1] = x[0];
-                return v;
-            };
-            data.p = [](Point3DCL const &, double) {
-                return 0.;
-            };
-            data.f_T = [=](Point3DCL const & p, double) {
-                return Point3DCL(0., 0., 0.);
-            };
-            data.m_g = [](Point3DCL const & p, double) {
-                return 0.;
-            };
         }
         else if (test.find("KelvinHelmholtzCristoph") != std::string::npos) {
             data.description += "u_0 = Kelvin-Helmholtz, p = 0\n";

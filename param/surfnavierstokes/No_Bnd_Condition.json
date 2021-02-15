@@ -1,12 +1,15 @@
 {
     "Output": {
-      "Directory":  "/scratch/alex/tor_kh6_1280_8_nu=1e-5",
-      "EveryStep":  100,
-      "Binary":     true
+      "Directory":  "../../output/tmp",
+      "EveryStep":  1,
+      "Binary":     true,
+      "Velocity": false,
+      "Vorticity": true,
+      "Pressure": false
     },
 
     "Mesh": {
-        "Type": "BrickBuilder", 
+        "Type": "BrickBuilder",
         "Origin": [-1.66666,-1.66666,-1.66666],
         "E1": [3.33333, 0,0],
         "E2": [0,3.33333,0],
@@ -16,11 +19,11 @@
         "N3": 2,
         "RestartFile": "",
         "AdaptRef": {
-            "_comment":      "# adaptive refinement",
+            "Comment":      "adaptive refinement",
             "Freq":          0,
             "Width":         0,
             "CoarsestLevel": 0,
-            "FinestLevel":   6,
+            "FinestLevel":   4,
             "SD":            0.1,
             "CurvDiff":      -1,
             "Discontinuous": 0
@@ -28,14 +31,10 @@
     },
 
     "SurfNavStokes": {
-      "gamma" :                   1.0,
-      "nu" :                      1e-5,
+      "gamma" : 1.0,
+      "nu" :    1e-5,
       "IC" : {
         "Comment" : "initial condition parameters",
-        "KelvinHelmholtzSphere" : {
-          "Frequency" : 20.0,
-          "Amplitude" : 0.1
-        },
         "KelvinHelmholtzCristoph" : {
           "Delta_0" : 0.05,
           "cn" : 0.01,
@@ -49,35 +48,57 @@
           "a"  : 0.1
         },
         "TorusVarTube" : {
-          "R" : 1.0,
-          "r_0" : 0.3 ,
+          "R"   : 1.0,
+          "r_0" : 0.3,
           "r_1" : 0.5
         }
       },
-      "TestName":                 "KelvinHelmholtzCristophTorus",
-      "FE":                       "P2P1",
-      "PressureVolumestabType":   "normal",
+      "UseTangentialMassMatrix":  false,
+      "TestName":                 "KelvinHelmholtzCristophSphere",
+      "PressureVolumestabType":   "Normal",
       "NormalPenaltyPower":       -2,
       "NormalPenaltyFactor":      1,
       "VelocityVolumestabPower":  -1,
       "VelocityVolumestabFactor": 1,
       "PressureVolumestabPower":  1,
       "PressureVolumestabFactor": 1,
-      "Formulation":              "consistent",
-      "NumbOfVirtualSubEdges":    8,
-      "UsePatchNormals":          false,
+      "Formulation":              "Consistent",
+      "NumbOfVirtualSubEdges":    2,
       "ExportMatrices":           false,
-      "ExportMatricesFormat":     "mat",
-      "ComputeNormalErr":         false,
-      "ComputeShapeErr":          false,
-      "IntegrateRHS":             true
+      "ExportMatricesFormat":     "mat"
     },
 
     "Time": {
       "Read":         0,
       "Write":        "yes",
-      "NumbOfSteps":  1280,
-      "FinalTime":    40
+      "NumbOfSteps":  20,
+      "FinalTime":    20.0
+    },
+
+    "Solver": {
+        "UsePreviousFrameAsInitialGuess" : false,
+        "Outer" : {
+          "Iteration" : "FLEXIBLE GMRES",
+          "OutputFrequency" : 1,
+          "KrylovSubspaceSize" : 100,
+          "MaxIter" : 50,
+          "RelResTol" : 1e-8
+        },
+        "Inner" : {
+            "Use" : true,
+            "Type" : "BlockTriangular",
+            "A" : {
+              "Comment" : "use Iteration = Amesos2_* (e.g. Amesos2_Klu, Amesos2_SuperLU etc.) for the sparse-direct; Type = Full for full factorization, BlockTriangular for block Gauss-Seidel, BlockDiagonal for block Jacobi",
+              "Iteration" : "Amesos2_KLU",
+              "Type" : "Full"
+            },
+            "S" : {
+              "S_L" : true,
+              "Iteration" : "CG",
+              "MaxIter" : 200,
+              "RelResTol" : 1e-2
+            }
+        }
     },
 
     "Levelset": {
@@ -111,58 +132,29 @@
     },
 
     "Reparam": {
-        "_comment": "# re-initialization of levelset function",
+        "Comment": "re-initialization of levelset function",
         "Freq":		0,
         "Method":	1
     },
 
     "Exp": {
-        "_comment": "# experimental conditions",
+        "Comment": "experimental conditions",
         "RadDrop":		[1, 1, 1 ],
         "PosDrop":		[0, 0, 0 ],
         "Velocity":		[0, 0, 0.5 ]
     },
 
     "SurfTransp": {
-        "_comment":  "# surfactant transport",
+        "Comment":  "surfactant transport",
         "Theta":     0.5,
         "OmitBound": -1,
         "Visc":      0.05,
         "FEdegree":  2
     },
-        
+
     "TestCase":         1,
     "InitialDivisions": 2,
     "EnsightCase":      "none",
     "EnsightDir":       "CNmass-lvl3",
-    "LB":               1,
-    
-    "Solver": {
-        "UsePreviousFrameAsInitialGuess" : true,
-        "Outer" : {
-            "Iteration" : "FLEXIBLE GMRES",
-            "OutputFrequency" : 1,
-            "KrylovSubspaceSize" : 100,
-            "MaxIter" : 100,
-            "RelResTol" : 1e-6
-        },
-        "Inner" : {
-            "Use" : true,
-            "Type" : "BlockTriangular",
-            "A" : {
-              "Comment" : "use Iteration = Amesos2_* (e.g. Amesos2_Klu, Amesos2_SuperLU etc.) for the sparse-direct solver (use Type = Full for full factorization, BlockTriangular for block Gauss-Seidel, BlockDiagonal for block Jacobi); or use some Belos iterations (e.g. Iteration = CG, BICGSTAB etc.)",
-              "Type" : "BlockTriangular",
-              "Iteration" : "Amesos2_KLU",
-              "ReFactorizeTol" : 0.2,
-              "MaxIter" : 1,
-              "RelResTol" : 1e-4
-            },
-            "S" : {
-              "S_L" : true,
-              "Iteration" : "CG",
-              "MaxIter" : 200,
-              "RelResTol" : 1e-2
-            }
-        }
-    }
+    "LB":               1
 }

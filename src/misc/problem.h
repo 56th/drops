@@ -285,7 +285,7 @@ class DummyExchangeCL;
 /// are allocated and numbered by using CreateNumbering.
 class IdxDescCL: public FE_InfoCL
 {
-  private:
+private:
     static const Uint        InvalidIdx;   ///< Constant representing an invalid index.
     static std::vector<bool> IdxFree;      ///< Cache for unused indices; reduces memory-usage.
 
@@ -311,8 +311,8 @@ class IdxDescCL: public FE_InfoCL
     /// \brief Number unknowns on the vertices surrounding an interface.
     void CreateNumbNearInterface(Uint level, MultiGridCL& mg, const VecDescCL& ls, const BndDataCL<>& lsetbnd,double width, double dist=0./*default to using dof in cut tetra*/);
 public:
+    IdxDescCL* extIdx = nullptr;
     using FE_InfoCL::IsExtended;
-
     /// \brief The constructor uses the lowest available index for the
     ///     numbering. The triangulation level is initialized as 0.
     IdxDescCL( FiniteElementT fe= P1_FE, const BndCondCL& bnd= BndCondCL(0), double omit_bound=-99);
@@ -719,8 +719,6 @@ class MatDescBaseCL
     void SetIdx( const IdxDescT*, const IdxDescT*);
     /// \brief Empty Data and set the index-pointers to 0.
     void Reset();
-    /// \brief Flag used by assembly routines to decide whether to populate the mtx or not
-    bool assemble = true;
 };
 
 typedef MatDescBaseCL<MatrixCL,IdxDescCL>     MatDescCL;
