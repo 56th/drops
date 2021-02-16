@@ -187,12 +187,7 @@ int main(int argc, char* argv[]) {
             InitScalar(mg, levelSet, surfNavierStokesData.surface.phi, 0.);
         logger.end();
         logger.beg("set up FE spaces");
-            IdxDescCL velExtIdx(vecP2_FE, vecBnd); {
-                velExtIdx.GetXidx().SetBound(inpJSON.get<double>("SurfTransp.OmitBound"));
-                velExtIdx.CreateNumbering(mg.GetLastLevel(), mg);
-            }
             IdxDescCL velIdx(vecP2IF_FE, vecBnd); {
-                velIdx.extIdx = &velExtIdx;
                 velIdx.GetXidx().SetBound(inpJSON.get<double>("SurfTransp.OmitBound"));
                 auto numbOfActiveTetras = velIdx.CreateNumbering(mg.GetLastLevel(), mg, &levelSet, &lsetBnd);
                 logger.buf
@@ -200,12 +195,7 @@ int main(int argc, char* argv[]) {
                     << (100. * numbOfActiveTetras) / numbOfTetras << "%)\n";
                 logger.log();
             }
-            IdxDescCL preExtIdx(P1_FE, scaBnd); {
-                preExtIdx.GetXidx().SetBound(inpJSON.get<double>("SurfTransp.OmitBound"));
-                preExtIdx.CreateNumbering(mg.GetLastLevel(), mg);
-            }
             IdxDescCL preIdx(P1IF_FE, scaBnd); {
-                preIdx.extIdx = &preExtIdx;
                 preIdx.GetXidx().SetBound(inpJSON.get<double>("SurfTransp.OmitBound"));
                 preIdx.CreateNumbering(mg.GetLastLevel(), mg, &levelSet, &lsetBnd);
             }

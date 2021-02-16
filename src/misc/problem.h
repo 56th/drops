@@ -311,7 +311,6 @@ private:
     /// \brief Number unknowns on the vertices surrounding an interface.
     void CreateNumbNearInterface(Uint level, MultiGridCL& mg, const VecDescCL& ls, const BndDataCL<>& lsetbnd,double width, double dist=0./*default to using dof in cut tetra*/);
 public:
-    IdxDescCL* extIdx = nullptr;
     using FE_InfoCL::IsExtended;
     /// \brief The constructor uses the lowest available index for the
     ///     numbering. The triangulation level is initialized as 0.
