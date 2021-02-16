@@ -918,7 +918,7 @@ public:
         double t = 0.;
         VecDescCL levelSet;
         struct {
-            double nu = 1, gamma = 0;
+            double nu = 1, gamma = 0., Pe = 1., u_N_max = 1.;
             VecDescCL w_T, u_N;
             InstatVectorFunction f_T = nullptr; // moment rhs
             InstatScalarFunction m_g = nullptr; // - continuity eqn rhs
@@ -1064,12 +1064,14 @@ private:
             qHatP2CrossN[i] = qHatCrossN(i, qHatP2);
     }
     void buildWind() {
-        require(qNormal, &LocalAssembler::buildNormal);
-        require(qSurfSpeed, &LocalAssembler::buildSurfSpeed);
         LocalP2CL<Point3DCL> windTet;
         windTet.assign(tet, params.surfOseenParams.w_T, BndDataCL<Point3DCL>());
         resize_and_evaluate_on_vertexes(windTet, qDomain, qWind);
-        qWind += qSurfSpeed * qNormal;
+        if (params.surfOseenParams.u_N_max) {
+            require(qNormal, &LocalAssembler::buildNormal);
+            require(qSurfSpeed, &LocalAssembler::buildSurfSpeed);
+            qWind += qSurfSpeed * qNormal;
+        }
     }
     void buildSurfSpeed() {
         LocalP2CL<> uNTet;
@@ -1081,10 +1083,12 @@ private:
         resize_and_evaluate_on_vertexes(params.surfOseenParams.f_T, tet, qDomain, params.t, qF);
     }
     void buildG() {
-        require(qH, &LocalAssembler::buildShapeOp);
-        require(qSurfSpeed, &LocalAssembler::buildSurfSpeed);
         resize_and_evaluate_on_vertexes(params.surfOseenParams.m_g, tet, qDomain, params.t, qG);
-        qG += qSurfSpeed * trace(qH);
+        if (params.surfOseenParams.u_N_max) {
+            require(qH, &LocalAssembler::buildShapeOp);
+            require(qSurfSpeed, &LocalAssembler::buildSurfSpeed);
+            qG = qG + qSurfSpeed * trace(qH);
+        }
     }
 public:
     LocalAssembler(TetraCL const & tet, LocalAssemblerParams const & params) : tet(tet), params(params) {
@@ -1130,6 +1134,7 @@ public:
         return quad_2D(qHatP2[js] * take(qP, jn, in) * qHatP2[is], qDomain);
     }
     double N_vecP2P2(size_t i, size_t j) {
+        if (!params.surfOseenParams.Pe) return 0.;
         require(qHatP2[0], &LocalAssembler::buildHatP2);
         require(qGradP2[0], &LocalAssembler::buildGradP2);
         require(qP, &LocalAssembler::buildProjector);
@@ -1143,6 +1148,7 @@ public:
         return quad_2D(trace(qE[j]) * trace(qE[i]), qDomain);
     }
     double H_vecP2P2(size_t i, size_t j) {
+        if (!params.surfOseenParams.u_N_max) return 0.;
         require(qHatP2[0], &LocalAssembler::buildHatP2);
         require(qH, &LocalAssembler::buildShapeOp);
         require(qSurfSpeed, &LocalAssembler::buildSurfSpeed);
@@ -1170,6 +1176,24 @@ public:
     double F_vecP2(size_t i) {
         require(qHatP2[0], &LocalAssembler::buildHatP2);
         require(qF, &LocalAssembler::buildF);
+        auto && [ is, in ] = ind(i);
+        auto e_in = std_basis<3>(in + 1);
+        auto integrand = dot(e_in, qF);
+        integrand *= qHatP2[is];
+        if (params.surfOseenParams.u_N_max) {
+            require(qSurfSpeed, &LocalAssembler::buildSurfSpeed);
+            require(qSurfSpeedSurfGrad, &LocalAssembler::buildSurfSpeed);
+            require(qE[0], &LocalAssembler::buildRateOfStrainTensor);
+            require(qH, &LocalAssembler::buildShapeOp);
+            integrand += qSurfSpeed * dot(e_in, qSurfSpeedSurfGrad) * qHatP2[is] - params.surfOseenParams.nu * qSurfSpeed * contract(qH, qE[i]);
+        }
+        if (params.surfOseenParams.gamma) {
+            require(qG, &LocalAssembler::buildG);
+            require(qE[0], &LocalAssembler::buildRateOfStrainTensor);
+            integrand -= params.surfOseenParams.gamma * qG * trace(qE[i]);
+        }
+        return quad_2D(integrand, qDomain);
+        /*
         require(qG, &LocalAssembler::buildG);
         require(qSurfSpeed, &LocalAssembler::buildSurfSpeed);
         require(qSurfSpeedSurfGrad, &LocalAssembler::buildSurfSpeed);
@@ -1182,6 +1206,7 @@ public:
                 params.surfOseenParams.nu * qSurfSpeed * contract(qH, qE[i]) -
                 params.surfOseenParams.gamma * qG * trace(qE[i]),
             qDomain);
+        */
     }
     double B_P1vecP2(size_t i, size_t j) {
         require(qSurfGradP1[0], &LocalAssembler::buildSurfGradP1);

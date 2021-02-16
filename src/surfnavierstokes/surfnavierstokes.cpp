@@ -119,7 +119,9 @@ int main(int argc, char* argv[]) {
             auto& nu = surfOseenSystem.params.surfOseenParams.nu;
             auto& t = surfOseenSystem.params.t;
             auto& w_T = surfOseenSystem.params.surfOseenParams.w_T;
+            auto& Pe = surfOseenSystem.params.surfOseenParams.Pe;
             auto& u_N = surfOseenSystem.params.surfOseenParams.u_N;
+            auto& u_N_max = surfOseenSystem.params.surfOseenParams.u_N_max;
             auto& levelSet = surfOseenSystem.params.levelSet;
             nu = inpJSON.get<double>("SurfNavStokes.nu");
             if (nu <= 0.) throw std::invalid_argument("viscosity must be non-negative");
@@ -187,7 +189,7 @@ int main(int argc, char* argv[]) {
         logger.beg("set up FE spaces");
             IdxDescCL velExtIdx(vecP2_FE, vecBnd); {
                 velExtIdx.GetXidx().SetBound(inpJSON.get<double>("SurfTransp.OmitBound"));
-                velExtIdx.CreateNumbering(mg.GetLastLevel(), mg);                
+                velExtIdx.CreateNumbering(mg.GetLastLevel(), mg);
             }
             IdxDescCL velIdx(vecP2IF_FE, vecBnd); {
                 velIdx.extIdx = &velExtIdx;
@@ -200,7 +202,7 @@ int main(int argc, char* argv[]) {
             }
             IdxDescCL preExtIdx(P1_FE, scaBnd); {
                 preExtIdx.GetXidx().SetBound(inpJSON.get<double>("SurfTransp.OmitBound"));
-                preExtIdx.CreateNumbering(mg.GetLastLevel(), mg);                
+                preExtIdx.CreateNumbering(mg.GetLastLevel(), mg);
             }
             IdxDescCL preIdx(P1IF_FE, scaBnd); {
                 preIdx.extIdx = &preExtIdx;
@@ -469,7 +471,7 @@ int main(int argc, char* argv[]) {
                 projectVorticity();
             auto projectTime = logger.end();
             logger.beg("output");
-                double Pe, alpha, b_norm, r0_norm, solveTime, solveWastedTime;
+                double alpha, b_norm, r0_norm, solveTime, solveWastedTime;
                 ReturnType belosSolverResult;
                 auto residual = [&](VectorCL const & u, VectorCL const & p) {
                     auto velResSq = norm_sq(A_sum * u + B_T * p - vF.Data);
@@ -554,6 +556,7 @@ int main(int argc, char* argv[]) {
                         tJSON.put("Solver.Inner.S.MeanIters.S_L", static_cast<double>(numItersS_L) / belosSolver->getNumIters());
                         tJSON.put("Solver.Inner.S.DOF", m);
                         tJSON.put("Peclet", Pe);
+                        tJSON.put("MaxSurfaceSpeed", u_N_max);
                         tJSON.put("MassMatrixCoef", alpha);
                         if (inpJSON.get<bool>("SurfNavStokes.ExportMatrices")) {
                             std::string format = inpJSON.get<std::string>("SurfNavStokes.ExportMatricesFormat") == "mtx" ? ".mtx" : ".mat";
@@ -594,41 +597,57 @@ int main(int argc, char* argv[]) {
                     InitScalar(mg, u_N, surfNavierStokesData.surface.u_N, t);
                 logger.end();
                 logger.beg("assemble");
+                    surfOseenSystem.matrices = {};
                     if (surfNavierStokesData.w_T) InitVector(mg, w_T, surfNavierStokesData.w_T, t); // Oseen (and Stokes) case
                     else w_T.Data = 2. * u.Data - u_prev.Data; // Navier-Stokes case
                     Pe = supnorm(w_T.Data) / nu;
+                    if (Pe) {
+                        logger.log("assembling convection mtx");
+                        surfOseenSystem.matrices.push_back(&mN);
+                    }
+                    u_N_max = supnorm(u_N.Data);
+                    if (u_N_max) {
+                        logger.log("assembling surf speed mtx");
+                        surfOseenSystem.matrices.push_back(&mH);
+                    }
                     alpha = i == 1 || BDF == 1 ? 1. / stepSize : 1.5 / stepSize;
                     logger.buf
                         << "$\\alpha$ = " << alpha << '\n'
-                        << "Pe = " << Pe;
+                        << "Pe = " << Pe << '\n'
+                        << "max |u_N| = " << u_N_max;
                     logger.log();
-                    surfOseenSystem.matrices = { &mN, &mH };
                     surfOseenSystem.vectors = { &vF, &vG };
                     setupFESystem(mg, surfOseenSystem);
-                    vG.Data -= (dot(vG.Data, I_p) / dot(I_p, I_p)) * I_p;
+                    // system mtx
+                    A_sum.LinComb(alpha, mM.Data, gamma, mAL.Data, nu, mA.Data, tau_u, mS.Data, rho_u, mC.Data);
+                    if (Pe) A_sum.LinComb(1., MatrixCL(A_sum), 1., mN.Data);
+                    if (u_N_max) A_sum.LinComb(1., MatrixCL(A_sum), 1., mH.Data);
+                    // system rhs
                     if (i == 1 || BDF == 1) vF.Data += (1. / stepSize) * (mM.Data * u.Data);
                     else vF.Data += (2. / stepSize) * (mM.Data * u.Data) - (.5 / stepSize) * (mM.Data * u_prev.Data);
-                    A_sum.LinComb(alpha, mM.Data, gamma, mAL.Data, 1., mN.Data, 1., mH.Data, nu, mA.Data, tau_u, mS.Data, rho_u, mC.Data);
+                    vG.Data -= (dot(vG.Data, I_p) / dot(I_p, I_p)) * I_p;
+                    // for the next step
                     u_prev = u;
                 assembleTime = logger.end();
                 logger.beg("convert to Epetra");
-                        A = static_cast<MT>(A_sum);
-                        auto printStat = [&](std::string const & name, MT const & A) {
-                            logger.buf << name << ": " << A.NumGlobalRows() << 'x' << A.NumGlobalCols() << ", " << A.NumGlobalNonzeros() << " nonzeros";
-                            if (A.NumGlobalNonzeros()) logger.buf << " (" << (100. * A.NumGlobalNonzeros()) / (static_cast<double>(A.NumGlobalRows()) * A.NumGlobalCols()) << "%)";
-                            logger.log();
-                        };
-                        printStat("A", A);
-                        B = static_cast<MT>(mB.Data);
-                        printStat("B", B);
-                        C = static_cast<MT>(mC_p.Data);
-                        printStat("C := -rho_p (pressure volume stabilization mtx)", C);
-                        S_M = static_cast<MT>(MatrixCL(1. / (gamma + nu), mM_p.Data, -1., mC_p.Data));
-                        printStat("S_M := (\\nu + \\gamma)^{-1} M_p - C", S_M);
-                        S_L = static_cast<MT>(MatrixCL(1. / alpha, mA_p.Data, -1., mC_p.Data));
-                        printStat("S_L := \\alpha^{-1} L_p - C", S_L);
-                        belosRHS = static_cast<SV>(vF.Data.append(vG.Data));
+                    A = static_cast<MT>(A_sum);
+                    auto printStat = [&](std::string const & name, MT const & A) {
+                        logger.buf << name << ": " << A.NumGlobalRows() << 'x' << A.NumGlobalCols() << ", " << A.NumGlobalNonzeros() << " nonzeros";
+                        if (A.NumGlobalNonzeros()) logger.buf << " (" << (100. * A.NumGlobalNonzeros()) / (static_cast<double>(A.NumGlobalRows()) * A.NumGlobalCols()) << "%)";
+                        logger.log();
+                    };
+                    printStat("A", A);
+                    B = static_cast<MT>(mB.Data);
+                    printStat("B", B);
+                    C = static_cast<MT>(mC_p.Data);
+                    printStat("C := -rho_p (pressure volume stabilization mtx)", C);
+                    S_M = static_cast<MT>(MatrixCL(1. / (gamma + nu), mM_p.Data, -1., mC_p.Data));
+                    printStat("S_M := (\\nu + \\gamma)^{-1} M_p - C", S_M);
+                    S_L = static_cast<MT>(MatrixCL(1. / alpha, mA_p.Data, -1., mC_p.Data));
+                    printStat("S_L := \\alpha^{-1} L_p - C", S_L);
+                    belosRHS = static_cast<SV>(vF.Data.append(vG.Data));
                 logger.end();
+                if (useInnerIters && i == 1) runFactorization();
                 logger.beg("linear solve");
                     b_norm = sqrt(norm_sq(vF.Data) + norm_sq(vG.Data));
                     if (usePrevGuess) {
@@ -640,7 +659,6 @@ int main(int argc, char* argv[]) {
                         r0_norm = b_norm;
                         belosLHS.PutScalar(0.);
                     }
-                    if (useInnerIters && i == 1) runFactorization();
                     belosProblem.setProblem();
                     belosSolver->setProblem(rcpFromRef(belosProblem));
                     belosSolverResult = belosSolver->solve();
