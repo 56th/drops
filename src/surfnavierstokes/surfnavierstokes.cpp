@@ -36,7 +36,7 @@
 #include "num/bndData.h"
 #include "surfactant/ifacetransp.h"
 
-#include "VTKWriter.hpp"
+#include "out/VTKWriter.hpp"
 #include "SurfNavierStokesData.hpp"
 #include "surfnavierstokes_utils.h"
 #include "SingletonLogger.hpp"
@@ -238,6 +238,7 @@ int main(int argc, char* argv[]) {
                     vtkWriter.add({ "u_h", u });
                     if (surfNavierStokesData.exactSoln) vtkWriter.add({ "u_*", u_star });
                 }
+                if (inpJSON.get<bool>("Output.SurfSpeed")) vtkWriter.add({ "u_N", u_N });
                 if (inpJSON.get<bool>("Output.Vorticity")) vtkWriter.add({ "w_h", surf_curl_u });
                 if (inpJSON.get<bool>("Output.Pressure")) {
                     vtkWriter.add({ "p_h", p });

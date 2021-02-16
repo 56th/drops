@@ -44,7 +44,7 @@
 //#include <stokes/instatstokes2phase.h>
 
 // vtk output
-#include "surfnavierstokes/VTKWriter.hpp"
+#include "out/VTKWriter.hpp"
 // logger
 #include "SingletonLogger.hpp"
 
