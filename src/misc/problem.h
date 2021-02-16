@@ -311,6 +311,20 @@ private:
     /// \brief Number unknowns on the vertices surrounding an interface.
     void CreateNumbNearInterface(Uint level, MultiGridCL& mg, const VecDescCL& ls, const BndDataCL<>& lsetbnd,double width, double dist=0./*default to using dof in cut tetra*/);
 public:
+    std::vector<IdxT> loc2glo(TetraCL const & tet) {
+        auto idx = GetIdx();
+        auto nV = NumUnknownsVertex();
+        auto nE = NumUnknownsEdge();
+        std::vector<IdxT> res;
+        res.reserve(4 * nV + 6 * nE);
+        for (size_t i = 0; i < 4; ++i)
+            for (size_t d = 0; d < nV; ++d)
+                res.push_back(tet.GetVertex(i)->Unknowns(idx) + d);
+        for (size_t i = 0; i < 6; ++i)
+            for (size_t d = 0; d < nE; ++d)
+                res.push_back(tet.GetEdge(i)->Unknowns(idx) + d);
+        return res;
+    }
     using FE_InfoCL::IsExtended;
     /// \brief The constructor uses the lowest available index for the
     ///     numbering. The triangulation level is initialized as 0.

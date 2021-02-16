@@ -585,72 +585,22 @@ public:
         LocalAssembler assembler(tet, system.params);
         if (!isInCutMesh(assembler.levelSetTet)) return;
         for (auto& matrix : system.matrices) {
-            if (matrix->RowIdx->GetFE() == vecP2IF_FE && matrix->ColIdx->GetFE() == vecP2IF_FE) {
-                IdxT idx[10];
-                GetLocalNumbP2NoBnd(idx, tet, *matrix->RowIdx);
-                for (size_t i = 0; i < 10; ++i) {
-                    auto I = idx[i];
-                    if (I == NoIdx) throw std::logic_error("invalid FE space idx");
-                    for (size_t j = 0; j < 10; ++j) {
-                        auto J = idx[j];
-                        if (J == NoIdx) throw std::logic_error("invalid FE space idx");
-                        for (size_t k = 0; k < 3; ++k)
-                            for (size_t l = 0; l < 3; ++l)
-                                (*builders[matrix])(I + k, J + l) += (assembler.*matrix->form)(3 * i + k, 3 * j + l);
-                    }
+            auto I = matrix->RowIdx->loc2glo(tet);
+            auto J = matrix->ColIdx->loc2glo(tet);
+            for (size_t i = 0; i < I.size(); ++i) {
+                if (I[i] == NoIdx) throw std::logic_error("invalid FE space idx");
+                for (size_t j = 0; j < J.size(); ++j) {
+                    if (J[j] == NoIdx) throw std::logic_error("invalid FE space idx");
+                    (*builders[matrix])(I[i], J[j]) += (assembler.*matrix->form)(i, j);
                 }
             }
-            else if (matrix->RowIdx->GetFE() == P1IF_FE && matrix->ColIdx->GetFE() == vecP2IF_FE) {
-                IdxT rowIdx[4], colIdx[10];
-                GetLocalNumbP1NoBnd(rowIdx, tet, *matrix->RowIdx);
-                GetLocalNumbP2NoBnd(colIdx, tet, *matrix->ColIdx);
-                for (size_t i = 0; i < 4; ++i) {
-                    auto I = rowIdx[i];
-                    if (I == NoIdx) throw std::logic_error("invalid FE space idx");
-                    for (size_t j = 0; j < 10; ++j) {
-                        auto J = colIdx[j];
-                        if (J == NoIdx) throw std::logic_error("invalid FE space idx");
-                        for (size_t k = 0; k < 3; ++k)
-                            (*builders[matrix])(I, J + k) += (assembler.*matrix->form)(i, 3 * j + k);
-                    }
-                }
-            }
-            else if (matrix->RowIdx->GetFE() == P1IF_FE && matrix->ColIdx->GetFE() == P1IF_FE) {
-                IdxT idx[4];
-                GetLocalNumbP1NoBnd(idx, tet, *matrix->RowIdx);
-                for (size_t i = 0; i < 4; ++i) {
-                    auto I = idx[i];
-                    if (I == NoIdx) throw std::logic_error("invalid FE space idx");
-                    for (size_t j = 0; j < 4; ++j) {
-                        auto J = idx[j];
-                        if (J == NoIdx) throw std::logic_error("invalid FE space idx");
-                        (*builders[matrix])(I, J) += (assembler.*matrix->form)(i, j);
-                    }
-                }
-            }
-            else throw std::invalid_argument(__func__ + std::string("invalid matrix trial/test FE pair"));
         }
         for (auto& vector : system.vectors) {
-            if (vector->RowIdx->GetFE() == vecP2IF_FE) {
-                IdxT idx[10];
-                GetLocalNumbP2NoBnd(idx, tet, *vector->RowIdx);
-                for (size_t i = 0; i < 10; ++i) {
-                    auto I = idx[i];
-                    if (I == NoIdx) throw std::logic_error("invalid FE space idx");
-                    for (size_t k = 0; k < 3; ++k)
-                        vector->Data[I + k] += (assembler.*vector->form)(3 * i + k);
-                }
+            auto I = vector->RowIdx->loc2glo(tet);
+            for (size_t i = 0; i < I.size(); ++i) {
+                if (I[i] == NoIdx) throw std::logic_error("invalid FE space idx");
+                vector->Data[I[i]] += (assembler.*vector->form)(i);
             }
-            else if (vector->RowIdx->GetFE() == P1IF_FE) {
-                IdxT idx[4];
-                GetLocalNumbP1NoBnd(idx, tet, *vector->RowIdx);
-                for (size_t i = 0; i < 4; ++i) {
-                    auto I = idx[i];
-                    if (I == NoIdx) throw std::logic_error("invalid FE space idx");
-                    vector->Data[I] += (assembler.*vector->form)(i);
-                }
-            }
-            else throw std::invalid_argument(__func__ + std::string("invalid vector test FE"));
         }
     }
     TetraAccumulatorCL* clone(int /*tid*/) { return new FESystemAccumulator(*this); }
