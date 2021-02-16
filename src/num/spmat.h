@@ -108,12 +108,11 @@ class VectorBaseCL: public std::valarray<T>
     VectorBaseCL (T c, size_t s)        : base_type( c, s)  {}
     VectorBaseCL (const T* tp, size_t s): base_type( tp, s) {}
 
-    VectorBaseCL& append(VectorBaseCL const & v) {
-        base_type res(this->size() + v.size());
+    VectorBaseCL append(VectorBaseCL const & v) {
+        VectorBaseCL res(this->size() + v.size());
         for (size_t i = 0; i < this->size(); ++i) res[i] = (*this)[i];
         for (size_t i = 0; i < v.size(); ++i) res[this->size() + i] = v[i];
-        *this = res;
-        return *this;
+        return res;
     }
 
 DROPS_DEFINE_VALARRAY_DERIVATIVE( VectorBaseCL, T, base_type)
