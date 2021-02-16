@@ -5,6 +5,7 @@
       "Binary":     true,
       "Velocity": false,
       "Vorticity": true,
+      "SurfSpeed": false,
       "Pressure": false
     },
 
