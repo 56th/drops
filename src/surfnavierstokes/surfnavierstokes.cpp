@@ -307,21 +307,18 @@ int main(int argc, char* argv[]) {
                         << "solver:      " << amesosSolver->name() << '\n'
                         << "description: " << amesosSolver->description();
                     logger.log();
-                    auto factorizationTime = 0.;
                     auto runFactorization = [&]() {
-                        logger.beg("factorization");
-                            logger.beg("symbolic factorization");
-                                amesosSolver->symbolicFactorization();
-                            logger.end();
-                            logger.beg("numeric factorization");
-                                amesosSolver->numericFactorization();
-                                auto amesosStatus = amesosSolver->getStatus();
-                                logger.buf
-                                    << "numb of nonzeros in L + U = " << amesosStatus.getNnzLU() << " ("
-                                    << (100. * amesosStatus.getNnzLU()) / (static_cast<double>(n) * n) << "%)";
-                                logger.log();
-                            logger.end();
-                        factorizationTime = logger.end();
+                        logger.beg("symbolic factorization");
+                            amesosSolver->symbolicFactorization();
+                        logger.end();
+                        logger.beg("numeric factorization");
+                            amesosSolver->numericFactorization();
+                            auto amesosStatus = amesosSolver->getStatus();
+                            logger.buf
+                                << "numb of nonzeros in L + U = " << amesosStatus.getNnzLU() << " ("
+                                << (100. * amesosStatus.getNnzLU()) / (static_cast<double>(n) * n) << "%)";
+                            logger.log();
+                        logger.end();
                     };
                     invA = [&](MV const &X, MV &Y) {
                         amesosSolver->setB(rcpFromRef(X));
@@ -431,12 +428,14 @@ int main(int argc, char* argv[]) {
                 transpose(mB.Data, B_T);
                 VectorCL I_p(1., m);
             auto assembleTime = logger.end();
+            auto factorizationTime = 0.;
             logger.beg("interpolate initial data");
                 InitVector(mg, u, surfNavierStokesData.u_T, t);
                 InitScalar(mg, p, surfNavierStokesData.p, t);
                 p.Data -= dot(mM_p.Data * p.Data, I_p) / dot(mM_p.Data * I_p, I_p) * I_p;
                 u_prev = u;
-            logger.end();
+            auto solveTime = logger.end();
+            auto solveWastedTime = 0.;
             logger.beg("project surface vorticity");
                 auto belosParamsW = parameterList();
                 belosParamsW->set("Maximum Iterations", 1000);
@@ -462,7 +461,7 @@ int main(int argc, char* argv[]) {
                 projectVorticity();
             auto projectTime = logger.end();
             logger.beg("output");
-                double alpha, b_norm, r0_norm, solveTime, solveWastedTime;
+                double alpha, b_norm, r0_norm;
                 ReturnType belosSolverResult;
                 auto residual = [&](VectorCL const & u, VectorCL const & p) {
                     auto velResSq = norm_sq(A_sum * u + B_T * p - vF.Data);
@@ -481,6 +480,9 @@ int main(int argc, char* argv[]) {
                     tJSON.put("MeshDepParams.tau_u", tau_u);
                     tJSON.put("ElapsedTime.Assemble", assembleTime);
                     tJSON.put("ElapsedTime.ProjectVorticity", projectTime);
+                    tJSON.put("ElapsedTime.LinearSolve", solveTime);
+                    tJSON.put("ElapsedTime.LinearSolveWasted", solveWastedTime);
+                    tJSON.put("ElapsedTime.Factorization", factorizationTime);
                     tJSON.put("Solver.ProjectVorticity.TotalIters", belosSolverW->getNumIters());
                     tJSON.put("Solver.ProjectVorticity.Converged", belosSolverResultW == Converged);
                     tJSON.put("Solver.ProjectVorticity.ResidualNormRelative", belosSolverW->achievedTol());
@@ -535,9 +537,6 @@ int main(int argc, char* argv[]) {
                         tJSON.put("Solver.Outer.TotalIters", belosSolver->getNumIters());
                         tJSON.put("Solver.Outer.DOF", n + m);
                         tJSON.put("Solver.Outer.Converged", belosSolverResult == Converged);
-                        tJSON.put("ElapsedTime.LinearSolve", solveTime);
-                        tJSON.put("ElapsedTime.LinearSolveWasted", solveWastedTime);
-                        tJSON.put("ElapsedTime.Factorization", factorizationTime);
                         tJSON.put("Solver.Inner.A.TotalIters", numItersA);
                         tJSON.put("Solver.Inner.A.MeanIters", static_cast<double>(numItersA) / belosSolver->getNumIters());
                         tJSON.put("Solver.Inner.A.DOF", n);
@@ -573,9 +572,7 @@ int main(int argc, char* argv[]) {
                     tJSON.put("ElapsedTime.VTK", vtkTime);
                     stats << tJSON;
                     logger.buf << tJSON;
-                    logger.log();
-                    numItersA = numItersS_M = numItersS_L = 0;
-                    factorizationTime = solveWastedTime = 0.;
+                    logger.log();;
                 };
                 exportStats(0);
             logger.end();
@@ -638,7 +635,13 @@ int main(int argc, char* argv[]) {
                     printStat("S_L := \\alpha^{-1} L_p - C", S_L);
                     belosRHS = static_cast<SV>(vF.Data.append(vG.Data));
                 logger.end();
-                if (useInnerIters && i == 1) runFactorization();
+                factorizationTime = 0.;
+                if (useInnerIters && i == 1) {
+                    logger.beg("build initial factorization");
+                        runFactorization();
+                    factorizationTime = logger.end();
+                }
+                solveWastedTime = 0.;
                 logger.beg("linear solve");
                     b_norm = sqrt(norm_sq(vF.Data) + norm_sq(vG.Data));
                     if (usePrevGuess) {
