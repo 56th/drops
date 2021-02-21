@@ -924,10 +924,17 @@ public:
             InstatScalarFunction m_g = nullptr; // - continuity eqn rhs
         } surfOseenParams;
     };
-    using LinearForm = double(LocalAssembler::*)(size_t);
-    using BilinearForm = double(LocalAssembler::*)(size_t, size_t);
+    using vec = std::vector<double>;
+    using mtx = std::vector<vec>;
+    using LinearForm = vec(LocalAssembler::*)();
+    using BilinearForm = mtx(LocalAssembler::*)();
     LocalP2CL<> levelSetTet;
 private:
+    struct {
+        size_t P1 = 4;
+        size_t P2 = 10;
+        size_t vecP2 = 30;
+    } const n;
     LocalAssemblerParams const & params;
     TetraCL const & tet;
     SMatrixCL<3, 3> T;
@@ -937,6 +944,10 @@ private:
     GridFunctionCL<> qHatP2[10], qHatP1[4], qLsGradNorm, qSurfSpeed, qG;
     GridFunctionCL<Point3DCL> qGradP2[10], qSurfGradP2[10], q3DGradP2[10], qGradP1[4], qSurfGradP1[4], q3DGradP1[4], qNormal, q3DNormal, qWind, qSurfSpeedSurfGrad, qF, qHatP2CrossN[30];
     GridFunctionCL<SMatrixCL<3,3>> qP, qH, qE[30];
+    mtx createMtx(size_t n, size_t m, double v) { return mtx(n, vec(v, m)); }
+    mtx createMtx(size_t n, double v) { return createMtx(n, n, v); }
+    mtx createMtx(size_t n, size_t m) { return mtx(n, vec(m)); }
+    mtx createMtx(size_t n) { return createMtx(n, n); }
     using GridFunctionBuilder = void(LocalAssembler::*)();
     template<class T>
     void require(GridFunctionCL<T> const & function, GridFunctionBuilder builder) {
@@ -1103,144 +1114,230 @@ public:
         GetTrafoTr(T, absDet, tet);
         absDet = std::fabs(absDet);
     }
-    // local matrices
-    double A_vecP2P2(size_t i, size_t j) {
+    mtx A_vecP2P2() {
         require(qE[0], &LocalAssembler::buildRateOfStrainTensor);
-        return quad_2D(contract(qE[j], qE[i]), qDomain);
+        auto A = createMtx(n.vecP2);
+        for (size_t i = 0; i < n.vecP2; ++i)
+            for (size_t j = i; j < n.vecP2; ++j) {
+                A[i][j] = quad_2D(contract(qE[j], qE[i]), qDomain);
+                A[j][i] = A[i][j];
+            }
+        return A;
     }
-    double A_consistent_vecP2P2(size_t i, size_t j) {
+    mtx A_consistent_vecP2P2() {
         require(qHatP2[0], &LocalAssembler::buildHatP2);
         require(qNormal, &LocalAssembler::buildNormal);
         require(qH, &LocalAssembler::buildShapeOp);
         require(qE[0], &LocalAssembler::buildRateOfStrainTensor);
-        auto && [ is, in ] = ind(i);
-        auto && [ js, jn ] = ind(j);
-        auto e_in = std_basis<3>(in + 1);
-        auto e_jn = std_basis<3>(jn + 1);
-        return quad_2D(contract(qE[j] - (qHatP2[js] * dot(e_jn, qNormal)) * qH, qE[i] - (qHatP2[is] * dot(e_in, qNormal)) * qH), qDomain);
+        auto A = createMtx(n.vecP2);
+        for (size_t i = 0; i < n.vecP2; ++i) {
+            auto && [ is, in ] = ind(i);
+            auto e_in = std_basis<3>(in + 1);
+            for (size_t j = i; j < n.vecP2; ++j) {
+                auto && [ js, jn ] = ind(j);
+                auto e_jn = std_basis<3>(jn + 1);
+                A[i][j] = quad_2D(contract(qE[j] - (qHatP2[js] * dot(e_jn, qNormal)) * qH, qE[i] - (qHatP2[is] * dot(e_in, qNormal)) * qH), qDomain);
+                A[j][i] = A[i][j];
+            }
+        }
+        return A;
     }
-    double M_vecP2P2(size_t i, size_t j) {
+    mtx M_vecP2P2() {
         require(qHatP2[0], &LocalAssembler::buildHatP2);
-        auto && [ is, in ] = ind(i);
-        auto && [ js, jn ] = ind(j);
-        if (in != jn) return 0.;
-        return quad_2D(qHatP2[js] * qHatP2[is], qDomain);
+        auto A = createMtx(n.vecP2);
+        for (size_t i = 0; i < n.vecP2; ++i) {
+            auto && [ is, in ] = ind(i);
+            for (size_t j = i; j < n.vecP2; ++j) {
+                auto && [ js, jn ] = ind(j);
+                A[i][j] = in == jn ? quad_2D(qHatP2[js] * qHatP2[is], qDomain) : 0.;
+                A[j][i] = A[i][j];
+            }
+        }
+        return A;
     }
-    double M_t_vecP2P2(size_t i, size_t j) {
+    mtx M_t_vecP2P2() {
         require(qHatP2[0], &LocalAssembler::buildHatP2);
         require(qP, &LocalAssembler::buildProjector);
-        auto && [ is, in ] = ind(i);
-        auto && [ js, jn ] = ind(j);
-        return quad_2D(qHatP2[js] * take(qP, jn, in) * qHatP2[is], qDomain);
+        auto A = createMtx(n.vecP2);
+        for (size_t i = 0; i < n.vecP2; ++i) {
+            auto && [ is, in ] = ind(i);
+            for (size_t j = i; j < n.vecP2; ++j) {
+                auto && [ js, jn ] = ind(j);
+                A[i][j] = quad_2D(qHatP2[js] * take(qP, jn, in) * qHatP2[is], qDomain);
+                A[j][i] = A[i][j];
+            }
+        }
+        return A;
     }
-    double N_vecP2P2(size_t i, size_t j) {
-        if (!params.surfOseenParams.Pe) return 0.;
+    mtx N_vecP2P2() {
+        if (!params.surfOseenParams.Pe) return createMtx(n.vecP2, 0.);
         require(qHatP2[0], &LocalAssembler::buildHatP2);
         require(qGradP2[0], &LocalAssembler::buildGradP2);
         require(qP, &LocalAssembler::buildProjector);
         require(qWind, &LocalAssembler::buildWind);
-        auto && [ is, in ] = ind(i);
-        auto && [ js, jn ] = ind(j);
-        return quad_2D(dot(qWind, qGradP2[js]) * qHatP2[is] * take(qP, in, jn), qDomain);
+        auto A = createMtx(n.vecP2);
+        for (size_t i = 0; i < n.vecP2; ++i) {
+            auto && [ is, in ] = ind(i);
+            for (size_t j = 0; j < n.vecP2; ++j) {
+                auto && [ js, jn ] = ind(j);
+                A[i][j] = quad_2D(dot(qWind, qGradP2[js]) * take(qP, in, jn) * qHatP2[is], qDomain);
+            }
+        }
+        return A;
     }
-    double AL_vecP2P2(size_t i, size_t j) {
+    mtx AL_vecP2P2() {
         require(qE[0], &LocalAssembler::buildRateOfStrainTensor);
-        return quad_2D(trace(qE[j]) * trace(qE[i]), qDomain);
+        auto A = createMtx(n.vecP2);
+        for (size_t i = 0; i < n.vecP2; ++i)
+            for (size_t j = i; j < n.vecP2; ++j) {
+                A[i][j] = quad_2D(trace(qE[j]) * trace(qE[i]), qDomain);
+                A[j][i] = A[i][j];
+            }
+        return A;
     }
-    double H_vecP2P2(size_t i, size_t j) {
-        if (!params.surfOseenParams.u_N_max) return 0.;
+    mtx H_vecP2P2() {
+        if (!params.surfOseenParams.u_N_max) return createMtx(n.vecP2, 0.);
         require(qHatP2[0], &LocalAssembler::buildHatP2);
         require(qH, &LocalAssembler::buildShapeOp);
         require(qSurfSpeed, &LocalAssembler::buildSurfSpeed);
-        auto && [ is, in ] = ind(i);
-        auto && [ js, jn ] = ind(j);
-        return quad_2D(qHatP2[js] * qSurfSpeed * take(qH, jn, in) * qHatP2[is], qDomain);
+        auto A = createMtx(n.vecP2);
+        for (size_t i = 0; i < n.vecP2; ++i) {
+            auto && [ is, in ] = ind(i);
+            for (size_t j = i; j < n.vecP2; ++j) {
+                auto && [ js, jn ] = ind(j);
+                A[i][j] = quad_2D(qHatP2[js] * qSurfSpeed * take(qH, jn, in) * qHatP2[is], qDomain);
+                A[j][i] = A[i][j];
+            }
+        }
+        return A;
     }
-    double S_vecP2P2(size_t i, size_t j) {
+    mtx S_vecP2P2() {
         require(qHatP2[0], &LocalAssembler::buildHatP2);
         require(qNormal, &LocalAssembler::buildNormal);
-        auto && [ is, in ] = ind(i);
-        auto && [ js, jn ] = ind(j);
-        auto e_in = std_basis<3>(in + 1);
-        auto e_jn = std_basis<3>(jn + 1);
-        return quad_2D(qHatP2[js] * dot(e_jn, qNormal) * qHatP2[is] * dot(e_in, qNormal), qDomain);
+        auto A = createMtx(n.vecP2);
+        for (size_t i = 0; i < n.vecP2; ++i) {
+            auto && [ is, in ] = ind(i);
+            auto e_in = std_basis<3>(in + 1);
+            for (size_t j = i; j < n.vecP2; ++j) {
+                auto && [ js, jn ] = ind(j);
+                auto e_jn = std_basis<3>(jn + 1);
+                A[i][j] = quad_2D(qHatP2[js] * dot(e_jn, qNormal) * qHatP2[is] * dot(e_in, qNormal), qDomain);
+                A[j][i] = A[i][j];
+            }
+        }
+        return A;
     }
-    double C_n_vecP2P2(size_t i, size_t j) {
+    mtx C_n_vecP2P2() {
         require(q3DGradP2[0], &LocalAssembler::buildGradP2);
         require(q3DNormal, &LocalAssembler::buildNormal);
-        auto && [ is, in ] = ind(i);
-        auto && [ js, jn ] = ind(j);
-        if (in != jn) return 0.;
-        return quad(dot(q3DNormal, q3DGradP2[js]) * dot(q3DNormal, q3DGradP2[is]), absDet, q3Domain, AllTetraC);
+        auto A = createMtx(n.vecP2);
+        for (size_t i = 0; i < n.vecP2; ++i) {
+            auto && [ is, in ] = ind(i);
+            for (size_t j = i; j < n.vecP2; ++j) {
+                auto && [ js, jn ] = ind(j);
+                A[i][j] = in == jn ? quad(dot(q3DNormal, q3DGradP2[js]) * dot(q3DNormal, q3DGradP2[is]), absDet, q3Domain, AllTetraC) : 0.;
+                A[j][i] = A[i][j];
+            }
+        }
+        return A;
     }
-    double F_vecP2(size_t i) {
+    vec F_vecP2() {
         require(qHatP2[0], &LocalAssembler::buildHatP2);
         require(qF, &LocalAssembler::buildF);
-        auto && [ is, in ] = ind(i);
-        auto e_in = std_basis<3>(in + 1);
-        auto integrand = dot(e_in, qF);
-        integrand *= qHatP2[is];
+        vec b(n.vecP2);
+        for (size_t i = 0; i < n.vecP2; ++i) {
+            auto && [is, in] = ind(i);
+            auto e_in = std_basis<3>(in + 1);
+            b[i] = quad_2D(dot(e_in, qF) * qHatP2[is], qDomain);
+        }
         if (params.surfOseenParams.u_N_max) {
             require(qSurfSpeed, &LocalAssembler::buildSurfSpeed);
             require(qSurfSpeedSurfGrad, &LocalAssembler::buildSurfSpeed);
             require(qE[0], &LocalAssembler::buildRateOfStrainTensor);
             require(qH, &LocalAssembler::buildShapeOp);
-            integrand += qSurfSpeed * dot(e_in, qSurfSpeedSurfGrad) * qHatP2[is] - params.surfOseenParams.nu * qSurfSpeed * contract(qH, qE[i]);
+            for (size_t i = 0; i < n.vecP2; ++i) {
+                auto && [is, in] = ind(i);
+                auto e_in = std_basis<3>(in + 1);
+                b[i] += quad_2D(qSurfSpeed * dot(e_in, qSurfSpeedSurfGrad) * qHatP2[is] - params.surfOseenParams.nu * qSurfSpeed * contract(qH, qE[i]), qDomain);
+            }
         }
         if (params.surfOseenParams.gamma) {
             require(qG, &LocalAssembler::buildG);
             require(qE[0], &LocalAssembler::buildRateOfStrainTensor);
-            integrand -= params.surfOseenParams.gamma * qG * trace(qE[i]);
+            for (size_t i = 0; i < n.vecP2; ++i)
+                b[i] -= params.surfOseenParams.gamma * quad_2D(qG * trace(qE[i]), qDomain);
         }
-        return quad_2D(integrand, qDomain);
-        /*
-        require(qG, &LocalAssembler::buildG);
-        require(qSurfSpeed, &LocalAssembler::buildSurfSpeed);
-        require(qSurfSpeedSurfGrad, &LocalAssembler::buildSurfSpeed);
-        require(qE[0], &LocalAssembler::buildRateOfStrainTensor);
-        require(qH, &LocalAssembler::buildShapeOp);
-        auto && [ is, in ] = ind(i);
-        auto e_in = std_basis<3>(in + 1);
-        return quad_2D(
-                (dot(e_in, qF) + qSurfSpeed * dot(e_in, qSurfSpeedSurfGrad)) * qHatP2[is] -
-                params.surfOseenParams.nu * qSurfSpeed * contract(qH, qE[i]) -
-                params.surfOseenParams.gamma * qG * trace(qE[i]),
-            qDomain);
-        */
+        return b;
     }
-    double B_P1vecP2(size_t i, size_t j) {
+    mtx B_P1vecP2() {
         require(qSurfGradP1[0], &LocalAssembler::buildSurfGradP1);
         require(qHatP2[0], &LocalAssembler::buildHatP2);
-        auto && [ js, jn ] = ind(j);
-        auto e_jn = std_basis<3>(jn + 1);
-        return quad_2D(qHatP2[js] * dot(e_jn, qSurfGradP1[i]), qDomain);
+        auto A = createMtx(n.P1, n.vecP2);
+        for (size_t i = 0; i < n.P1; ++i)
+            for (size_t j = 0; j < n.vecP2; ++j) {
+                auto && [ js, jn ] = ind(j);
+                auto e_jn = std_basis<3>(jn + 1);
+                A[i][j] = quad_2D(qHatP2[js] * dot(e_jn, qSurfGradP1[i]), qDomain);
+            }
+        return A;
     }
-    double Q_P1vecP2(size_t i, size_t j) { // rhs-curl-projection mtx
+    mtx Q_P1vecP2() { // rhs-curl-projection mtx
         require(qSurfGradP1[0], &LocalAssembler::buildSurfGradP1);
         require(qHatP2CrossN[0], &LocalAssembler::buildHatP2CrossN);
-        return quad_2D(dot(qHatP2CrossN[j], qSurfGradP1[i]), qDomain);
+        auto A = createMtx(n.P1, n.vecP2);
+        for (size_t i = 0; i < n.P1; ++i)
+            for (size_t j = 0; j < n.vecP2; ++j)
+                A[i][j] = quad_2D(dot(qHatP2CrossN[j], qSurfGradP1[i]), qDomain);
+        return A;
     }
-    double A_P1P1(size_t i, size_t j) {
+    mtx A_P1P1() {
         require(qSurfGradP1[0], &LocalAssembler::buildSurfGradP1);
-        return quad_2D(dot(qSurfGradP1[j], qSurfGradP1[i]), qDomain);
+        auto A = createMtx(n.P1);
+        for (size_t i = 0; i < n.P1; ++i)
+            for (size_t j = i; j < n.P1; ++j) {
+                A[i][j] = quad_2D(dot(qSurfGradP1[j], qSurfGradP1[i]), qDomain);
+                A[j][i] = A[i][j];
+            }
+        return A;
     }
-    double C_n_P1P1(size_t i, size_t j) {
+    mtx C_n_P1P1() {
         require(q3DGradP1[0], &LocalAssembler::buildGradP1);
         require(q3DNormal, &LocalAssembler::buildNormal);
-        return quad(dot(q3DNormal, q3DGradP1[j]) * dot(q3DNormal, q3DGradP1[i]), absDet, q3Domain, AllTetraC);
+        auto A = createMtx(n.P1);
+        for (size_t i = 0; i < n.P1; ++i)
+            for (size_t j = i; j < n.P1; ++j) {
+                A[i][j] = quad(dot(q3DNormal, q3DGradP1[j]) * dot(q3DNormal, q3DGradP1[i]), absDet, q3Domain, AllTetraC);
+                A[j][i] = A[i][j];
+            }
+        return A;
     }
-    double C_full_P1P1(size_t i, size_t j) {
+    mtx C_full_P1P1() {
         require(q3DGradP1[0], &LocalAssembler::buildGradP1);
-        return quad(dot(q3DGradP1[j], q3DGradP1[i]), absDet, q3Domain, AllTetraC);
+        auto A = createMtx(n.P1);
+        for (size_t i = 0; i < n.P1; ++i)
+            for (size_t j = i; j < n.P1; ++j) {
+                A[i][j] = quad(dot(q3DGradP1[j], q3DGradP1[i]), absDet, q3Domain, AllTetraC);
+                A[j][i] = A[i][j];
+            }
+        return A;
     }
-    double M_P1P1(size_t i, size_t j) {
+    mtx M_P1P1() {
         require(qHatP1[0], &LocalAssembler::buildHatP1);
-        return quad_2D(qHatP1[j] * qHatP1[i], qDomain);
+        auto A = createMtx(n.P1);
+        for (size_t i = 0; i < n.P1; ++i)
+            for (size_t j = i; j < n.P1; ++j) {
+                A[i][j] = quad_2D(qHatP1[j] * qHatP1[i], qDomain);
+                A[j][i] = A[i][j];
+            }
+        return A;
     }
-    double G_P1(size_t i) {
+    vec G_P1() {
         require(qHatP1[0], &LocalAssembler::buildHatP1);
         require(qG, &LocalAssembler::buildG);
-        return quad_2D(qG * qHatP1[i], qDomain);
+        vec b(n.P1);
+        for (size_t i = 0; i < n.P1; ++i)
+            b[i] = quad_2D(qG * qHatP1[i], qDomain);
+        return b;
     }
 };
 

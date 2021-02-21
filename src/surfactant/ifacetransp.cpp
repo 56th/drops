@@ -585,21 +585,23 @@ public:
         LocalAssembler assembler(tet, system.params);
         if (!isInCutMesh(assembler.levelSetTet)) return;
         for (auto& matrix : system.matrices) {
+            auto form = (assembler.*matrix->form)();
             auto I = matrix->RowIdx->loc2glo(tet);
             auto J = matrix->ColIdx->loc2glo(tet);
             for (size_t i = 0; i < I.size(); ++i) {
                 if (I[i] == NoIdx) throw std::logic_error("invalid FE space idx");
                 for (size_t j = 0; j < J.size(); ++j) {
                     if (J[j] == NoIdx) throw std::logic_error("invalid FE space idx");
-                    (*builders[matrix])(I[i], J[j]) += (assembler.*matrix->form)(i, j);
+                    (*builders[matrix])(I[i], J[j]) += form[i][j];
                 }
             }
         }
         for (auto& vector : system.vectors) {
+            auto form = (assembler.*vector->form)();
             auto I = vector->RowIdx->loc2glo(tet);
             for (size_t i = 0; i < I.size(); ++i) {
                 if (I[i] == NoIdx) throw std::logic_error("invalid FE space idx");
-                vector->Data[I[i]] += (assembler.*vector->form)(i);
+                vector->Data[I[i]] += form[i];
             }
         }
     }
