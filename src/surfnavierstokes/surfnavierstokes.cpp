@@ -479,39 +479,39 @@ int main(int argc, char* argv[]) {
                     tJSON.put("MeshDepParams.rho_u", rho_u);
                     tJSON.put("MeshDepParams.tau_u", tau_u);
                     tJSON.put("ElapsedTime.Assemble", assembleTime);
-                    tJSON.put("ElapsedTime.ProjectVorticity", projectTime);
+                    tJSON.put("ElapsedTime.Factorization", factorizationTime);
                     tJSON.put("ElapsedTime.LinearSolve", solveTime);
                     tJSON.put("ElapsedTime.LinearSolveWasted", solveWastedTime);
-                    tJSON.put("ElapsedTime.Factorization", factorizationTime);
+                    tJSON.put("ElapsedTime.ProjectVorticity", projectTime);
                     tJSON.put("Solver.ProjectVorticity.TotalIters", belosSolverW->getNumIters());
                     tJSON.put("Solver.ProjectVorticity.Converged", belosSolverResultW == Converged);
                     tJSON.put("Solver.ProjectVorticity.ResidualNormRelative", belosSolverW->achievedTol());
                     auto surfArea = dot(I_p, mM_p.Data * I_p);
-                    tJSON.put("Integral.SurfacaArea", surfArea);
-                    tJSON.put("Integral.PressureMean", dot(I_p, mM_p.Data * p.Data) / surfArea);
-                    tJSON.put("Integral.PressureL2", sqrt(dot(p.Data, mM_p.Data * p.Data)));
+                    tJSON.put("Integral.SurfacaAreaP1", surfArea);
+                    tJSON.put("Integral.FESolution.PressureMean", dot(I_p, mM_p.Data * p.Data) / surfArea);
+                    tJSON.put("Integral.FESolution.PressureL2", sqrt(dot(p.Data, mM_p.Data * p.Data)));
                     auto velL2Sq = dot(u.Data, mM.Data * u.Data);
-                    tJSON.put("Integral.KineticEnergy", .5 * velL2Sq);
-                    tJSON.put("Integral.VelocityL2", sqrt(velL2Sq));
-                    tJSON.put("Integral.VelocitySurfaceDivergenceL2", sqrt(dot(u.Data, mAL.Data * u.Data)));
-                    tJSON.put("Integral.VelocityNormalL2", sqrt(dot(u.Data, mS.Data * u.Data)));
+                    tJSON.put("Integral.FESolution.KineticEnergy", .5 * velL2Sq);
+                    tJSON.put("Integral.FESolution.VelocityL2", sqrt(velL2Sq));
+                    tJSON.put("Integral.FESolution.VelocityNormalL2", sqrt(dot(u.Data, mS.Data * u.Data)));
+                    tJSON.put("Integral.FESolution.VelocitySurfaceDivergenceL2", sqrt(dot(u.Data, mAL.Data * u.Data)));
                     auto vorL2Sq = dot(surf_curl_u.Data, mM_p.Data * surf_curl_u.Data);
-                    tJSON.put("Integral.Enstrophy", .5 * vorL2Sq);
-                    tJSON.put("Integral.SurfaceVorticityL2", sqrt(vorL2Sq));
+                    tJSON.put("Integral.FESolution.Enstrophy", .5 * vorL2Sq);
+                    tJSON.put("Integral.FESolution.SurfaceVorticityL2", sqrt(vorL2Sq));
                     auto vorH1Sq = dot(surf_curl_u.Data, mA_p.Data * surf_curl_u.Data);
-                    tJSON.put("Integral.Palinstrophy", .5 * vorH1Sq);
-                    tJSON.put("Integral.SurfaceVorticityH1", sqrt(vorH1Sq));
+                    tJSON.put("Integral.FESolution.Palinstrophy", .5 * vorH1Sq);
+                    tJSON.put("Integral.FESolution.SurfaceVorticityH1", sqrt(vorH1Sq));
                     if (surfNavierStokesData.exactSoln) {
                         InitVector(mg, u_star, surfNavierStokesData.u_T, t);
                         InitScalar(mg, p_star, surfNavierStokesData.p, t);
                         p_star.Data -= dot(mM_p.Data * p_star.Data, I_p) / dot(mM_p.Data * I_p, I_p) * I_p;
-                        tJSON.put("Integral.Exact.PressureMean", dot(I_p, mM_p.Data * p_star.Data) / surfArea);
-                        tJSON.put("Integral.Exact.PressureL2", sqrt(dot(p_star.Data, mM_p.Data * p_star.Data)));
+                        tJSON.put("Integral.ExactSolution.PressureMean", dot(I_p, mM_p.Data * p_star.Data) / surfArea);
+                        tJSON.put("Integral.ExactSolution.PressureL2", sqrt(dot(p_star.Data, mM_p.Data * p_star.Data)));
                         auto velL2Sq = dot(u_star.Data, mM.Data * u_star.Data);
-                        tJSON.put("Integral.Exact.KineticEnergy", .5 * velL2Sq);
-                        tJSON.put("Integral.Exact.VelocityL2", sqrt(velL2Sq));
-                        tJSON.put("Integral.Exact.VelocitySurfaceDivergenceL2", sqrt(dot(u_star.Data, mAL.Data * u_star.Data)));
-                        tJSON.put("Integral.Exact.VelocityNormalL2", sqrt(dot(u_star.Data, mS.Data * u_star.Data)));
+                        tJSON.put("Integral.ExactSolution.KineticEnergy", .5 * velL2Sq);
+                        tJSON.put("Integral.ExactSolution.VelocityL2", sqrt(velL2Sq));
+                        tJSON.put("Integral.ExactSolution.VelocityNormalL2", sqrt(dot(u_star.Data, mS.Data * u_star.Data)));
+                        tJSON.put("Integral.ExactSolution.VelocitySurfaceDivergenceL2", sqrt(dot(u_star.Data, mAL.Data * u_star.Data)));
                         auto u_diff = u_star.Data - u.Data;
                         tJSON.put("Integral.Error.VelocityL2", sqrt(dot(u_diff, mM.Data * u_diff)));
                         tJSON.put("Integral.Error.VelocityH1", sqrt(dot(u_diff, mA.Data * u_diff)));
@@ -643,15 +643,14 @@ int main(int argc, char* argv[]) {
                 }
                 solveWastedTime = 0.;
                 logger.beg("linear solve");
-                    b_norm = sqrt(norm_sq(vF.Data) + norm_sq(vG.Data));
+                    numItersA = numItersS_M = numItersS_L = 0;
+                    b_norm = r0_norm = sqrt(norm_sq(vF.Data) + norm_sq(vG.Data));
+                    belosLHS.PutScalar(0.);
                     if (usePrevGuess) {
-                        r0_norm = std::get<2>(residual(u.Data, p.Data));
                         belosLHS = static_cast<SV>(u.Data.append(p.Data));
+                        r0_norm = std::get<2>(residual(u.Data, p.Data));
                         belosParams->set("Convergence Tolerance", inpJSON.get<double>("Solver.Outer.RelResTol") * b_norm / r0_norm);
                         belosSolver = belosFactory.create(inpJSON.get<std::string>("Solver.Outer.Iteration"), belosParams);
-                    } else {
-                        r0_norm = b_norm;
-                        belosLHS.PutScalar(0.);
                     }
                     belosProblem.setProblem();
                     belosSolver->setProblem(rcpFromRef(belosProblem));
@@ -663,7 +662,9 @@ int main(int argc, char* argv[]) {
                     if (useInnerIters && i > 1) {
                         solveWastedTime = solveTime;
                         numItersA = numItersS_M = numItersS_L = 0;
-                        runFactorization();
+                        logger.beg("build new factorization");
+                            runFactorization();
+                        factorizationTime = logger.end();
                         logger.beg("linear solve w/ new factorization");
                             if (usePrevGuess) belosLHS = static_cast<SV>(u.Data.append(p.Data));
                             else belosLHS.PutScalar(0.);
