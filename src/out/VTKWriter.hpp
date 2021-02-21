@@ -76,75 +76,78 @@ namespace DROPS {
         VTKWriter& write(double time) {
             std::string funcName = __func__;
             #ifdef _VTK
-                // (1) update mesh, cf. https://lorensen.github.io/VTKExamples/site/Cxx/IO/WriteVTU/
+                // update mesh, cf. https://lorensen.github.io/VTKExamples/site/Cxx/IO/WriteVTU/
                 // vertexIndex.clear();
                 // edgeIndex.clear();
                 // ...
-                // (2) update vars
                 auto& logger = SingletonLogger::instance();
-                auto n = unstructuredGrid->GetNumberOfPoints();
-                for (auto& var : vars) {
-                    logger.beg("export " + var.name);
-                        auto idx = var.vec.RowIdx->GetIdx();
-                        auto array = vtkSmartPointer<vtkDoubleArray>::New();
-                        auto dim = var.vec.RowIdx->NumUnknownsVertex();
-                        auto size = dim * n;
-                        logger.buf
-                            << "FE space idx: " << idx << '\n'
-                            << "dim: " << dim << '\n'
-                            << "size: " << size;
-                        logger.log();
-                        auto* value = new double[size];
-                        for (size_t i = 0; i < size; ++i) value[i] = 0.;
-                        for (auto it = mg.GetTriangVertexBegin(); it != mg.GetTriangVertexEnd(); ++it)
-                            if (it->Unknowns.Exist(idx))
-                                for (size_t d = 0; d < dim; ++d)
-                                    value[dim * vertexIndex[&*it] + d] = var.vec.Data[it->Unknowns(idx) + d];
-                        for (auto it = mg.GetTriangEdgeBegin(); it != mg.GetTriangEdgeEnd(); ++it)
-                            if (it->Unknowns.Exist(idx))
-                                for (size_t d = 0; d < dim; ++d)
-                                    value[dim * edgeIndex[&*it] + d] = var.vec.Data[it->Unknowns(idx) + d];
-                            else { // P1
-                                auto i0 = dim * vertexIndex[it->GetVertex(0)];
-                                auto i1 = dim * vertexIndex[it->GetVertex(1)];
-                                for (size_t d = 0; d < dim; ++d)
-                                    value[dim * edgeIndex[&*it] + d] = .5 * (value[i0 + d] + value[i1 + d]);
-                            }
-                        array->SetNumberOfComponents(dim); // cf. https://vtk.org/Wiki/VTK/Examples/Cxx/PolyData/PolyDataCellNormals
-                        array->SetArray(value, size, 0 /* this will free the memory for ptr, cf. https://vtk.org/doc/release/5.6/html/a00505.html#d35ae5bee4aa873d543f1ab3eaf94454 */);
-                        array->SetName(var.name.c_str());
-                        unstructuredGrid->GetPointData()->AddArray(array);
-                    logger.end();
-                }
-                // (3) write
-                auto writer = vtkSmartPointer<vtkXMLUnstructuredGridWriter>::New();
-                auto name = path + '_' + std::to_string(frame) + ".vtu";
-                writer->SetFileName(name.c_str());
-                writer->SetInputData(unstructuredGrid);
-                if (!binary) writer->SetDataModeToAscii();
-                writer->Write();
-                // (4) update .pvd
-                name = name.substr(name.find_last_of("/\\") + 1);
-                if  (frame == 0) {
-                    std::ofstream pvd(path + ".pvd");
-                    pvd <<
-                        "<?xml version=\"1.0\"?>\n"
-                        "<VTKFile type=\"Collection\" version=\"0.1\" byte_order=\"LittleEndian\">\n"
-                        "<Collection>\n"
-                            "\t<DataSet timestep=\""<< time <<"\" group=\"\" part=\"0\" file=\"" << name <<"\"/>\n"
-                        "</Collection>\n"
-                        "</VTKFile>";
-                } else {
-                    std::ofstream pvd;
-                    pvd.open(path + ".pvd", std::ios_base::in);
-                    if(!pvd.is_open()) std::logic_error(funcName + ": cannot reopen .pvd file");
-                    pvd.seekp(-24, std::ios_base::end);
-                    pvd <<
-                            "\t<DataSet timestep=\""<< time <<"\" group=\"\" part=\"0\" file=\"" << name <<"\"/>\n"
-                        "</Collection>\n"
-                        "</VTKFile>";
-                    pvd.close();
-                }
+                logger.beg("prepare vars");
+                    auto n = unstructuredGrid->GetNumberOfPoints();
+                    for (auto& var : vars) {
+                        logger.beg("var: " + var.name);
+                            auto idx = var.vec.RowIdx->GetIdx();
+                            auto array = vtkSmartPointer<vtkDoubleArray>::New();
+                            auto dim = var.vec.RowIdx->NumUnknownsVertex();
+                            auto size = dim * n;
+                            logger.buf
+                                << "FE space idx: " << idx << '\n'
+                                << "dim: " << dim << '\n'
+                                << "size: " << size;
+                            logger.log();
+                            auto* value = new double[size];
+                            for (size_t i = 0; i < size; ++i) value[i] = 0.;
+                            for (auto it = mg.GetTriangVertexBegin(); it != mg.GetTriangVertexEnd(); ++it)
+                                if (it->Unknowns.Exist(idx))
+                                    for (size_t d = 0; d < dim; ++d)
+                                        value[dim * vertexIndex[&*it] + d] = var.vec.Data[it->Unknowns(idx) + d];
+                            for (auto it = mg.GetTriangEdgeBegin(); it != mg.GetTriangEdgeEnd(); ++it)
+                                if (it->Unknowns.Exist(idx))
+                                    for (size_t d = 0; d < dim; ++d)
+                                        value[dim * edgeIndex[&*it] + d] = var.vec.Data[it->Unknowns(idx) + d];
+                                else { // P1
+                                    auto i0 = dim * vertexIndex[it->GetVertex(0)];
+                                    auto i1 = dim * vertexIndex[it->GetVertex(1)];
+                                    for (size_t d = 0; d < dim; ++d)
+                                        value[dim * edgeIndex[&*it] + d] = .5 * (value[i0 + d] + value[i1 + d]);
+                                }
+                            array->SetNumberOfComponents(dim); // cf. https://vtk.org/Wiki/VTK/Examples/Cxx/PolyData/PolyDataCellNormals
+                            array->SetArray(value, size, 0 /* this will free the memory for ptr, cf. https://vtk.org/doc/release/5.6/html/a00505.html#d35ae5bee4aa873d543f1ab3eaf94454 */);
+                            array->SetName(var.name.c_str());
+                            unstructuredGrid->GetPointData()->AddArray(array);
+                        logger.end();
+                    }
+                logger.end();
+                logger.beg("write .vtu");
+                    auto writer = vtkSmartPointer<vtkXMLUnstructuredGridWriter>::New();
+                    auto name = path + '_' + std::to_string(frame) + ".vtu";
+                    writer->SetFileName(name.c_str());
+                    writer->SetInputData(unstructuredGrid);
+                    if (!binary) writer->SetDataModeToAscii();
+                    writer->Write();
+                logger.end();
+                logger.beg("write .pvd");
+                    name = name.substr(name.find_last_of("/\\") + 1);
+                    if  (frame == 0) {
+                        std::ofstream pvd(path + ".pvd");
+                        pvd <<
+                            "<?xml version=\"1.0\"?>\n"
+                            "<VTKFile type=\"Collection\" version=\"0.1\" byte_order=\"LittleEndian\">\n"
+                            "<Collection>\n"
+                                "\t<DataSet timestep=\""<< time <<"\" group=\"\" part=\"0\" file=\"" << name <<"\"/>\n"
+                            "</Collection>\n"
+                            "</VTKFile>";
+                    } else {
+                        std::ofstream pvd;
+                        pvd.open(path + ".pvd", std::ios_base::in);
+                        if(!pvd.is_open()) std::logic_error(funcName + ": cannot reopen .pvd file");
+                        pvd.seekp(-24, std::ios_base::end);
+                        pvd <<
+                                "\t<DataSet timestep=\""<< time <<"\" group=\"\" part=\"0\" file=\"" << name <<"\"/>\n"
+                            "</Collection>\n"
+                            "</VTKFile>";
+                        pvd.close();
+                    }
+                logger.end();
                 ++frame;
                 return *this;
             #else
