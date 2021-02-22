@@ -258,7 +258,7 @@ int main(int argc, char* argv[]) {
             belosParams->set("Num Blocks", inpJSON.get<int>("Solver.Outer.KrylovSubspaceSize"));
             belosParams->set("Maximum Iterations", inpJSON.get<int>("Solver.Outer.MaxIter"));
             belosParams->set("Convergence Tolerance", inpJSON.get<double>("Solver.Outer.RelResTol"));
-            belosParams->set( "Output Frequency", inpJSON.get<int>("Solver.Outer.OutputFrequency"));
+            belosParams->set("Output Frequency", inpJSON.get<int>("Solver.Outer.OutputFrequency"));
             belosParams->set("Verbosity", Errors + Warnings + StatusTestDetails + TimingDetails + FinalSummary + IterationDetails);
             belosParams->set<int>("Output Style", Brief);
             SolverFactory<ST, MV, OP> belosFactory;
@@ -338,12 +338,10 @@ int main(int argc, char* argv[]) {
                     logger.buf << "inner solver: " << belosSolverS_M->description();
                     logger.log();
                     invS = [&](MV const & X, MV& Y) {
-                        // ini guess
-                        Y.PutScalar(0.);
+                        Y.PutScalar(0.); // ini guess
                         auto& Y_M = Y;
                         auto  Y_L = Y;
-                        // normalized rhs
-                        auto X_nrm = X; {
+                        auto X_nrm = X; { // normalized rhs
                             double mean;
                             X_nrm.MeanValue(&mean);
                             for (size_t i = 0; i < m; ++i) (*X_nrm(0))[i] -= mean;
@@ -378,21 +376,16 @@ int main(int argc, char* argv[]) {
                         Y(0)->ExtractView(&view);
                         SV y1(Epetra_DataAccess::View, mapVelocity, view);
                         SV y2(Epetra_DataAccess::View, mapPressure, view + n);
-                        #ifdef _OPENMP
-                            #pragma omp parallel num_threads(2)
+                        #pragma omp parallel
+                        {
+                            #pragma omp single
                             {
-                                #pragma omp single
-                                {
-                                    #pragma omp task
-                                        invA(x1, y1); // y1
-                                    #pragma omp task
-                                        invS(x2, y2); // y2
-                                }
+                                #pragma omp task
+                                invA(x1, y1); // y1
+                                #pragma omp task
+                                invS(x2, y2); // y2
                             }
-                        #else
-                            invA(x1, y1);
-                            invS(x2, y2);
-                        #endif
+                        }
                     }));
                 }
                 else {
@@ -549,17 +542,17 @@ int main(int argc, char* argv[]) {
                         tJSON.put("MaxSurfaceSpeed", u_N_max);
                         tJSON.put("MassMatrixCoef", alpha);
                         if (inpJSON.get<bool>("SurfNavStokes.ExportMatrices")) {
-                            std::string format = inpJSON.get<std::string>("SurfNavStokes.ExportMatricesFormat") == "mtx" ? ".mtx" : ".mat";
+                            std::string format = inpJSON.get<std::string>("SurfNavStokes.ExportMatricesFormat") == ".mtx" ? ".mtx" : ".mat";
                             auto expFunc = format == ".mtx" ? &MatrixCL::exportMTX : &MatrixCL::exportMAT;
                             auto expMat = [&](MatrixCL &A, std::string const a, std::string const &b) {
                                 logger.beg(a);
-                                logger.buf << "size: " << A.num_rows() << "x" << A.num_cols();
-                                logger.log();
-                                (A.*expFunc)(dirName + "/matrices/" + b + format);
-                                tJSON.put("Matrices." + a, "../matrices/" + b + format);
+                                    logger.buf << "size: " << A.num_rows() << 'x' << A.num_cols();
+                                    logger.log();
+                                    (A.*expFunc)(dirName + "/matrices/" + b + format);
+                                    tJSON.put("Matrices." + a, "../matrices/" + b + format);
                                 logger.end();
                             };
-                            expMat(mA_p.Data, "PressureStiffness", "A_p");
+                            expMat(mM.Data, "VelocityMass", "M_u");
                             logger.log();
                         }
                     }
