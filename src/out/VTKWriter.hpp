@@ -85,10 +85,12 @@ namespace DROPS {
                     auto n = unstructuredGrid->GetNumberOfPoints();
                     for (auto& var : vars) {
                         logger.beg("var: " + var.name);
+                            size_t dim = var.vec.RowIdx->IsScalar() ? 1 : 3;
+                            if (var.vec.RowIdx->NumUnknowns() % dim) throw std::logic_error(funcName + ": invalid numb of d.o.f.");
+                            auto size = dim * n;
+                            auto blockSize = var.vec.RowIdx->NumUnknowns() / dim;
                             auto idx = var.vec.RowIdx->GetIdx();
                             auto array = vtkSmartPointer<vtkDoubleArray>::New();
-                            auto dim = var.vec.RowIdx->NumUnknownsVertex();
-                            auto size = dim * n;
                             logger.buf
                                 << "FE space idx: " << idx << '\n'
                                 << "dim: " << dim << '\n'
@@ -99,11 +101,11 @@ namespace DROPS {
                             for (auto it = mg.GetTriangVertexBegin(); it != mg.GetTriangVertexEnd(); ++it)
                                 if (it->Unknowns.Exist(idx))
                                     for (size_t d = 0; d < dim; ++d)
-                                        value[dim * vertexIndex[&*it] + d] = var.vec.Data[it->Unknowns(idx) + d];
+                                        value[dim * vertexIndex[&*it] + d] = var.vec.Data[it->Unknowns(idx) / dim /* / dim is tmp */ + d * blockSize];
                             for (auto it = mg.GetTriangEdgeBegin(); it != mg.GetTriangEdgeEnd(); ++it)
                                 if (it->Unknowns.Exist(idx))
                                     for (size_t d = 0; d < dim; ++d)
-                                        value[dim * edgeIndex[&*it] + d] = var.vec.Data[it->Unknowns(idx) + d];
+                                        value[dim * edgeIndex[&*it] + d] = var.vec.Data[it->Unknowns(idx) / dim /* / dim is tmp */ + d * blockSize];
                                 else { // P1
                                     auto i0 = dim * vertexIndex[it->GetVertex(0)];
                                     auto i1 = dim * vertexIndex[it->GetVertex(1)];
