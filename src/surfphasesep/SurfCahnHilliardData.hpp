@@ -7,20 +7,14 @@
 
 #include <random>
 #include <string>
-#include "../num/discretize.h"
+#include "num/functions.hpp"
 
 namespace DROPS {
 
     struct SurfCahnHilliardData {
         bool exactSoln;
         double raftRatio = -1.;
-        InstatScalarFunction chi, omega, rhs3, rhs4;
-        struct Surface {
-            InstatScalarFunction phi;
-            InstatVectorFunction n;
-            InstatVectorFunction e;
-            InstatMatrixFunction H;
-        };
+        InstatScalarFunction chi, omega, f;
         Surface surface;
         std::string description;
     };
@@ -28,7 +22,7 @@ namespace DROPS {
     SurfCahnHilliardData SurfCahnHilliardDataFactory(ParamCL const & param) {
         auto test = param.get<std::string>("SurfCahnHilliard.TestName");
         SurfCahnHilliardData data;
-        SurfCahnHilliardData::Surface sphere;
+        Surface sphere;
         sphere.phi = [](Point3DCL const & p, double) {
             return std::sqrt(std::pow(p[0], 2.) + std::pow(p[1], 2.) + std::pow(p[2], 2.)) - 1.;
         };
@@ -67,7 +61,7 @@ namespace DROPS {
                 std::uniform_real_distribution<> dis(a, b);
                 return dis(gen);
             };
-            data.omega = data.rhs3 = data.rhs4 = [](Point3DCL const &, double) {
+            data.omega = data.f = [](Point3DCL const &, double) {
                 return 0.;
             };
             data.surface = sphere;
@@ -84,7 +78,7 @@ namespace DROPS {
                 std::bernoulli_distribution dis(data.raftRatio);
                 return dis(gen);
             };
-            data.omega = data.rhs3 = data.rhs4 = [](Point3DCL const &, double) {
+            data.omega = data.f = [](Point3DCL const &, double) {
                 return 0.;
             };
             data.surface = sphere;
@@ -99,7 +93,7 @@ namespace DROPS {
                 auto x = sphere.e(p, t);
                 return .5 * (1. + std::tanh(x[1] / (2. * std::sqrt(2.) * eps)));
             };
-            data.omega = data.rhs3 = data.rhs4 = [](Point3DCL const &, double) {
+            data.omega = data.f = [](Point3DCL const &, double) {
                 return 0.;
             };
             data.surface = sphere;

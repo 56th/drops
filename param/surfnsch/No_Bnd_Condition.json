@@ -31,9 +31,11 @@
         }
     },
 
-    "SurfNavierStokes": {
-      "gamma" : 1.0,
-      "nu" :    1e-5,
+    "SurfNSCH": {
+      "BDF":                      2,
+      "NumbOfVirtualSubEdges":    2,
+      "ExportMatrices":           false,
+      "ExportMatricesFormat":     "mat",
       "IC" : {
         "Comment" : "initial condition parameters",
         "KelvinHelmholtzCristoph" : {
@@ -44,30 +46,35 @@
           "ab" : 0.1,
           "mb" : 20.0
         },
-        "Bubble" : {
-          "r0" : 1.0,
-          "a"  : 0.1
-        },
         "TorusVarTube" : {
           "R"   : 1.0,
           "r_0" : 0.3,
           "r_1" : 0.5
         }
       },
-      "UseTangentialMassMatrix":  false,
-      "TestName":                 "KelvinHelmholtzCristophSphere",
-      "BDF":                      2,
-      "PressureVolumestabType":   "Normal",
-      "NormalPenaltyPower":       -2,
-      "NormalPenaltyFactor":      1,
-      "VelocityVolumestabPower":  -1,
-      "VelocityVolumestabFactor": 1,
-      "PressureVolumestabPower":  1,
-      "PressureVolumestabFactor": 1,
-      "Formulation":              "Consistent",
-      "NumbOfVirtualSubEdges":    2,
-      "ExportMatrices":           false,
-      "ExportMatricesFormat":     "mat"
+      "rho" : {
+        "max" : 1.0,
+        "min" : 1.0
+      },
+      "NS" : {
+        "gamma": 1.0,
+        "nu": 1e-5,
+        "UseTangentialMassMatrix": false,
+        "TestName": "KelvinHelmholtzCristophSphere",
+        "PressureVolumestabType": "Normal",
+        "NormalPenaltyPower": -2,
+        "NormalPenaltyFactor": 1,
+        "VelocityVolumestabPower": -1,
+        "VelocityVolumestabFactor": 1,
+        "PressureVolumestabPower": 1,
+        "PressureVolumestabFactor": 1,
+        "Formulation": "Consistent"
+      },
+      "CH" : {
+        "Epsilon": 0.01,
+        "MobilityScaling": 1.0,
+        "UseDegenerateMobility": false
+      }
     },
 
     "Time": {

@@ -40,7 +40,7 @@
 // initial data
 #include "SurfCahnHilliardData.hpp"
 // for chemical potential
-#include "hermite_cubic.hpp"
+#include "hermite_cubic/hermite_cubic.hpp"
 // belos (iterative solvers)
 #include "BelosSolverFactory.hpp"
 #include "BelosLinearProblem.hpp"
@@ -49,7 +49,7 @@
 #include "Amesos2.hpp"
 #include "Amesos2_Version.hpp"
 // epetra (vectors and operators / matrices)
-#include "../surfnavierstokes/Epetra_OperatorApply.hpp"
+#include "epetra/Epetra_OperatorApply.hpp"
 #include "Epetra_CrsMatrix.h"
 #include "Epetra_Vector.h"
 #ifdef HAVE_MPI
@@ -216,7 +216,7 @@ int main (int argc, char* argv[]) {
         P1FEidxCoarse.GetXidx().SetBound(inpJSON.get<double>("SurfTransp.OmitBound"));
         P1FEidxCoarse.CreateNumbering(coarseLevel, mg);
         // construct FE vectors (initialized with zero)
-        VecDescCL v, omega, omegaSol, chi, chi_ext, chi_coarse_ini_ext, chi_prev, chi_prev_prev, chi_BDF1, chi_BDF2, chi_extrap, chiSol, energy, well_potential, f1, rhs1, f2, rhs2;
+        VecDescCL v, omega, omegaSol, chi, chi_ext, chi_coarse_ini_ext, chi_prev, chi_prev_prev, chi_BDF1, chi_BDF2, chi_extrap, chiSol, energy, well_potential, f1, rhs1, rhs2;
         if( !FE.compare("P1P1")) {
              v.SetIdx( &ifaceVecP1idx);
              chi.SetIdx( &ifaceP1idx);
@@ -234,7 +234,6 @@ int main (int argc, char* argv[]) {
              omegaSol.SetIdx( &ifaceP1idx);
              f1.SetIdx(&ifaceP1idx);
              rhs1.SetIdx(&ifaceP1idx);
-             f2.SetIdx(&ifaceP1idx);
              rhs2.SetIdx(&ifaceP1idx);
         }
         // setup matrices
@@ -381,8 +380,7 @@ int main (int argc, char* argv[]) {
                     logger.log();
                     InitScalar(mg, chiSol, surfCahnHilliardData.chi, t);
                     InitScalar(mg, omegaSol, surfCahnHilliardData.omega, t);
-                    SetupInterfaceRhsP1(mg, &f1, lset.Phi, lset.GetBndData(), surfCahnHilliardData.rhs3, t);
-                    SetupInterfaceRhsP1(mg, &f2, lset.Phi, lset.GetBndData(), surfCahnHilliardData.rhs4, t);
+                    SetupInterfaceRhsP1(mg, &f1, lset.Phi, lset.GetBndData(), surfCahnHilliardData.f, t);
                 logger.end();
                 logger.beg("BDF1 step");
                     logger.beg("set up blocks");
@@ -390,8 +388,7 @@ int main (int argc, char* argv[]) {
                             well_potential.Data[i] = chemicalPotential(chi_prev.Data[i]);
                         rhs1 = f1;
                         rhs1.Data += (1. / dt) * (Mass.Data * chi_prev.Data);
-                        rhs2 = f2;
-                        rhs2.Data += S * (Mass.Data * chi_prev.Data) - Mass.Data * well_potential.Data;
+                        rhs2.Data = S * (Mass.Data * chi_prev.Data) - Mass.Data * well_potential.Data;
                         A.LinComb(0., Laplace.Data, 1. / dt, Mass.Data);
                         B.LinComb(sigm, LaplaceM.Data, alpha, Volume_stab.Data);
                         C.LinComb(eps * eps, Laplace.Data, S, Mass.Data, alpha * eps * eps, Volume_stab.Data);
@@ -488,8 +485,7 @@ int main (int argc, char* argv[]) {
                                 logger.log();
                                 InitScalar(mg, chiSol, surfCahnHilliardData.chi, t);
                                 InitScalar(mg, omegaSol, surfCahnHilliardData.omega, t);
-                                SetupInterfaceRhsP1(mg, &f1, lset.Phi, lset.GetBndData(), surfCahnHilliardData.rhs3, t);
-                                SetupInterfaceRhsP1(mg, &f2, lset.Phi, lset.GetBndData(), surfCahnHilliardData.rhs4, t);
+                                SetupInterfaceRhsP1(mg, &f1, lset.Phi, lset.GetBndData(), surfCahnHilliardData.f, t);
                             logger.end();
                             logger.beg("BDF1 step");
                                 logger.beg("set up blocks");
@@ -497,8 +493,7 @@ int main (int argc, char* argv[]) {
                                         well_potential.Data[i] = chemicalPotential(chi_prev.Data[i]);
                                     rhs1 = f1;
                                     rhs1.Data += (1. / dt) * (Mass.Data * chi_prev.Data);
-                                    rhs2 = f2;
-                                    rhs2.Data += S * (Mass.Data * chi_prev.Data) - Mass.Data * well_potential.Data;
+                                    rhs2.Data = S * (Mass.Data * chi_prev.Data) - Mass.Data * well_potential.Data;
                                     A.LinComb(0., Laplace.Data, 1. / dt, Mass.Data);
                                     B.LinComb(sigm, LaplaceM.Data, alpha, Volume_stab.Data);
                                     C.LinComb(eps * eps, Laplace.Data, S, Mass.Data, alpha * eps * eps, Volume_stab.Data);
@@ -544,8 +539,7 @@ int main (int argc, char* argv[]) {
                                         well_potential.Data[i] = 2. * chemicalPotential(chi_prev.Data[i]) - chemicalPotential(chi_prev_prev.Data[i]);
                                     rhs1 = f1;
                                     rhs1.Data += (2. / dt) * (Mass.Data * chi_prev.Data) - (.5 / dt) * (Mass.Data * chi_prev_prev.Data);
-                                    rhs2 = f2;
-                                    rhs2.Data += S * (Mass.Data * chi_extrap.Data) - Mass.Data * well_potential.Data;
+                                    rhs2.Data = S * (Mass.Data * chi_extrap.Data) - Mass.Data * well_potential.Data;
                                     A.LinComb(0., Laplace.Data, 1.5 / dt, Mass.Data);
                                     ABCD = MatrixCL(A, B, C, D);
                                 logger.end();

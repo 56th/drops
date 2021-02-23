@@ -5,9 +5,7 @@
 #ifndef SURF_NAVIER_STOKES_DATA_HPP
 #define SURF_NAVIER_STOKES_DATA_HPP
 
-#include "../num/discretize.h"
-// #include "surfnavierstokes_funcs.h"
-#include "hermite_cubic/hermite_cubic.hpp"
+#include "num/functions.hpp"
 
 namespace DROPS {
 
@@ -15,26 +13,13 @@ namespace DROPS {
         bool exactSoln;
         InstatVectorFunction u_T, f_T, w_T = nullptr; // w = nullptr for the Navier-Stokes case
         InstatScalarFunction p, m_g; // m_g is "-g"
-        struct Surface {
-            InstatScalarFunction phi, u_N;
-            InstatVectorFunction n;
-            InstatVectorFunction e;
-            InstatMatrixFunction H;
-        };
         Surface surface;
         std::string description;
     };
 
-    double arctan(double x, double y) {
-        if (x > 0 && y >= 0) return std::atan(y/x);
-        if (x > 0 && y < 0)  return std::atan(y/x) + 2. * M_PI;
-        if (x < 0)           return std::atan(y/x) + M_PI;
-        return sign(y) * M_PI / 2.;
-    }
-
     SurfNavierStokesData SurfNavierStokesDataFactory(std::string const & test, ParamCL const & param) {
         SurfNavierStokesData data;
-        auto nu = param.get<double>("SurfNavStokes.nu");
+        auto nu = param.get<double>("SurfNavierStokes.nu");
         if (test.find("Sphere") != std::string::npos) {
             data.description = "phi = x^2 + y^2 + z^2 - 1\n";
             data.surface.u_N = [](Point3DCL const &, double) {
@@ -65,8 +50,8 @@ namespace DROPS {
             };
         }
         else if (test.find("Bubble") != std::string::npos) {
-            auto r0 = param.get<double>("SurfNavStokes.IC.Bubble.r0");
-            auto a  = param.get<double>("SurfNavStokes.IC.Bubble.a");
+            auto r0 = param.get<double>("SurfNavierStokes.IC.Bubble.r0");
+            auto a  = param.get<double>("SurfNavierStokes.IC.Bubble.a");
             data.description = "phi = x^2 + y^2 + z^2 - r^2(t), r(t) = r0 (1 + a sin(2 Pi t))\n";
             data.surface.u_N = [=](Point3DCL const &, double t) {
                 return 6.283185307179586*a*r0*cos(6.283185307179586*t);
@@ -81,9 +66,9 @@ namespace DROPS {
             };
         }
         else if (test.find("TorusVarTube") != std::string::npos) {
-            auto r_0 = param.get<double>("SurfNavStokes.IC.TorusVarTube.r_0");
-            auto r_1 = param.get<double>("SurfNavStokes.IC.TorusVarTube.r_1");
-            auto R   = param.get<double>("SurfNavStokes.IC.TorusVarTube.R");
+            auto r_0 = param.get<double>("SurfNavierStokes.IC.TorusVarTube.r_0");
+            auto r_1 = param.get<double>("SurfNavierStokes.IC.TorusVarTube.r_1");
+            auto R   = param.get<double>("SurfNavierStokes.IC.TorusVarTube.R");
             data.description =
                     "torus w/ const distance $R$ from the center of the tube to the center of the torus and\n"
                     "      w/ variable tube radius $" + std::to_string(r_0) + " =: r_0 <= r(\\xi) <= r_1 =: " + std::to_string(r_1) + ", \\xi \\in [0, \\2 pi]\n"
@@ -129,8 +114,8 @@ namespace DROPS {
             data.p = [](Point3DCL const & p, double) {
                 return 0.;
             };
-            auto r0 = param.get<double>("SurfNavStokes.IC.Bubble.r0");
-            auto a  = param.get<double>("SurfNavStokes.IC.Bubble.a");
+            auto r0 = param.get<double>("SurfNavierStokes.IC.Bubble.r0");
+            auto a  = param.get<double>("SurfNavierStokes.IC.Bubble.a");
             data.f_T = [=](Point3DCL const & p, double t) {
                 Point3DCL v;
                 v[0] = (-1.*(std::pow(p[1],2) + std::pow(p[2],2))*(std::sqrt(std::pow(p[0],2) + std::pow(p[1],2) + std::pow(p[2],2))*(std::pow(1. - 2.*t,2)*p[0] + 2.*std::pow(p[0],2) + 2.*std::pow(p[1],2) + 2.*std::pow(p[2],2) - 1.*nu + 2.*t*nu) + 6.283185307179586*a*r0*(-1. + 2.*t)*(std::pow(p[0],2) + std::pow(p[1],2) + std::pow(p[2],2))*cos(6.283185307179586*t)))/std::pow(std::pow(p[0],2) + std::pow(p[1],2) + std::pow(p[2],2),2.5);
@@ -228,6 +213,12 @@ namespace DROPS {
             auto eta = [=](Point3DCL const & p) {
                 return -0.3183098861837907*std::asin(p[2]/std::sqrt(std::pow(p[0],2) + std::pow(p[1],2) + std::pow(p[2],2)));
             };
+            auto arctan = [](double x, double y) {
+                if (x > 0 && y >= 0) return std::atan(y/x);
+                if (x > 0 && y < 0)  return std::atan(y/x) + 2. * M_PI;
+                if (x < 0)           return std::atan(y/x) + M_PI;
+                return sign(y) * M_PI / 2.;
+            };
             auto xi = [=](Point3DCL const & p) {
                 return 0.15915494309189535*arctan(p[0],p[1]);
             };
@@ -235,12 +226,12 @@ namespace DROPS {
                 if (std::pow(p[0],2) + std::pow(p[1],2) == 0.) return Point3DCL(0., 0., 0.);
                 return Point3DCL(-1.*p[1]*std::sqrt(1/(std::pow(p[0],2) + std::pow(p[1],2))), p[0]*std::sqrt(1/(std::pow(p[0],2) + std::pow(p[1],2))), 0.);
             };
-            auto delta_0 = param.get<double>("SurfNavStokes.IC.KelvinHelmholtzCristoph.Delta_0");
-            auto cn = param.get<double>("SurfNavStokes.IC.KelvinHelmholtzCristoph.cn");
-            auto aa = param.get<double>("SurfNavStokes.IC.KelvinHelmholtzCristoph.aa");
-            auto ab = param.get<double>("SurfNavStokes.IC.KelvinHelmholtzCristoph.ab");
-            auto ma = param.get<double>("SurfNavStokes.IC.KelvinHelmholtzCristoph.ma");
-            auto mb = param.get<double>("SurfNavStokes.IC.KelvinHelmholtzCristoph.mb");
+            auto delta_0 = param.get<double>("SurfNavierStokes.IC.KelvinHelmholtzCristoph.Delta_0");
+            auto cn = param.get<double>("SurfNavierStokes.IC.KelvinHelmholtzCristoph.cn");
+            auto aa = param.get<double>("SurfNavierStokes.IC.KelvinHelmholtzCristoph.aa");
+            auto ab = param.get<double>("SurfNavierStokes.IC.KelvinHelmholtzCristoph.ab");
+            auto ma = param.get<double>("SurfNavierStokes.IC.KelvinHelmholtzCristoph.ma");
+            auto mb = param.get<double>("SurfNavierStokes.IC.KelvinHelmholtzCristoph.mb");
             auto Hs = [=](double eta) {
                 return std::tanh(2. * eta / delta_0);
             };

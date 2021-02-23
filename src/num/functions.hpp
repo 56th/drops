@@ -13,6 +13,12 @@ namespace DROPS {
     using InstatVectorFunction = InstatFunction<Point3DCL>;
     using InstatMatrixFunction = InstatFunction<SMatrixCL<3, 3>>;
     using MatchFunction = std::function<bool(const Point3DCL&, const Point3DCL&)>;
+    struct Surface {
+        InstatScalarFunction phi, u_N;
+        InstatVectorFunction n;
+        InstatVectorFunction e;
+        InstatMatrixFunction H;
+    };
 }
 
 #endif // FUNCTIONS_HPP
