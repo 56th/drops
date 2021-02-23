@@ -30,8 +30,6 @@
 #include <fstream>
 
 #include "surfphasesep/surfphasesep_funcs.h"
-#include "surfnavierstokes/surfnavierstokes_utils.h"
-#include "surfnavierstokes/surfnavierstokes_tests.h"
 
 // vtk output
 #include "out/VTKWriter.hpp"
@@ -59,19 +57,6 @@
 #endif
 
 using namespace DROPS;
-
-void InitVecLaplace(const MultiGridCL& MG, LevelsetP2CL& lset, VecDescCL& rhs, VecDescCL& vSol, VecDescCL& pSol,
-                    InstatVectorFunction f_rhs, InstatVectorFunction f_vsol, InstatScalarFunction f_psol, double t = 0.0)
-{
-    if( vSol.RowIdx->NumUnknownsEdge()) {
-        SetupInterfaceVectorRhsP2(MG, &rhs, lset.Phi, lset.GetBndData(), f_rhs);
-    } else {
-        SetupInterfaceVectorRhsP1(MG, &rhs, lset.Phi, lset.GetBndData(), f_rhs, t);
-    }
-    InitScalar(MG, pSol, f_psol);
-    InitVector(MG, vSol, f_vsol);
-}
-
 
 int main (int argc, char* argv[]) {
     srand(time(NULL));
@@ -304,7 +289,7 @@ int main (int argc, char* argv[]) {
                 }
                 double raftFraction, raftFractionError;
                 do {
-                    InitScalar(mg, chi_coarse_ini_ext, surfCahnHilliardData.chi, 0.);
+                    chi_coarse_ini_ext.Interpolate(mg, surfCahnHilliardData.chi, 0.);
                     chi_ext.Data = chi_coarse_ini_ext.Data;
                     for (auto const &p : P)
                         chi_ext.Data = p * chi_ext.Data;
@@ -378,8 +363,8 @@ int main (int argc, char* argv[]) {
                         << "t  = " << t << '\n'
                         << "dt = " << dt;
                     logger.log();
-                    InitScalar(mg, chiSol, surfCahnHilliardData.chi, t);
-                    InitScalar(mg, omegaSol, surfCahnHilliardData.omega, t);
+                    chiSol.Interpolate(mg, surfCahnHilliardData.chi, t);
+                    omegaSol.Interpolate(mg, surfCahnHilliardData.omega, t);
                     SetupInterfaceRhsP1(mg, &f1, lset.Phi, lset.GetBndData(), surfCahnHilliardData.f, t);
                 logger.end();
                 logger.beg("BDF1 step");
@@ -483,8 +468,8 @@ int main (int argc, char* argv[]) {
                                     << "t  = " << t << '\n'
                                     << "dt = " << dt;
                                 logger.log();
-                                InitScalar(mg, chiSol, surfCahnHilliardData.chi, t);
-                                InitScalar(mg, omegaSol, surfCahnHilliardData.omega, t);
+                                chiSol.Interpolate(mg, surfCahnHilliardData.chi, t);
+                                omegaSol.Interpolate(mg, surfCahnHilliardData.omega, t);
                                 SetupInterfaceRhsP1(mg, &f1, lset.Phi, lset.GetBndData(), surfCahnHilliardData.f, t);
                             logger.end();
                             logger.beg("BDF1 step");

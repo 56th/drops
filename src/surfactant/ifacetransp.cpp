@@ -586,8 +586,8 @@ public:
         if (!isInCutMesh(assembler.levelSetTet)) return;
         for (auto& matrix : system.matrices) {
             auto form = (assembler.*matrix->form)();
-            auto I = matrix->RowIdx->loc2glo(tet);
-            auto J = matrix->ColIdx->loc2glo(tet);
+            auto I = matrix->RowIdx->Loc2Glo(tet);
+            auto J = matrix->ColIdx->Loc2Glo(tet);
             for (size_t i = 0; i < I.size(); ++i) {
                 if (I[i] == NoIdx) throw std::logic_error("invalid FE space idx");
                 for (size_t j = 0; j < J.size(); ++j) {
@@ -598,7 +598,7 @@ public:
         }
         for (auto& vector : system.vectors) {
             auto form = (assembler.*vector->form)();
-            auto I = vector->RowIdx->loc2glo(tet);
+            auto I = vector->RowIdx->Loc2Glo(tet);
             for (size_t i = 0; i < I.size(); ++i) {
                 if (I[i] == NoIdx) throw std::logic_error("invalid FE space idx");
                 vector->Data[I[i]] += form[i];

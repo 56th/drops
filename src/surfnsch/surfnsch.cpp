@@ -1,4 +1,4 @@
-/// \file surfnavierstokes.cpp
+/// \file surfnsch.cpp
 /// \brief Trace FEM discretization of a surface Navier-Stokes-Cahn-Hilliard problem
 /// \author Alexander Zhiliakov alex@math.uh.edu, Yerbol Palzhanov palzhanov@math.uh.edu
 
@@ -24,11 +24,6 @@
 
 #include <fstream>
 
-#include <surfactant/ifacetransp.h>
-#include <surfactant/surfacestokes_tests.h>
-#include <surfactant/surfacestokes_utils.h>
-
-#include "surfactant/ifacetransp.h"
 #include "misc/params.h"
 #include "geom/builder.h"
 #include "levelset/levelset.h"
@@ -37,16 +32,14 @@
 #include "misc/dynamicload.h"
 #include "num/bndData.h"
 #include "surfactant/ifacetransp.h"
-#include "surfnavierstokes/surfnavierstokes_utils.h"
-
 #include "out/VTKWriter.hpp"
-#include "SurfNSCHData.hpp"
+#include "SurfNSCHData.hpp.hpp"
 #include "SingletonLogger.hpp"
-
 // belos (iterative solvers)
 #include "BelosSolverFactory.hpp"
 #include "BelosLinearProblem.hpp"
 #include "BelosEpetraAdapter.hpp"
+// #include "BelosStatusTestImpResNorm.hpp"
 // amesos2 (sparse-direct solvers)
 #include "Amesos2.hpp"
 #include "Amesos2_Version.hpp"
@@ -190,7 +183,7 @@ int main(int argc, char* argv[]) {
             MLIdxDescCL lstIdx(P2_FE);
             lstIdx.CreateNumbering(mg.GetLastLevel(), mg, lsetBnd);
             levelSet.SetIdx(&lstIdx);
-            InitScalar(mg, levelSet, surfNavierStokesData.surface.phi, 0.);
+            levelSet.Interpolate(mg, surfNavierStokesData.surface.phi, 0.);
         logger.end();
         logger.beg("set up FE spaces");
             IdxDescCL velIdx(vecP2IF_FE, vecBnd); {
@@ -442,8 +435,8 @@ int main(int argc, char* argv[]) {
             auto factorizationTime = 0.;
             logger.beg("interpolate initial data");
                 // ... add $c$
-                InitVector(mg, u, surfNavierStokesData.u_T, t);
-                InitScalar(mg, p, surfNavierStokesData.p, t);
+                u.Interpolate(mg, surfNavierStokesData.u_T, t);
+                p.Interpolate(mg, surfNavierStokesData.p, t);
                 p.Data -= dot(M_p.Data * p.Data, I_p) / dot(M_p.Data * I_p, I_p) * I_p;
                 u_prev = u;
             auto solveTime = logger.end();
@@ -517,8 +510,8 @@ int main(int argc, char* argv[]) {
                     tJSON.put("Integral.FESolution.Palinstrophy", .5 * vorH1Sq);
                     tJSON.put("Integral.FESolution.SurfaceVorticityH1", sqrt(vorH1Sq));
                     if (surfNavierStokesData.exactSoln) {
-                        InitVector(mg, u_star, surfNavierStokesData.u_T, t);
-                        InitScalar(mg, p_star, surfNavierStokesData.p, t);
+                        u_star.Interpolate(mg, surfNavierStokesData.u_T, t);
+                        p_star.Interpolate(mg, surfNavierStokesData.p, t);
                         p_star.Data -= dot(M_p.Data * p_star.Data, I_p) / dot(M_p.Data * I_p, I_p) * I_p;
                         tJSON.put("Integral.ExactSolution.PressureMean", dot(I_p, M_p.Data * p_star.Data) / surfArea);
                         tJSON.put("Integral.ExactSolution.PressureL2", sqrt(dot(p_star.Data, M_p.Data * p_star.Data)));
@@ -623,7 +616,7 @@ int main(int argc, char* argv[]) {
                             logger.log("assembling mass mtx scaled w/ cut-off function");
                             surfNSCHSystem.matrices.push_back(&rho_M_u);
                         }
-                        if (surfNavierStokesData.w_T) InitVector(mg, w_T, surfNavierStokesData.w_T, t); // Oseen (and Stokes) case
+                        if (surfNavierStokesData.w_T) w_T.Interpolate(mg, surfNavierStokesData.w_T, t); // Oseen (and Stokes) case
                         else w_T.Data = 2. * u.Data - u_prev.Data; // Navier-Stokes case
                         Pe = supnorm(w_T.Data) / nu;
                         logger.buf << "Pe = " << Pe;

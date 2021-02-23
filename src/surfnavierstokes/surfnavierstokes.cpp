@@ -24,7 +24,6 @@
 
 #include <fstream>
 
-#include "surfactant/ifacetransp.h"
 #include "misc/params.h"
 #include "geom/builder.h"
 #include "levelset/levelset.h"
@@ -33,12 +32,9 @@
 #include "misc/dynamicload.h"
 #include "num/bndData.h"
 #include "surfactant/ifacetransp.h"
-
 #include "out/VTKWriter.hpp"
 #include "SurfNavierStokesData.hpp"
-#include "surfnavierstokes_utils.h"
 #include "SingletonLogger.hpp"
-
 // belos (iterative solvers)
 #include "BelosSolverFactory.hpp"
 #include "BelosLinearProblem.hpp"
@@ -176,7 +172,7 @@ int main(int argc, char* argv[]) {
             MLIdxDescCL lstIdx(P2_FE);
             lstIdx.CreateNumbering(mg.GetLastLevel(), mg, lsetBnd);
             levelSet.SetIdx(&lstIdx);
-            InitScalar(mg, levelSet, surfNavierStokesData.surface.phi, 0.);
+            levelSet.Interpolate(mg, surfNavierStokesData.surface.phi, 0.);
         logger.end();
         logger.beg("set up FE spaces");
             IdxDescCL velIdx(vecP2IF_FE, vecBnd); {
@@ -415,8 +411,8 @@ int main(int argc, char* argv[]) {
             auto assembleTime = logger.end();
             auto factorizationTime = 0.;
             logger.beg("interpolate initial data");
-                InitVector(mg, u, surfNavierStokesData.u_T, t);
-                InitScalar(mg, p, surfNavierStokesData.p, t);
+                u.Interpolate(mg, surfNavierStokesData.u_T, t);
+                p.Interpolate(mg, surfNavierStokesData.p, t);
                 p.Data -= dot(M_p.Data * p.Data, I_p) / dot(M_p.Data * I_p, I_p) * I_p;
                 u_prev = u;
             auto solveTime = logger.end();
@@ -487,8 +483,8 @@ int main(int argc, char* argv[]) {
                     tJSON.put("Integral.FESolution.Palinstrophy", .5 * vorH1Sq);
                     tJSON.put("Integral.FESolution.SurfaceVorticityH1", sqrt(vorH1Sq));
                     if (surfNavierStokesData.exactSoln) {
-                        InitVector(mg, u_star, surfNavierStokesData.u_T, t);
-                        InitScalar(mg, p_star, surfNavierStokesData.p, t);
+                        u_star.Interpolate(mg, surfNavierStokesData.u_T, t);
+                        p_star.Interpolate(mg, surfNavierStokesData.p, t);
                         p_star.Data -= dot(M_p.Data * p_star.Data, I_p) / dot(M_p.Data * I_p, I_p) * I_p;
                         tJSON.put("Integral.ExactSolution.PressureMean", dot(I_p, M_p.Data * p_star.Data) / surfArea);
                         tJSON.put("Integral.ExactSolution.PressureL2", sqrt(dot(p_star.Data, M_p.Data * p_star.Data)));
@@ -537,7 +533,7 @@ int main(int argc, char* argv[]) {
                             std::string format = inpJSON.get<std::string>("SurfNavierStokes.ExportMatricesFormat") == ".mtx" ? ".mtx" : ".mat";
                             auto expFunc = format == ".mtx" ? &MatrixCL::exportMTX : &MatrixCL::exportMAT;
                             auto expMat = [&](MatrixCL &A, std::string const a, std::string const &b) {
-                                logger.beg(a);
+                                logger.beg("export " + a + " mtx");
                                     logger.buf << "size: " << A.num_rows() << 'x' << A.num_cols();
                                     logger.log();
                                     (A.*expFunc)(dirName + "/matrices/" + b + format);
@@ -567,11 +563,11 @@ int main(int argc, char* argv[]) {
             std::stringstream header; header << "t = t_" << i << " = " << t << " (" << (100. * i) / numSteps << "%)";
             logger.beg(header.str());
                 logger.beg("initialize surface speed u_N");
-                    InitScalar(mg, u_N, surfNavierStokesData.surface.u_N, t);
+                    u_N.Interpolate(mg, surfNavierStokesData.surface.u_N, t);
                 logger.end();
                 logger.beg("assemble");
                     surfNSystem.matrices = {};
-                    if (surfNavierStokesData.w_T) InitVector(mg, w_T, surfNavierStokesData.w_T, t); // Oseen (and Stokes) case
+                    if (surfNavierStokesData.w_T) w_T.Interpolate(mg, surfNavierStokesData.w_T, t); // Oseen (and Stokes) case
                     else w_T.Data = 2. * u.Data - u_prev.Data; // Navier-Stokes case
                     Pe = supnorm(w_T.Data) / nu;
                     if (Pe) {

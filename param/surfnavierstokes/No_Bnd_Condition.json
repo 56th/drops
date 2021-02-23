@@ -67,7 +67,7 @@
       "Formulation":              "Consistent",
       "NumbOfVirtualSubEdges":    2,
       "ExportMatrices":           false,
-      "ExportMatricesFormat":     "mat"
+      "ExportMatricesFormat":     ".mat"
     },
 
     "Time": {

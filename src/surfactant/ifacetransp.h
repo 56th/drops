@@ -967,9 +967,14 @@ private:
         if (!function.size()) (this->*builder)();
         if (!function.size()) throw std::logic_error(__func__ + std::string(": invalid builder"));
     }
-    std::pair<size_t, size_t> ind(size_t i) {
+    std::pair<size_t, size_t> ind(size_t n, size_t i) {
+        /*
         auto is = i / 3; // scalar shape index
         auto in = i - 3 * is; // nonzero vect component
+        return { is, in };
+        */
+        auto in = i / n; // nonzero vect component
+        auto is = i - in * n; // scalar shape index
         return { is, in };
     }
     GridFunctionCL<Point3DCL> getSurfGradP1(GridFunctionCL<> const & f) {
@@ -1067,30 +1072,30 @@ private:
     void buildRateOfStrainTensor() {
         require(qGradP2[0], &LocalAssembler::buildGradP2);
         require(qP, &LocalAssembler::buildProjector);
-        auto qVectGrad = [&](size_t vecShapeIndex, GridFunctionCL<Point3DCL>* P1OrP2grad) {
+        auto qVectGrad = [&](size_t vecShapeIndex, GridFunctionCL<Point3DCL>* qGrad) {
             GridFunctionCL<SMatrixCL<3,3>> res(SMatrixCL<3,3>(), qDomain.vertex_size());
-            auto && [ scaShapeIndex, row ] = ind(vecShapeIndex);
+            auto && [ scaShapeIndex, row ] = ind(n.P2, vecShapeIndex);
             for (size_t i = 0; i < res.size(); ++i) {
                 SMatrixCL<3, 3> mtx(0.);
-                mtx.col(row, P1OrP2grad[scaShapeIndex][i]);
+                mtx.col(row, qGrad[scaShapeIndex][i]);
                 assign_transpose(res[i], mtx);
             }
             return res;
         };
-        for (size_t i = 0; i < 30; ++i)
+        for (size_t i = 0; i < n.vecP2; ++i)
             qE[i] = qP * sym_part(qVectGrad(i, qGradP2)) * qP;
     }
     void buildHatP2CrossN() { // compute velocity shape func cross normal vector
         require(qHatP2[0], &LocalAssembler::buildHatP2);
         require(qNormal, &LocalAssembler::buildNormal);
-        auto qHatCrossN = [&](size_t vecShapeIndex, GridFunctionCL<>* P1OrP2Hat) {
+        auto qHatCrossN = [&](size_t vecShapeIndex, GridFunctionCL<>* qHat) {
             GridFunctionCL<Point3DCL> phi(Point3DCL(0., 0., 0.), qDomain.vertex_size());
-            auto && [ is, in ] = ind(vecShapeIndex);
+            auto && [ is, in ] = ind(n.P2, vecShapeIndex);
             for (size_t i = 0; i < phi.size(); ++i)
-                phi[i][in] = P1OrP2Hat[is][i];
+                phi[i][in] = qHat[is][i];
             return cross_product(qNormal, phi);
         };
-        for (size_t i = 0; i < 30; ++i)
+        for (size_t i = 0; i < n.vecP2; ++i)
             qHatP2CrossN[i] = qHatCrossN(i, qHatP2);
     }
     void buildWind() {
@@ -1170,10 +1175,10 @@ public:
         require(qE[0], &LocalAssembler::buildRateOfStrainTensor);
         auto A = createMtx(n.vecP2);
         for (size_t i = 0; i < n.vecP2; ++i) {
-            auto && [ is, in ] = ind(i);
+            auto && [ is, in ] = ind(n.P2, i);
             auto e_in = std_basis<3>(in + 1);
             for (size_t j = i; j < n.vecP2; ++j) {
-                auto && [ js, jn ] = ind(j);
+                auto && [ js, jn ] = ind(n.P2, j);
                 auto e_jn = std_basis<3>(jn + 1);
                 A[i][j] = quad_2D(contract(qE[j] - (qHatP2[js] * dot(e_jn, qNormal)) * qH, qE[i] - (qHatP2[is] * dot(e_in, qNormal)) * qH), qDomain);
                 A[j][i] = A[i][j];
@@ -1185,9 +1190,9 @@ public:
         require(qHatP2[0], &LocalAssembler::buildHatP2);
         auto A = createMtx(n.vecP2);
         for (size_t i = 0; i < n.vecP2; ++i) {
-            auto && [ is, in ] = ind(i);
+            auto && [ is, in ] = ind(n.P2, i);
             for (size_t j = i; j < n.vecP2; ++j) {
-                auto && [ js, jn ] = ind(j);
+                auto && [ js, jn ] = ind(n.P2, j);
                 A[i][j] = in == jn ? quad_2D(qHatP2[js] * qHatP2[is], qDomain) : 0.;
                 A[j][i] = A[i][j];
             }
@@ -1200,9 +1205,9 @@ public:
         require(qHatP2[0], &LocalAssembler::buildHatP2);
         auto A = createMtx(n.vecP2);
         for (size_t i = 0; i < n.vecP2; ++i) {
-            auto && [ is, in ] = ind(i);
+            auto && [ is, in ] = ind(n.P2, i);
             for (size_t j = i; j < n.vecP2; ++j) {
-                auto && [ js, jn ] = ind(j);
+                auto && [ js, jn ] = ind(n.P2, j);
                 A[i][j] = in == jn ? quad_2D(qCutOffFunc * qHatP2[js] * qHatP2[is], qDomain) : 0.;
                 A[j][i] = A[i][j];
             }
@@ -1214,9 +1219,9 @@ public:
         require(qP, &LocalAssembler::buildProjector);
         auto A = createMtx(n.vecP2);
         for (size_t i = 0; i < n.vecP2; ++i) {
-            auto && [ is, in ] = ind(i);
+            auto && [ is, in ] = ind(n.P2, i);
             for (size_t j = i; j < n.vecP2; ++j) {
-                auto && [ js, jn ] = ind(j);
+                auto && [ js, jn ] = ind(n.P2, j);
                 A[i][j] = quad_2D(qHatP2[js] * take(qP, jn, in) * qHatP2[is], qDomain);
                 A[j][i] = A[i][j];
             }
@@ -1230,9 +1235,9 @@ public:
         require(qP, &LocalAssembler::buildProjector);
         auto A = createMtx(n.vecP2);
         for (size_t i = 0; i < n.vecP2; ++i) {
-            auto && [ is, in ] = ind(i);
+            auto && [ is, in ] = ind(n.P2, i);
             for (size_t j = i; j < n.vecP2; ++j) {
-                auto && [ js, jn ] = ind(j);
+                auto && [ js, jn ] = ind(n.P2, j);
                 A[i][j] = quad_2D(qCutOffFunc * qHatP2[js] * take(qP, jn, in) * qHatP2[is], qDomain);
                 A[j][i] = A[i][j];
             }
@@ -1247,9 +1252,9 @@ public:
         require(qWind, &LocalAssembler::buildWind);
         auto A = createMtx(n.vecP2);
         for (size_t i = 0; i < n.vecP2; ++i) {
-            auto && [ is, in ] = ind(i);
+            auto && [ is, in ] = ind(n.P2, i);
             for (size_t j = 0; j < n.vecP2; ++j) {
-                auto && [ js, jn ] = ind(j);
+                auto && [ js, jn ] = ind(n.P2, j);
                 A[i][j] = quad_2D(dot(qWind, qGradP2[js]) * take(qP, in, jn) * qHatP2[is], qDomain);
             }
         }
@@ -1264,9 +1269,9 @@ public:
         require(qWind, &LocalAssembler::buildWind);
         auto A = createMtx(n.vecP2);
         for (size_t i = 0; i < n.vecP2; ++i) {
-            auto && [ is, in ] = ind(i);
+            auto && [ is, in ] = ind(n.P2, i);
             for (size_t j = 0; j < n.vecP2; ++j) {
-                auto && [ js, jn ] = ind(j);
+                auto && [ js, jn ] = ind(n.P2, j);
                 A[i][j] = quad_2D(qCutOffFunc * dot(qWind, qGradP2[js]) * take(qP, in, jn) * qHatP2[is], qDomain);
             }
         }
@@ -1289,9 +1294,9 @@ public:
         require(qSurfSpeed, &LocalAssembler::buildSurfSpeed);
         auto A = createMtx(n.vecP2);
         for (size_t i = 0; i < n.vecP2; ++i) {
-            auto && [ is, in ] = ind(i);
+            auto && [ is, in ] = ind(n.P2, i);
             for (size_t j = i; j < n.vecP2; ++j) {
-                auto && [ js, jn ] = ind(j);
+                auto && [ js, jn ] = ind(n.P2, j);
                 A[i][j] = quad_2D(qHatP2[js] * qSurfSpeed * take(qH, jn, in) * qHatP2[is], qDomain);
                 A[j][i] = A[i][j];
             }
@@ -1303,10 +1308,10 @@ public:
         require(qNormal, &LocalAssembler::buildNormal);
         auto A = createMtx(n.vecP2);
         for (size_t i = 0; i < n.vecP2; ++i) {
-            auto && [ is, in ] = ind(i);
+            auto && [ is, in ] = ind(n.P2, i);
             auto e_in = std_basis<3>(in + 1);
             for (size_t j = i; j < n.vecP2; ++j) {
-                auto && [ js, jn ] = ind(j);
+                auto && [ js, jn ] = ind(n.P2, j);
                 auto e_jn = std_basis<3>(jn + 1);
                 A[i][j] = quad_2D(qHatP2[js] * dot(e_jn, qNormal) * qHatP2[is] * dot(e_in, qNormal), qDomain);
                 A[j][i] = A[i][j];
@@ -1319,9 +1324,9 @@ public:
         require(q3DNormal, &LocalAssembler::buildNormal);
         auto A = createMtx(n.vecP2);
         for (size_t i = 0; i < n.vecP2; ++i) {
-            auto && [ is, in ] = ind(i);
+            auto && [ is, in ] = ind(n.P2, i);
             for (size_t j = i; j < n.vecP2; ++j) {
-                auto && [ js, jn ] = ind(j);
+                auto && [ js, jn ] = ind(n.P2, j);
                 A[i][j] = in == jn ? quad(dot(q3DNormal, q3DGradP2[js]) * dot(q3DNormal, q3DGradP2[is]), absDet, q3Domain, AllTetraC) : 0.;
                 A[j][i] = A[i][j];
             }
@@ -1335,7 +1340,7 @@ public:
         if (rho_delta) {
             require(qCutOffFunc, &LocalAssembler::buildCutOffFunc);
             for (size_t i = 0; i < n.vecP2; ++i) {
-                auto && [is, in] = ind(i);
+                auto && [is, in] = ind(n.P2, i);
                 auto e_in = std_basis<3>(in + 1);
                 b[i] = quad_2D(qCutOffFunc * dot(e_in, qF) * qHatP2[is], qDomain);
             }
@@ -1345,7 +1350,7 @@ public:
                 require(qE[0], &LocalAssembler::buildRateOfStrainTensor);
                 require(qH, &LocalAssembler::buildShapeOp);
                 for (size_t i = 0; i < n.vecP2; ++i) {
-                    auto && [is, in] = ind(i);
+                    auto && [is, in] = ind(n.P2, i);
                     auto e_in = std_basis<3>(in + 1);
                     b[i] += quad_2D(qCutOffFunc * qSurfSpeed * dot(e_in, qSurfSpeedSurfGrad) * qHatP2[is] - params.surfNavierStokesParams.nu * qSurfSpeed * contract(qH, qE[i]), qDomain);
                 }
@@ -1353,7 +1358,7 @@ public:
         }
         else {
             for (size_t i = 0; i < n.vecP2; ++i) {
-                auto && [is, in] = ind(i);
+                auto && [is, in] = ind(n.P2, i);
                 auto e_in = std_basis<3>(in + 1);
                 b[i] = params.surfNavierStokesParams.rho_max * quad_2D(dot(e_in, qF) * qHatP2[is], qDomain);
             }
@@ -1363,7 +1368,7 @@ public:
                 require(qE[0], &LocalAssembler::buildRateOfStrainTensor);
                 require(qH, &LocalAssembler::buildShapeOp);
                 for (size_t i = 0; i < n.vecP2; ++i) {
-                    auto && [is, in] = ind(i);
+                    auto && [is, in] = ind(n.P2, i);
                     auto e_in = std_basis<3>(in + 1);
                     b[i] += quad_2D(params.surfNavierStokesParams.rho_max * qSurfSpeed * dot(e_in, qSurfSpeedSurfGrad) * qHatP2[is] - params.surfNavierStokesParams.nu * qSurfSpeed * contract(qH, qE[i]), qDomain);
                 }
@@ -1374,7 +1379,7 @@ public:
             require(qChiSurfGrad, &LocalAssembler::buildConcentration);
             require(qOmega, &LocalAssembler::buildChemPotential);
             for (size_t i = 0; i < n.vecP2; ++i) {
-                auto && [is, in] = ind(i);
+                auto && [is, in] = ind(n.P2, i);
                 auto e_in = std_basis<3>(in + 1);
                 b[i] -= params.surfNavierStokesParams.lineTension * quad_2D(qOmega * dot(e_in, qChiSurfGrad) * qHatP2[is], qDomain);
             }
@@ -1393,7 +1398,7 @@ public:
         auto A = createMtx(n.P1, n.vecP2);
         for (size_t i = 0; i < n.P1; ++i)
             for (size_t j = 0; j < n.vecP2; ++j) {
-                auto && [ js, jn ] = ind(j);
+                auto && [ js, jn ] = ind(n.P2, j);
                 auto e_jn = std_basis<3>(jn + 1);
                 A[i][j] = quad_2D(qHatP2[js] * dot(e_jn, qSurfGradP1[i]), qDomain);
             }

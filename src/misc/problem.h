@@ -311,18 +311,21 @@ private:
     /// \brief Number unknowns on the vertices surrounding an interface.
     void CreateNumbNearInterface(Uint level, MultiGridCL& mg, const VecDescCL& ls, const BndDataCL<>& lsetbnd,double width, double dist=0./*default to using dof in cut tetra*/);
 public:
-    std::vector<IdxT> loc2glo(TetraCL const & tet) {
+    std::vector<IdxT> Loc2Glo(TetraCL const & tet) {
+        size_t dim = IsScalar() ? 1 : 3;
+        if (NumUnknowns_ % dim) throw std::logic_error(__func__ + std::string(": invalid numb of d.o.f."));
+        auto blockSize = NumUnknowns_ / dim;
         auto idx = GetIdx();
-        auto nV = NumUnknownsVertex();
-        auto nE = NumUnknownsEdge();
         std::vector<IdxT> res;
-        res.reserve(4 * nV + 6 * nE);
-        for (size_t i = 0; i < 4; ++i)
-            for (size_t d = 0; d < nV; ++d)
-                res.push_back(tet.GetVertex(i)->Unknowns(idx) + d);
-        for (size_t i = 0; i < 6; ++i)
-            for (size_t d = 0; d < nE; ++d)
-                res.push_back(tet.GetEdge(i)->Unknowns(idx) + d);
+        res.reserve(4 * NumUnknownsVertex_ + 6 * NumUnknownsEdge_);
+        for (size_t d = 0; d < dim; ++d) {
+            if (NumUnknownsVertex_)
+                for (size_t i = 0; i < 4; ++i)
+                    res.push_back(tet.GetVertex(i)->Unknowns(idx) / dim /* / dim is tmp */ + d * blockSize);
+            if (NumUnknownsEdge_)
+                for (size_t i = 0; i < 6; ++i)
+                    res.push_back(tet.GetEdge(i)->Unknowns(idx) / dim /* / dim is tmp */ + d * blockSize);
+        }
         return res;
     }
     using FE_InfoCL::IsExtended;
@@ -665,24 +668,19 @@ class LocalNumbP2CL
 /// \brief A numerical vector together with an IdxDescCL -object,
 ///     that couples it to simplices in a multigrid.
 template<class T>
-class VecDescBaseCL
-{
-  public:
+class VecDescBaseCL {
+public:
     /// \brief The type of the numerical vector.
     typedef T DataType;
-
     /// \brief The default-constructor creates an empty vector and sets RowIdx to 0.
     VecDescBaseCL()
         :RowIdx( 0), t( 0.0) {}
     /// \brief Initialize RowIdx with idx and construct Data with the given size.
     VecDescBaseCL( IdxDescCL* idx) : t( 0.0) { SetIdx( idx); }
     VecDescBaseCL( MLIdxDescCL* idx): t( 0.0) { SetIdx( &(idx->GetFinest()) ); }
-
-
     IdxDescCL* RowIdx; ///< Pointer to the index-description used for Data.
     DataType   Data;   ///< The numerical data.
     mutable double t;  ///< time
-
     /// \brief The triangulation-level of the index.
     Uint GetLevel() const { return RowIdx->TriangLevel(); }
     /// \brief Use a new index for accessing the components.
@@ -694,11 +692,45 @@ class VecDescBaseCL
     void Clear( double time);
     /// \brief Empty Data and set RowIdx to 0.
     void Reset();
-
     /// \brief Write Data on a stream
     void Write(std::ostream&, bool binary=false) const;
     /// \brief Read Data from a stream
     void Read(std::istream&, bool binary=false);
+    VecDescBaseCL& Interpolate(MultiGridCL const & mg, InstatScalarFunction f, double t = 0.) {
+        if (!RowIdx->IsScalar()) throw std::invalid_argument(__func__ + std::string(": f must be vector-valued"));
+        auto lvl = GetLevel();
+        auto idx = RowIdx->GetIdx();
+        this->t = t;
+        if (RowIdx->NumUnknownsVertex())
+            for (auto it = mg.GetTriangVertexBegin(lvl); it != mg.GetTriangVertexEnd(lvl); ++it)
+                if (it->Unknowns.Exist(idx))
+                    Data[it->Unknowns(idx)] = f(it->GetCoord(), t);
+        if (RowIdx->NumUnknownsEdge())
+            for (auto it = mg.GetTriangEdgeBegin(lvl); it != mg.GetTriangEdgeEnd(lvl); ++it)
+                if (it->Unknowns.Exist(idx))
+                    Data[it->Unknowns(idx)] = f(GetBaryCenter(*it), t);
+        return *this;
+    }
+    VecDescBaseCL& Interpolate(MultiGridCL const & mg, InstatVectorFunction f, double t = 0.) {
+        if (RowIdx->IsScalar()) throw std::invalid_argument(__func__ + std::string(": f must be scalar-valued"));
+        size_t const dim = 3;
+        if (RowIdx->NumUnknowns() % dim) throw std::logic_error(__func__ + std::string(": invalid numb of d.o.f."));
+        auto blockSize = RowIdx->NumUnknowns() / dim;
+        auto lvl = GetLevel();
+        auto idx = RowIdx->GetIdx();
+        this->t = t;
+        for (size_t d = 0; d < dim; ++d) {
+            if (RowIdx->NumUnknownsVertex())
+                for (auto it = mg.GetTriangVertexBegin(lvl); it != mg.GetTriangVertexEnd(lvl); ++it)
+                    if (it->Unknowns.Exist(idx))
+                        Data[it->Unknowns(idx) / dim /* / dim is tmp */ + d * blockSize] = f(it->GetCoord(), t)[d];
+            if (RowIdx->NumUnknownsEdge())
+                for (auto it = mg.GetTriangEdgeBegin(lvl); it != mg.GetTriangEdgeEnd(lvl); ++it)
+                    if (it->Unknowns.Exist(idx))
+                        Data[it->Unknowns(idx) / dim /* / dim is tmp */ + d * blockSize] = f(GetBaryCenter(*it), t)[d];
+        }
+        return *this;
+    }
 };
 
 /// \brief A sparse matrix together with two IdxDescCL -objects,
