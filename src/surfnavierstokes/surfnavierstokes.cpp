@@ -50,7 +50,7 @@
 #include "Amesos2.hpp"
 #include "Amesos2_Version.hpp"
 // epetra (vectors and operators / matrices)
-#include "Epetra_OperatorApply.hpp"
+#include "epetra/Epetra_OperatorApply.hpp"
 #include "Epetra_CrsMatrix.h"
 #include "Epetra_Vector.h"
 #ifdef HAVE_MPI
