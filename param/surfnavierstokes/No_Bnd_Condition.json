@@ -1,12 +1,16 @@
 {
     "Output": {
       "Directory":  "../../output/tmp",
-      "EveryStep":  1,
+      "EveryStep":  10,
       "Binary":     true,
-      "Velocity": false,
-      "Vorticity": true,
-      "SurfSpeed": false,
-      "Pressure": false
+      "VTK": {
+        "Velocity": false,
+        "Vorticity": true,
+        "SurfSpeed": false,
+        "Pressure": false
+      },
+      "Matrices": false,
+      "Vectors": false
     },
 
     "Mesh": {
@@ -65,9 +69,7 @@
       "PressureVolumestabPower":  1,
       "PressureVolumestabFactor": 1,
       "Formulation":              "Consistent",
-      "NumbOfVirtualSubEdges":    2,
-      "ExportMatrices":           false,
-      "ExportMatricesFormat":     ".mat"
+      "NumbOfVirtualSubEdges":    2
     },
 
     "Time": {

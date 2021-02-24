@@ -69,6 +69,9 @@ namespace DROPS {
                 unstructuredGrid->SetCells(VTK_LAGRANGE_TETRAHEDRON, cellArray);
             #endif
         }
+        size_t numVars() const {
+            return vars.size();
+        }
         VTKWriter& add(VTKVar const & var) {
             vars.push_back(var);
             return *this;
