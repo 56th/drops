@@ -1100,7 +1100,12 @@ private:
     }
     void buildWind() {
         LocalP2CL<Point3DCL> windTet;
-        windTet.assign(tet, params.surfNavierStokesParams.w_T, BndDataCL<Point3DCL>());
+        auto I = params.surfNavierStokesParams.w_T.RowIdx->Loc2Glo(tet);
+        for (size_t i = 0; i < I.size(); ++i) {
+            auto && [is, in] = ind(n.P2, i);
+            windTet[is][in] = params.surfNavierStokesParams.w_T.Data[I[i]];
+        }
+        // windTet.assign(tet, params.surfNavierStokesParams.w_T, BndDataCL<Point3DCL>());
         resize_and_evaluate_on_vertexes(windTet, qDomain, qWind);
         if (params.surfNavierStokesParams.u_N_max) {
             require(qNormal, &LocalAssembler::buildNormal);
