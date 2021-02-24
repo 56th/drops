@@ -714,7 +714,7 @@ public:
         LinComb(a, A, b, B, args...);
     }
     ~SparseMatBaseCL();
-    SparseMatBaseCL(size_t rows, size_t cols, size_t nnz); ///< the fields are allocated, but not initialized
+    SparseMatBaseCL(size_t rows, size_t cols, size_t nnz = 0); ///< the fields are allocated, but not initialized
     SparseMatBaseCL(const std::valarray<T>&); ///< Creates a square diagonal matrix.
     SparseMatBaseCL(SparseMatBaseCL const & A, SparseMatBaseCL const & B, SparseMatBaseCL const & C, SparseMatBaseCL const & D)
         : _rows(A.num_rows() + C.num_rows())
@@ -750,6 +750,38 @@ public:
         };
         mergeRowBlocks(A, B, 0);
         mergeRowBlocks(C, D, A.num_rows());
+    }
+
+    std::vector<std::vector<SparseMatBaseCL>> Split(size_t n, size_t m) {
+        std::string func = __func__ ;
+        if (_rows % n || _cols % m) throw std::invalid_argument(func + ": invalid block sizes");
+        size_t numRows = _rows / n, numCols = _cols / m;
+        std::vector<std::vector<SparseMatBaseCL>> blocks(n);
+        for (size_t i = 0; i < n; ++i) {
+            size_t rowBeg = i * numRows;
+            for (size_t j = 0; j < m; ++j) {
+                size_t colBeg = j * numCols;
+                SparseMatBaseCL A(numRows, numCols);
+                A._rowbeg[0] = 0;
+                std::vector<double> val;
+                std::vector<size_t> colind;
+                for (size_t row = rowBeg; row < rowBeg + numRows; ++row) {
+                    size_t nnzRow = 0;
+                    for (size_t k = _rowbeg[row]; k < _rowbeg[row + 1]; ++k)
+                        if (colBeg <= _colind[k] && _colind[k] < colBeg + numCols) {
+                            val.push_back(_val[k]);
+                            colind.push_back(_colind[k] - colBeg);
+                            ++nnzRow;
+                        }
+                    A._rowbeg[row - rowBeg + 1] = A._rowbeg[row - rowBeg] + nnzRow;
+                }
+                A.nnz_ = val.size();
+                A._val = std::valarray<double>(val.data(), A.nnz_);
+                A._colind = std::valarray<size_t>(colind.data(), A.nnz_);
+                blocks[i].push_back(A);
+            }
+        }
+        return blocks;
     }
 
     SparseMatBaseCL& operator= (const SparseMatBaseCL& m);
