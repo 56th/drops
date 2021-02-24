@@ -262,10 +262,8 @@ int main(int argc, char* argv[]) {
                 SV x1(Epetra_DataAccess::View, mapVelocity, view);
                 SV x2(Epetra_DataAccess::View, mapPressure, view + n);
                 Y(0)->ExtractView(&view);
-                SV y11(Epetra_DataAccess::View, mapVelocity, view);
-                auto y12 = y11;
-                SV y21(Epetra_DataAccess::View, mapPressure, view + n);
-                auto y22 = y21;
+                SV y11(Epetra_DataAccess::View, mapVelocity, view), y12(mapVelocity, true);
+                SV y21(Epetra_DataAccess::View, mapPressure, view + n), y22(mapPressure, true);
                 // y1
                 A->Multiply(false, x1, y11);
                 B->Multiply(true, x2, y12);
@@ -308,7 +306,7 @@ int main(int argc, char* argv[]) {
                         logger.log();
                     };
                     size_t numItersA = 0;
-                    auto invA = [&](MV const &X, MV &Y) {
+                    Epetra_OperatorApply::ApplyType invA = [&](MV const &X, MV &Y) {
                         double *viewX, *viewY;
                         X(0)->ExtractView(&viewX);
                         Y(0)->ExtractView(&viewY);
@@ -328,7 +326,7 @@ int main(int argc, char* argv[]) {
                         numItersA++;
                     };
                     if (precTypeA == "BlockTriangular")
-                        auto invA = [&](MV const &X, MV &Y) {
+                        invA = [&](MV const &X, MV &Y) {
                             double *viewX, *viewY;
                             X(0)->ExtractView(&viewX);
                             Y(0)->ExtractView(&viewY);
