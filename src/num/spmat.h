@@ -60,6 +60,7 @@
 
 // for casting to epetra
 #ifdef _TRILINOS
+    #include "Teuchos_RCPDecl.hpp"
     #include "Epetra_CrsMatrix.h"
     #include "Epetra_Vector.h"
     #ifdef HAVE_MPI
