@@ -842,14 +842,14 @@ public:
     SparseMatBaseCL& exportMAT(std::string const &);
 
     #ifdef _TRILINOS
-        explicit operator Epetra_CrsMatrix() const {
+        explicit operator Teuchos::RCP<Epetra_CrsMatrix>() const {
             #ifdef HAVE_MPI
                 Epetra_MpiComm comm(MPI_COMM_WORLD);
             #else
                 Epetra_SerialComm comm;
             #endif
-            Epetra_Map rowMap(static_cast<int>(num_rows()), 0, comm);
-            Epetra_Map colMap(static_cast<int>(num_cols()), 0, comm);
+            Epetra_Map rowMap(static_cast<int>(_rows), 0, comm);
+            Epetra_Map colMap(static_cast<int>(_cols), 0, comm);
             auto numMyElements = rowMap.NumMyElements();
             auto* myGlobalElements = rowMap.MyGlobalElements();
             std::vector<int> nnz(numMyElements);
@@ -857,7 +857,7 @@ public:
                 auto I = myGlobalElements[i];
                 nnz[i] = _rowbeg[I + 1] - _rowbeg[I];
             }
-            Epetra_CrsMatrix result(Copy, rowMap, /*colMap,*/ nnz.data(), true);
+            auto result = Teuchos::rcp(new Epetra_CrsMatrix(Copy, rowMap, /*colMap,*/ nnz.data(), true));
             for (size_t i = 0; i < numMyElements; ++i) {
                 auto I = myGlobalElements[i];
                 std::vector<double> values;
@@ -866,9 +866,9 @@ public:
                     values.push_back(_val[j]);
                     columns.push_back(_colind[j]);
                 }
-                result.InsertGlobalValues(I, values.size(), values.data(), columns.data());
+                result->InsertGlobalValues(I, values.size(), values.data(), columns.data());
             }
-            result.FillComplete(colMap, rowMap);
+            result->FillComplete(colMap, rowMap);
             return result;
         }
     #endif

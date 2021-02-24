@@ -100,6 +100,7 @@ int main(int argc, char* argv[]) {
             auto finalTime = inpJSON.get<double>("Time.FinalTime");
             auto stepSize = finalTime / numSteps;
             auto everyStep = inpJSON.get<int>("Output.EveryStep");
+            auto exportMatrices = inpJSON.get<bool>("SurfNavierStokes.ExportMatrices");
             auto testName = inpJSON.get<std::string>("SurfNavierStokes.TestName");
             auto surfNavierStokesData = SurfNavierStokesDataFactory(testName, inpJSON);
             FESystem surfNSystem;
@@ -257,7 +258,7 @@ int main(int argc, char* argv[]) {
             logger.log();
             Epetra_Map mapVelocity(static_cast<int>(n), 0, comm), mapVelocityComp(static_cast<int>(n_i), 0, comm), mapVelocityPressure(static_cast<int>(n + m), 0, comm), mapPressure(static_cast<int>(m), 0, comm);
             SV belosLHS(mapVelocityPressure), belosRHS(mapVelocityPressure);
-            MT A(Epetra_DataAccess::Copy, mapVelocity, 0, true), B(Epetra_DataAccess::Copy, mapPressure, 0, true), C(Epetra_DataAccess::Copy, mapPressure, 0, true), S_L(Epetra_DataAccess::Copy, mapPressure, 0, true), S_M(Epetra_DataAccess::Copy, mapPressure, 0, true);
+            RCP<MT> A, B, C;
             RCP<OP> belosMTX = rcp(new Epetra_OperatorApply([&](MV const & X, MV& Y) {
                 double* view;
                 X(0)->ExtractView(&view);
@@ -269,55 +270,93 @@ int main(int argc, char* argv[]) {
                 SV y21(Epetra_DataAccess::View, mapPressure, view + n);
                 auto y22 = y21;
                 // y1
-                A.Multiply(false, x1, y11);
-                B.Multiply(true, x2, y12);
+                A->Multiply(false, x1, y11);
+                B->Multiply(true, x2, y12);
                 y11.Update(1., y12, 1.);
                 // y2
-                B.Multiply(false, x1, y21);
-                C.Multiply(false, x2, y22);
+                B->Multiply(false, x1, y21);
+                C->Multiply(false, x2, y22);
                 y21.Update(1., y22, 1.);
             }));
             logger.beg("set up preconditioners");
-                auto identity = [](MV const & X, MV& Y) {
-                    double* view;
-                    Y(0)->ExtractView(&view);
-                    X(0)->ExtractCopy(view);
-                };
                 logger.beg("diffusion-convection-reaction block");
-                    size_t numItersA = 0;
-                    Epetra_OperatorApply::ApplyType invA = identity;
-                    logger.log(inpJSON.get<std::string>("Solver.Inner.A.Comment"));
                     auto iterationA = inpJSON.get<std::string>("Solver.Inner.A.Iteration");
                     if (!Amesos2::query(iterationA)) throw std::invalid_argument("solver " + iterationA + " is not available for Amesos2");
-                    logger.log("factorizing full velocity matrix");
-                    auto amesosSolver = Amesos2::create<MT, MV>(iterationA, rcpFromRef(A));
-                    logger.buf
-                        << "solver:      " << amesosSolver->name() << '\n'
-                        << "description: " << amesosSolver->description();
-                    logger.log();
+                    logger.log("iteration: " + iterationA);
+                    auto precTypeA = inpJSON.get<std::string>("Solver.Inner.A.Type");
+                    logger.log("preconditioner type: " + precTypeA);
+                    size_t numBlocksA = precTypeA == "Full" ? 1 : 3;
+                    auto& mapVelocityBlock = numBlocksA == 1 ? mapVelocity : mapVelocityComp;
+                    if (numBlocksA == 1) logger.log("factorizing full velocity matrix");
+                    else logger.log("factorizing diagonal blocks A_{ii} of velocity matrix");
+                    std::vector<std::vector<RCP<MT>>> A_block(numBlocksA, std::vector<RCP<MT>>(numBlocksA));
+                    std::vector<RCP<Amesos2::Solver<MT, MV>>> amesosSolver(numBlocksA);
                     auto runFactorization = [&]() {
-                        logger.beg("symbolic factorization");
-                            amesosSolver->symbolicFactorization();
-                        logger.end();
-                        logger.beg("numeric factorization");
-                            amesosSolver->numericFactorization();
-                            auto amesosStatus = amesosSolver->getStatus();
+                        if (!amesosSolver[0]) {
+                            for (size_t i = 0; i < numBlocksA; ++i)
+                                amesosSolver[i] = Amesos2::create<MT, MV>(iterationA, A_block[i][i]);
                             logger.buf
-                                << "numb of nonzeros in L + U = " << amesosStatus.getNnzLU() << " ("
-                                << (100. * amesosStatus.getNnzLU()) / (static_cast<double>(n) * n) << "%)";
+                                << "solver: " << amesosSolver[0]->name() << '\n'
+                                << "description: " << amesosSolver[0]->description();
                             logger.log();
-                        logger.end();
+                        }
+                        #pragma omp parallel for
+                        for (size_t i = 0; i < numBlocksA; ++i) {
+                            amesosSolver[i]->symbolicFactorization();
+                            amesosSolver[i]->numericFactorization();
+                        }
+                        auto amesosStatus = amesosSolver[0]->getStatus();
+                        logger.buf << "numb of nonzeros in L + U = " << amesosStatus.getNnzLU() << " ("
+                                   << (100. * amesosStatus.getNnzLU()) / (static_cast<double>(A_block[0][0]->NumGlobalRows()) * A_block[0][0]->NumGlobalCols()) << "%)";
+                        logger.log();
                     };
-                    invA = [&](MV const &X, MV &Y) {
-                        amesosSolver->setB(rcpFromRef(X));
-                        amesosSolver->setX(rcpFromRef(Y));
-                        amesosSolver->solve();
+                    size_t numItersA = 0;
+                    auto invA = [&](MV const &X, MV &Y) {
+                        double *viewX, *viewY;
+                        X(0)->ExtractView(&viewX);
+                        Y(0)->ExtractView(&viewY);
+                        std::vector<SV> x, y;
+                        x.reserve(numBlocksA);
+                        y.reserve(numBlocksA);
+                        for (size_t i = 0; i < numBlocksA; ++i) {
+                            x.emplace_back(Epetra_DataAccess::View, mapVelocityBlock, viewX + i * n_i);
+                            y.emplace_back(Epetra_DataAccess::View, mapVelocityBlock, viewY + i * n_i);
+                        }
+                        #pragma omp parallel for
+                        for (size_t i = 0; i < numBlocksA; ++i) {
+                            amesosSolver[i]->setB(rcpFromRef(x[i]));
+                            amesosSolver[i]->setX(rcpFromRef(y[i]));
+                            amesosSolver[i]->solve();
+                        }
                         numItersA++;
                     };
+                    if (precTypeA == "BlockTriangular")
+                        auto invA = [&](MV const &X, MV &Y) {
+                            double *viewX, *viewY;
+                            X(0)->ExtractView(&viewX);
+                            Y(0)->ExtractView(&viewY);
+                            std::vector<SV> x, y;
+                            x.reserve(numBlocksA);
+                            y.reserve(numBlocksA);
+                            for (size_t i = 0; i < numBlocksA; ++i) {
+                                x.emplace_back(Epetra_DataAccess::View, mapVelocityBlock, viewX + i * n_i);
+                                y.emplace_back(Epetra_DataAccess::View, mapVelocityBlock, viewY + i * n_i);
+                            }
+                            for (int i = numBlocksA - 1; i >= 0; --i) { // backward substitution
+                                SV rhs(Epetra_DataAccess::Copy, x[i], 0);
+                                for (size_t j = i + 1; j < numBlocksA; ++j) {
+                                    SV A_y(mapVelocityBlock, true);
+                                    A_block[i][j]->Multiply(false, y[j], A_y);
+                                    rhs.Update(-1., A_y, 1.);
+                                }
+                                amesosSolver[i]->setB(rcpFromRef(rhs));
+                                amesosSolver[i]->setX(rcpFromRef(y[i]));
+                                amesosSolver[i]->solve();
+                            }
+                            numItersA++;
+                        };
                 logger.end();
                 logger.beg("schur complement block");
-                    size_t numItersS_M = 0, numItersS_L = 0;
-                    Epetra_OperatorApply::ApplyType invS = identity;
                     auto belosParamsS = parameterList();
                     belosParamsS->set("Maximum Iterations", inpJSON.get<int>("Solver.Inner.S.MaxIter"));
                     belosParamsS->set("Convergence Tolerance", inpJSON.get<double>("Solver.Inner.S.RelResTol"));
@@ -325,7 +364,9 @@ int main(int argc, char* argv[]) {
                     auto belosSolverS_L = belosFactory.create(inpJSON.get<std::string>("Solver.Inner.S.Iteration"), belosParamsS);
                     logger.buf << "inner solver: " << belosSolverS_M->description();
                     logger.log();
-                    invS = [&](MV const & X, MV& Y) {
+                    RCP<MT> S_L, S_M;
+                    size_t numItersS_M = 0, numItersS_L = 0;
+                    auto invS = [&](MV const & X, MV& Y) {
                         Y.PutScalar(0.); // ini guess
                         auto& Y_M = Y;
                         auto  Y_L = Y;
@@ -335,14 +376,14 @@ int main(int argc, char* argv[]) {
                             for (size_t i = 0; i < m; ++i) (*X_nrm(0))[i] -= mean;
                         }
                         // Y_M
-                        LinearProblem<ST, MV, OP> belosProblemS_M(rcpFromRef(S_M), rcpFromRef(Y_M), rcpFromRef(X_nrm));
+                        LinearProblem<ST, MV, OP> belosProblemS_M(S_M, rcpFromRef(Y_M), rcpFromRef(X_nrm));
                         belosProblemS_M.setProblem();
                         belosSolverS_M->setProblem(rcpFromRef(belosProblemS_M));
                         belosSolverS_M->solve();
                         numItersS_M += belosSolverS_M->getNumIters();
                         // Y_L (TODO: make parallel)
                         if (inpJSON.get<bool>("Solver.Inner.S.S_L")) {
-                            LinearProblem<ST, MV, OP> belosProblemS_L(rcpFromRef(S_L), rcpFromRef(Y_L), rcpFromRef(X_nrm));
+                            LinearProblem<ST, MV, OP> belosProblemS_L(S_L, rcpFromRef(Y_L), rcpFromRef(X_nrm));
                             belosProblemS_L.setProblem();
                             belosSolverS_L->setProblem(rcpFromRef(belosProblemS_L));
                             belosSolverS_L->solve();
@@ -353,31 +394,27 @@ int main(int argc, char* argv[]) {
                     };
                 logger.end();
                 auto precType = inpJSON.get<std::string>("Solver.Inner.Type");
-                RCP<OP> belosPRE;
-                if (precType == "BlockDiagonal") {
-                    logger.log("using block-diagonal preconditioner");
-                    belosPRE = rcp(new Epetra_OperatorApply([&](MV const & X, MV& Y) {
-                        double* view;
-                        X(0)->ExtractView(&view);
-                        SV x1(Epetra_DataAccess::View, mapVelocity, view);
-                        SV x2(Epetra_DataAccess::View, mapPressure, view + n);
-                        Y(0)->ExtractView(&view);
-                        SV y1(Epetra_DataAccess::View, mapVelocity, view);
-                        SV y2(Epetra_DataAccess::View, mapPressure, view + n);
-                        #pragma omp parallel
+                logger.log("preconditioner type: " + precType);
+                auto belosPRE = rcp(new Epetra_OperatorApply([&](MV const & X, MV& Y) {
+                    double* view;
+                    X(0)->ExtractView(&view);
+                    SV x1(Epetra_DataAccess::View, mapVelocity, view);
+                    SV x2(Epetra_DataAccess::View, mapPressure, view + n);
+                    Y(0)->ExtractView(&view);
+                    SV y1(Epetra_DataAccess::View, mapVelocity, view);
+                    SV y2(Epetra_DataAccess::View, mapPressure, view + n);
+                    #pragma omp parallel
+                    {
+                        #pragma omp single
                         {
-                            #pragma omp single
-                            {
-                                #pragma omp task
-                                invA(x1, y1); // y1
-                                #pragma omp task
-                                invS(x2, y2); // y2
-                            }
+                            #pragma omp task
+                            invA(x1, y1); // y1
+                            #pragma omp task
+                            invS(x2, y2); // y2
                         }
-                    }));
-                }
-                else {
-                    logger.log("using block-triangular preconditioner");
+                    }
+                }));
+                if (precType == "BlockTriangular")
                     belosPRE = rcp(new Epetra_OperatorApply([&](MV const & X, MV& Y) {
                         double* view;
                         X(0)->ExtractView(&view);
@@ -385,16 +422,15 @@ int main(int argc, char* argv[]) {
                         SV x2(Epetra_DataAccess::View, mapPressure, view + n);
                         Y(0)->ExtractView(&view);
                         SV y1(Epetra_DataAccess::View, mapVelocity, view);
-                        auto y1_tmp = y1;
                         SV y2(Epetra_DataAccess::View, mapPressure, view + n);
                         // y2
                         invS(x2, y2);
                         // y1
-                        B.Multiply(true, y2, y1_tmp);
-                        y1_tmp.Update(1., x1, -1.);
-                        invA(y1_tmp, y1);
+                        SV rhs(mapVelocity, true);
+                        B->Multiply(true, y2, rhs);
+                        rhs.Update(1., x1, -1.);
+                        invA(rhs, y1);
                     }));
-                }
             logger.end();
             LinearProblem<ST, MV, OP> belosProblem(belosMTX, rcpFromRef(belosLHS), rcpFromRef(belosRHS));
             if (useInnerIters) belosProblem.setRightPrec(belosPRE);
@@ -405,8 +441,8 @@ int main(int argc, char* argv[]) {
                 surfNSystem.matrices = { &M_u, &A_u, &AL_u, &S_u, &C_u, &M_p, &C_p, &A_p, &B_pu, &Q_pu };
                 setupFESystem(mg, surfNSystem);
                 C_p.Data *= -rho_p;
-                MatrixCL B_T, A_sum;
-                transpose(B_pu.Data, B_T);
+                MatrixCL B_pu_T, A_sum;
+                transpose(B_pu.Data, B_pu_T);
                 VectorCL I_p(1., m);
             auto assembleTime = logger.end();
             auto factorizationTime = 0.;
@@ -427,11 +463,11 @@ int main(int argc, char* argv[]) {
                 auto belosSolverW = belosFactory.create("CG", belosParamsW);
                 ReturnType belosSolverResultW;
                 auto projectVorticity = [&]() {
-                    auto mtx = static_cast<MT>(MatrixCL(1., M_p.Data, -1., C_p.Data));
+                    auto mtx = static_cast<RCP<MT>>(MatrixCL(1., M_p.Data, -1., C_p.Data));
                     auto rhs = static_cast<SV>(Q_pu.Data * u.Data);
                     auto sln = static_cast<SV>(surf_curl_u.Data);
                     sln.PutScalar(0.);
-                    LinearProblem<ST, MV, OP> belosProblemW(rcpFromRef(mtx), rcpFromRef(sln), rcpFromRef(rhs));
+                    LinearProblem<ST, MV, OP> belosProblemW(mtx, rcpFromRef(sln), rcpFromRef(rhs));
                     belosProblemW.setProblem();
                     belosSolverW->setProblem(rcpFromRef(belosProblemW));
                     belosSolverResultW = belosSolverW->solve();
@@ -445,7 +481,7 @@ int main(int argc, char* argv[]) {
                 double alpha, b_norm, r0_norm;
                 ReturnType belosSolverResult;
                 auto residual = [&](VectorCL const & u, VectorCL const & p) {
-                    auto velResSq = norm_sq(A_sum * u + B_T * p - F_u.Data);
+                    auto velResSq = norm_sq(A_sum * u + B_pu_T * p - F_u.Data);
                     auto preResSq = norm_sq(B_pu.Data * u + C_p.Data * p - G_p.Data);
                     return std::tuple<double, double, double>(sqrt(velResSq), sqrt(preResSq), sqrt(velResSq + preResSq));
                 };
@@ -456,6 +492,8 @@ int main(int argc, char* argv[]) {
                     tJSON.put("h", h);
                     tJSON.put("nu", nu);
                     tJSON.put("gamma", gamma);
+                    tJSON.put("DOF.Velocity", n);
+                    tJSON.put("DOF.Pressure", m);
                     tJSON.put("MeshDepParams.rho_p", rho_p);
                     tJSON.put("MeshDepParams.rho_u", rho_u);
                     tJSON.put("MeshDepParams.tau_u", tau_u);
@@ -516,41 +554,50 @@ int main(int argc, char* argv[]) {
                         tJSON.put("Solver.Outer.ResidualNorm.r_i/r_0", fullRes / r0_norm);
                         tJSON.put("Solver.Outer.ResidualNorm.SolverRelative", belosSolver->achievedTol());
                         tJSON.put("Solver.Outer.TotalIters", belosSolver->getNumIters());
-                        tJSON.put("Solver.Outer.DOF", n + m);
                         tJSON.put("Solver.Outer.Converged", belosSolverResult == Converged);
                         tJSON.put("Solver.Inner.A.TotalIters", numItersA);
                         tJSON.put("Solver.Inner.A.MeanIters", static_cast<double>(numItersA) / belosSolver->getNumIters());
-                        tJSON.put("Solver.Inner.A.DOF", n);
                         tJSON.put("Solver.Inner.S.TotalIters.S_M", numItersS_M);
                         tJSON.put("Solver.Inner.S.TotalIters.S_L", numItersS_L);
                         tJSON.put("Solver.Inner.S.MeanIters.S_M", static_cast<double>(numItersS_M) / belosSolver->getNumIters());
                         tJSON.put("Solver.Inner.S.MeanIters.S_L", static_cast<double>(numItersS_L) / belosSolver->getNumIters());
-                        tJSON.put("Solver.Inner.S.DOF", m);
                         tJSON.put("Peclet", Pe);
                         tJSON.put("MaxSurfaceSpeed", u_N_max);
                         tJSON.put("MassMatrixCoef", alpha);
-                        if (inpJSON.get<bool>("SurfNavierStokes.ExportMatrices")) {
-                            std::string format = inpJSON.get<std::string>("SurfNavierStokes.ExportMatricesFormat") == ".mtx" ? ".mtx" : ".mat";
-                            auto expFunc = format == ".mtx" ? &MatrixCL::exportMTX : &MatrixCL::exportMAT;
-                            auto expMat = [&](MatrixCL &A, std::string const a, std::string const &b) {
-                                logger.beg("export " + a + " mtx");
-                                    logger.buf << "size: " << A.num_rows() << 'x' << A.num_cols();
-                                    logger.log();
-                                    (A.*expFunc)(dirName + "/matrices/" + b + format);
-                                    tJSON.put("Matrices." + a, "../matrices/" + b + format);
-                                logger.end();
-                            };
-                            expMat(M_u.Data, "VelocityMass", "M_u");
-                            logger.log();
-                        }
                     }
+                    auto exportFiles = everyStep > 0 && (i % everyStep == 0 || i == numSteps);
                     auto vtkTime = 0.;
-                    if (everyStep > 0 && (i == 0 || i == numSteps || (i - 1) % everyStep == 0)) {
+                    if (exportFiles) {
                         logger.beg("write vtk");
                             vtkWriter.write(t);
                         vtkTime = logger.end();
                     }
                     tJSON.put("ElapsedTime.VTK", vtkTime);
+                    auto mtxTime = 0.;
+                    if (exportMatrices && exportFiles) {
+                        std::string format = inpJSON.get<std::string>("SurfNavierStokes.ExportMatricesFormat") == ".mtx" ? ".mtx" : ".mat";
+                        auto expFunc = format == ".mtx" ? &MatrixCL::exportMTX : &MatrixCL::exportMAT;
+                        auto expMat = [&](MatrixCL &A, std::string const name) {
+                            logger.beg("export " + name + " mtx");
+                                logger.buf << "size: " << A.num_rows() << 'x' << A.num_cols();
+                                logger.log();
+                                auto path = dirName + "/matrices/" + std::to_string(i) + '_' + name + format;
+                                (A.*expFunc)(path);
+                                tJSON.put("Matrices." + name, path);
+                            logger.end();
+                        };
+                        logger.beg("export matrices");
+                            expMat(M_u.Data, "M_u");
+                            if (i > 0) {
+                                expMat(A_sum, "A_u");
+                                for (size_t i = 0; i < numBlocksA; ++i)
+                                    for (size_t j = 0; j < numBlocksA; ++j)
+                                        expMat(A_sum.Split(numBlocksA, numBlocksA)[i][j], "A_u_" + std::to_string(i + 1) + std::to_string(j + 1));
+                            }
+                            // ...
+                        mtxTime = logger.end();
+                    }
+                    tJSON.put("ElapsedTime.MatrixExport", mtxTime);
                     stats << tJSON;
                     logger.buf << tJSON;
                     logger.log();;
@@ -599,21 +646,24 @@ int main(int argc, char* argv[]) {
                     u_prev = u;
                 assembleTime = logger.end();
                 logger.beg("convert to Epetra");
-                    A = static_cast<MT>(A_sum);
-                    auto printStat = [&](std::string const & name, MT const & A) {
-                        logger.buf << name << ": " << A.NumGlobalRows() << 'x' << A.NumGlobalCols() << ", " << A.NumGlobalNonzeros() << " nonzeros";
-                        if (A.NumGlobalNonzeros()) logger.buf << " (" << (100. * A.NumGlobalNonzeros()) / (static_cast<double>(A.NumGlobalRows()) * A.NumGlobalCols()) << "%)";
-                        logger.log();
-                    };
-                    printStat("A", A);
-                    B = static_cast<MT>(B_pu.Data);
-                    printStat("B", B);
-                    C = static_cast<MT>(C_p.Data);
-                    printStat("C := -rho_p (pressure volume stabilization mtx)", C);
-                    S_M = static_cast<MT>(MatrixCL(1. / (gamma + nu), M_p.Data, -1., C_p.Data));
-                    printStat("S_M := (\\nu + \\gamma)^{-1} M_p - C", S_M);
-                    S_L = static_cast<MT>(MatrixCL(1. / alpha, A_p.Data, -1., C_p.Data));
-                    printStat("S_L := \\alpha^{-1} L_p - C", S_L);
+                    A = static_cast<RCP<MT>>(A_sum);
+                    logCRS(*A, "A");
+                    {
+                        auto A_sum_blocks = A_sum.Split(numBlocksA, numBlocksA);
+                        for (size_t i = 0; i < numBlocksA; ++i)
+                            for (size_t j = 0; j < numBlocksA; ++j)
+                                A_block[i][j] = static_cast<RCP<MT>>(A_sum_blocks[i][j]);
+                        if (numBlocksA != 1)
+                            logCRS(*A_block[0][0], "A_{ij}");
+                    }
+                    B = static_cast<RCP<MT>>(B_pu.Data);
+                    logCRS(*B, "B");
+                    C = static_cast<RCP<MT>>(C_p.Data);
+                    logCRS(*C, "C := -rho_p (pressure volume stabilization mtx)");
+                    S_M = static_cast<RCP<MT>>(MatrixCL(1. / (gamma + nu), M_p.Data, -1., C_p.Data));
+                    logCRS(*S_M, "S_M := (nu + gamma)^{-1} M_p - C");
+                    S_L = static_cast<RCP<MT>>(MatrixCL(1. / alpha, A_p.Data, -1., C_p.Data));
+                    logCRS(*S_L, "S_L := \\alpha^{-1} L_p - C");
                     belosRHS = static_cast<SV>(F_u.Data.append(G_p.Data));
                 logger.end();
                 factorizationTime = 0.;
@@ -630,8 +680,7 @@ int main(int argc, char* argv[]) {
                     if (usePrevGuess) {
                         belosLHS = static_cast<SV>(u.Data.append(p.Data));
                         r0_norm = std::get<2>(residual(u.Data, p.Data));
-                        belosParams->set("Convergence Tolerance", inpJSON.get<double>("Solver.Outer.RelResTol") * b_norm / r0_norm);
-                        belosSolver = belosFactory.create(inpJSON.get<std::string>("Solver.Outer.Iteration"), belosParams);
+                        belosSolver->setParameters(rcpFromRef(belosParams->set("Convergence Tolerance", inpJSON.get<double>("Solver.Outer.RelResTol") * b_norm / r0_norm)));
                     }
                     belosProblem.setProblem();
                     belosSolver->setProblem(rcpFromRef(belosProblem));
