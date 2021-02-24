@@ -8,6 +8,7 @@
 #include <functional>
 #include <string>
 #include "Epetra_Operator.h"
+#include "SingletonLogger.hpp"
 
 namespace DROPS {
 
@@ -59,6 +60,14 @@ namespace DROPS {
             throw std::logic_error(funcName + ": not implemented");
         }
     };
+
+    void logCRS(Epetra_CrsMatrix const & A, std::string const & name) {
+        auto& logger = SingletonLogger::instance();
+        logger.buf << name << ": " << A.NumGlobalRows() << 'x' << A.NumGlobalCols() << ", " << A.NumGlobalNonzeros() << " nonzeros";
+        if (A.NumGlobalNonzeros()) logger.buf << " (" << (100. * A.NumGlobalNonzeros()) / (static_cast<double>(A.NumGlobalRows()) * A.NumGlobalCols()) << "%)";
+        logger.log();
+    }
+
 }
 
 #endif //DROPS_BELOSDROPSADAPTER_HPP
