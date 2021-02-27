@@ -17,8 +17,9 @@ namespace DROPS {
         std::string description;
     };
 
-    SurfNavierStokesData SurfNavierStokesDataFactory(std::string const & test, ParamCL const & param) {
+    SurfNavierStokesData SurfNavierStokesDataFactory(ParamCL const & param) {
         SurfNavierStokesData data;
+        auto test = param.get<std::string>("SurfNavierStokes.TestName");
         auto nu = param.get<double>("SurfNavierStokes.nu");
         if (test.find("Sphere") != std::string::npos) {
             data.description = "phi = x^2 + y^2 + z^2 - 1\n";

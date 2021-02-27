@@ -79,12 +79,9 @@ int main(int argc, char* argv[]) {
             read_parameter_file_from_cmdline(inpJSON, argc, argv, "../../param/surfnavierstokes/No_Bnd_Condition.json");
             dynamicLoad(inpJSON.get<std::string>("General.DynamicLibsPrefix"), inpJSON.get<std::vector<std::string>>("General.DynamicLibs"));
             auto dirName = inpJSON.get<std::string>("Output.Directory");
-            system(("mkdir -p " + dirName).c_str());
-            system(("rm -r -f " + dirName + "/*").c_str());
             system((
-                "mkdir " + dirName + "/matrices ; "
-                "mkdir " + dirName + "/vtk ; "
-                "mkdir " + dirName + "/stats"
+                "mkdir -p " + dirName + " ; rm -r -f " + dirName + "/* ; "
+                "mkdir " + dirName + "/stats ; mkdir " + dirName + "/matrices ; mkdir " + dirName + "/vectors ; mkdir " + dirName + "/vtk"
             ).c_str());
             {
                 std::ofstream input(dirName + "/input.json");
@@ -100,9 +97,13 @@ int main(int argc, char* argv[]) {
             auto finalTime = inpJSON.get<double>("Time.FinalTime");
             auto stepSize = finalTime / numSteps;
             auto everyStep = inpJSON.get<int>("Output.EveryStep");
-            auto exportMatrices = inpJSON.get<bool>("SurfNavierStokes.ExportMatrices");
+            auto exportMatrices = inpJSON.get<bool>("Output.Matrices");
+            auto binary = inpJSON.get<bool>("Output.Binary");
+            auto mtxFormat = binary ? ".mat" : ".mtx";
+            auto mtxExpFunc = binary ? &MatrixCL::exportMAT : &MatrixCL::exportMTX;
+            auto exportVectors = inpJSON.get<bool>("Output.Vectors");
             auto testName = inpJSON.get<std::string>("SurfNavierStokes.TestName");
-            auto surfNavierStokesData = SurfNavierStokesDataFactory(testName, inpJSON);
+            auto surfNavierStokesData = SurfNavierStokesDataFactory(inpJSON);
             FESystem surfNSystem;
             auto& gamma = surfNSystem.params.surfNavierStokesParams.gamma;
             gamma = inpJSON.get<double>("SurfNavierStokes.gamma");
@@ -118,8 +119,8 @@ int main(int argc, char* argv[]) {
             surfNSystem.params.numbOfVirtualSubEdges = inpJSON.get<size_t>("SurfNavierStokes.NumbOfVirtualSubEdges");
             surfNSystem.params.surfNavierStokesParams.m_g = surfNavierStokesData.m_g;
             surfNSystem.params.surfNavierStokesParams.f_T = surfNavierStokesData.f_T;
-            auto formulation = inpJSON.get<std::string>("SurfNavierStokes.Formulation") == "Consistent" ? "Consistent" : "Inonsistent";
-            auto stab = inpJSON.get<std::string>("SurfNavierStokes.PressureVolumestabType") == "Normal" ? "Normal" : "Full";
+            auto formulation = inpJSON.get<std::string>("SurfNavierStokes.Formulation");
+            auto stab = inpJSON.get<std::string>("SurfNavierStokes.PressureVolumestabType");
             auto useTangMassMat = inpJSON.get<bool>("SurfNavierStokes.UseTangentialMassMatrix");
             auto useInnerIters = inpJSON.get<bool>("Solver.Inner.Use");
             auto usePrevGuess = inpJSON.get<bool>("Solver.UsePreviousFrameAsInitialGuess");
@@ -127,12 +128,7 @@ int main(int argc, char* argv[]) {
             if (BDF != 1 && BDF != 2) throw std::invalid_argument("use BDF = 1 or 2");
             logger.buf
                 << surfNavierStokesData.description
-                << "delta t = " << stepSize << '\n'
-                << "BDF: " << BDF << '\n'
-                << "nu = " << nu << '\n'
-                << "gamma = " << gamma << " (AL / grad-div stabilization constant)\n"
-                << "penalty formulation type: " << formulation << '\n'
-                << "pressure volume stabilization type: " << stab << '\n';
+                << "delta t = " << stepSize << '\n';
             logger.log();
         logger.end();
         logger.beg("build mesh");
@@ -220,20 +216,21 @@ int main(int argc, char* argv[]) {
             logger.end();
         logger.end();
         logger.beg("set up vtk");
-            VTKWriter vtkWriter(dirName + "/vtk/" + testName, mg, inpJSON.get<bool>("Output.Binary"));
+            VTKWriter vtkWriter(dirName + "/vtk/" + testName, mg, binary);
             vtkWriter.add({ "level-set", levelSet });
             if (everyStep > 0) {
-                if (inpJSON.get<bool>("Output.Velocity")) {
+                if (inpJSON.get<bool>("Output.VTK.Velocity")) {
                     vtkWriter.add({ "u_h", u });
                     if (surfNavierStokesData.exactSoln) vtkWriter.add({ "u_*", u_star });
                 }
-                if (inpJSON.get<bool>("Output.SurfSpeed")) vtkWriter.add({ "u_N", u_N });
-                if (inpJSON.get<bool>("Output.Vorticity")) vtkWriter.add({ "w_h", surf_curl_u });
-                if (inpJSON.get<bool>("Output.Pressure")) {
+                if (inpJSON.get<bool>("Output.VTK.SurfSpeed")) vtkWriter.add({ "u_N", u_N });
+                if (inpJSON.get<bool>("Output.VTK.Vorticity")) vtkWriter.add({ "w_h", surf_curl_u });
+                if (inpJSON.get<bool>("Output.VTK.Pressure")) {
                     vtkWriter.add({ "p_h", p });
                     if (surfNavierStokesData.exactSoln) vtkWriter.add({ "p_*", p_star });
                 }
             }
+            auto exportVTK = vtkWriter.numVars() > 0;
         logger.end();
         logger.beg("set up linear solver");
             using SV = Epetra_Vector;
@@ -265,10 +262,8 @@ int main(int argc, char* argv[]) {
                 SV x1(Epetra_DataAccess::View, mapVelocity, view);
                 SV x2(Epetra_DataAccess::View, mapPressure, view + n);
                 Y(0)->ExtractView(&view);
-                SV y11(Epetra_DataAccess::View, mapVelocity, view);
-                auto y12 = y11;
-                SV y21(Epetra_DataAccess::View, mapPressure, view + n);
-                auto y22 = y21;
+                SV y11(Epetra_DataAccess::View, mapVelocity, view), y12(mapVelocity, true);
+                SV y21(Epetra_DataAccess::View, mapPressure, view + n), y22(mapPressure, true);
                 // y1
                 A->Multiply(false, x1, y11);
                 B->Multiply(true, x2, y12);
@@ -311,7 +306,7 @@ int main(int argc, char* argv[]) {
                         logger.log();
                     };
                     size_t numItersA = 0;
-                    auto invA = [&](MV const &X, MV &Y) {
+                    Epetra_OperatorApply::ApplyType invA = [&](MV const &X, MV &Y) {
                         double *viewX, *viewY;
                         X(0)->ExtractView(&viewX);
                         Y(0)->ExtractView(&viewY);
@@ -331,7 +326,7 @@ int main(int argc, char* argv[]) {
                         numItersA++;
                     };
                     if (precTypeA == "BlockTriangular")
-                        auto invA = [&](MV const &X, MV &Y) {
+                        invA = [&](MV const &X, MV &Y) {
                             double *viewX, *viewY;
                             X(0)->ExtractView(&viewX);
                             Y(0)->ExtractView(&viewY);
@@ -566,23 +561,36 @@ int main(int argc, char* argv[]) {
                         tJSON.put("MassMatrixCoef", alpha);
                     }
                     auto exportFiles = everyStep > 0 && (i % everyStep == 0 || i == numSteps);
-                    auto vtkTime = 0.;
-                    if (exportFiles) {
+                    if (exportVTK && exportFiles) {
                         logger.beg("write vtk");
                             vtkWriter.write(t);
-                        vtkTime = logger.end();
+                        auto vtkTime = logger.end();
+                        tJSON.put("ElapsedTime.VTK", vtkTime);
                     }
-                    tJSON.put("ElapsedTime.VTK", vtkTime);
-                    auto mtxTime = 0.;
+                    if (exportVectors && exportFiles) {
+                        logger.beg("export vectors");
+                            auto expVec = [&](VecDescCL const & v, std::string const name) {
+                                logger.beg("export " + name + " vec");
+                                    logger.buf << "size: " << v.Data.size();
+                                    logger.log();
+                                    auto path = dirName + "/vectors/" + name + '_' + std::to_string(i) + ".dat";
+                                    std::ofstream file(path);
+                                    v.Write(file, binary);
+                                    tJSON.put("Vectors." + name, path);
+                                logger.end();
+                            };
+                            expVec(u, "u");
+                            expVec(p, "p");
+                        auto vecTime = logger.end();
+                        tJSON.put("ElapsedTime.VectorExport", vecTime);
+                    }
                     if (exportMatrices && exportFiles) {
-                        std::string format = inpJSON.get<std::string>("SurfNavierStokes.ExportMatricesFormat") == ".mtx" ? ".mtx" : ".mat";
-                        auto expFunc = format == ".mtx" ? &MatrixCL::exportMTX : &MatrixCL::exportMAT;
                         auto expMat = [&](MatrixCL &A, std::string const name) {
                             logger.beg("export " + name + " mtx");
                                 logger.buf << "size: " << A.num_rows() << 'x' << A.num_cols();
                                 logger.log();
-                                auto path = dirName + "/matrices/" + std::to_string(i) + '_' + name + format;
-                                (A.*expFunc)(path);
+                                auto path = dirName + "/matrices/" + name + '_' + std::to_string(i) + mtxFormat;
+                                (A.*mtxExpFunc)(path);
                                 tJSON.put("Matrices." + name, path);
                             logger.end();
                         };
@@ -595,9 +603,9 @@ int main(int argc, char* argv[]) {
                                         expMat(A_sum.Split(numBlocksA, numBlocksA)[i][j], "A_u_" + std::to_string(i + 1) + std::to_string(j + 1));
                             }
                             // ...
-                        mtxTime = logger.end();
+                        auto mtxTime = logger.end();
+                        tJSON.put("ElapsedTime.MatrixExport", mtxTime);
                     }
-                    tJSON.put("ElapsedTime.MatrixExport", mtxTime);
                     stats << tJSON;
                     logger.buf << tJSON;
                     logger.log();;
