@@ -1,7 +1,7 @@
 #!/usr/bin/env wolframscript
 (* ::Package:: *)
 
-surface = "Sphere";
+surface = "Torus";
 solution = "KillingExact";
 
 
@@ -10,9 +10,14 @@ surfaces = <|
 		"dist" -> ({x, y, z, t} |-> Sqrt[x^2 + y^2 + z^2] - r[t]),
 		"phi" -> ({x, y, z, t} |-> x^2 + y^2 + z^2 - r[t]r[t]),
 		"L" -> 5/3, "T" -> 1,
-		"Default" -> {r[t] -> r0 (1 + A Sin[2 Pi t]), r0 -> 1, A -> .2}
+		"Default" -> {r[t] -> r0 (1 + A Sin[2 Pi t]), r0 -> 1, A -> 1/10}
 	|>,
-	"Torus" -> <||>
+	"Torus" -> <|
+		"dist" -> ({x, y, z, t} |-> Sqrt[(Sqrt[x^2 + y^2] - R)^2 + z^2] - r[x, y]),
+		"phi" -> ({x, y, z, t} |-> (x^2 + y^2 + z^2 + R^2 - r[x, y]r[x, y])^2 - 4 R^2 (x^2 + y^2)),
+		"L" -> 5/3, "T" -> 0,
+		"Default" -> {r[x, y] -> r0 + (r1 - r0)(1 - x / Sqrt[x^2 + y^2]) / 2, R -> 1, r1 -> 1/2, r0 -> 1/2}
+	|>
 |>;
 
 
@@ -47,8 +52,19 @@ Print["x0: ", x0, ", t0 = ", t0]
 Print["d(x0, t0) = ", d[{x, y, z}, t] //. srfDef /. x0 /. t -> t0]
 
 
-replaceCPP[x_] := StringReplace[ToString@CForm@N[x /. {Pi -> PI, r' -> rprime}], {
-	"x" -> "x[0]", "y" -> "x[1]", "z" -> "x[2]", "prime" -> "_prime", "-1.*" -> "-",
+replaceCPP[exp_] := StringReplace[ToString@CForm@N[exp /. {Pi -> PI, r' -> rprime, \!\(\*SuperscriptBox[\(r\), 
+TagBox[
+RowBox[{"(", 
+RowBox[{"1", ",", "0"}], ")"}],
+Derivative],
+MultilineFunction->None]\)[x, y] -> rgrad0, \!\(\*SuperscriptBox[\(r\), 
+TagBox[
+RowBox[{"(", 
+RowBox[{"0", ",", "1"}], ")"}],
+Derivative],
+MultilineFunction->None]\)[x, y] -> rgrad1}], {
+	"x" -> "x[0]", "y" -> "x[1]", "z" -> "x[2]", "prime" -> "_prime", "grad0" -> "_grad(x[0], x[1])[0]", "grad1" -> "_grad(x[0], x[1])[1]", 
+	"-1.*" -> "-", "- 1.*" -> "- ",
 	"PI" -> "M_PI",
 	"Power" -> "pow", "Sqrt" -> "std::sqrt", 
 	"Cos" -> "cos", "Sin" -> "sin",
@@ -63,6 +79,7 @@ Print["\[Phi] = ", exportCPP@\[Phi]]
 uN[{x_,y_,z_},t_] := Evaluate@FullSimplify[-D[d[{x, y, z}, t], t]];
 Print["u_N = ", exportCPP@uN]
 n[{x_, y_, z_}, t_] := Evaluate@FullSimplify[Grad[d[{x,y,z}, t],{x, y, z}]];
+n[{x, y, z}, t]
 Print["n = ", exportCPP@n // MatrixForm]
 
 
@@ -114,6 +131,3 @@ fConv[{x_, y_, z_}, t_] := Evaluate@FullSimplify[P[{x, y, z}, t] . conv[w, {x, y
 
 fConv[{x, y, z}, t]
 Print["(Convective term) f_T += ", exportCPP[fConv] // MatrixForm]
-
-
-
