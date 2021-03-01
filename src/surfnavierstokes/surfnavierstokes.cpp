@@ -90,9 +90,9 @@ int main(int argc, char* argv[]) {
                 logger.log();
             }
             auto h = inpJSON.get<Point3DCL>("Mesh.E1")[0] / inpJSON.get<double>("Mesh.N1") * std::pow(2., -inpJSON.get<double>("Mesh.AdaptRef.FinestLevel"));
-            auto tau_u = inpJSON.get<double>("SurfNavierStokes.NormalPenaltyFactor") * pow(h, inpJSON.get<double>("SurfNavierStokes.NormalPenaltyPower")); // constant for normal penalty
-            auto rho_u = inpJSON.get<double>("SurfNavierStokes.VelocityVolumestabFactor")  * pow(h, inpJSON.get<double>("SurfNavierStokes.VelocityVolumestabPower")); // constant for velocity stabilisation
-            auto rho_p = inpJSON.get<double>("SurfNavierStokes.PressureVolumestabFactor")  * pow(h, inpJSON.get<double>("SurfNavierStokes.PressureVolumestabPower")); // constant for pressure stabilisation
+            auto tau_u = inpJSON.get<double>("SurfNavierStokes.NormalPenalty.Scaling") * pow(h, inpJSON.get<double>("SurfNavierStokes.NormalPenalty.Power")); // constant for normal penalty
+            auto rho_u = inpJSON.get<double>("SurfNavierStokes.VelocityStab.Scaling")  * pow(h, inpJSON.get<double>("SurfNavierStokes.VelocityStab.Power")); // constant for velocity stabilisation
+            auto rho_p = inpJSON.get<double>("SurfNavierStokes.PressureStab.Scaling")  * pow(h, inpJSON.get<double>("SurfNavierStokes.PressureStab.Power")); // constant for pressure stabilisation
             auto numSteps = inpJSON.get<size_t>("Time.NumbOfSteps");
             auto finalTime = inpJSON.get<double>("Time.FinalTime");
             auto stepSize = finalTime / numSteps;
@@ -102,8 +102,9 @@ int main(int argc, char* argv[]) {
             auto mtxFormat = binary ? ".mat" : ".mtx";
             auto mtxExpFunc = binary ? &MatrixCL::exportMAT : &MatrixCL::exportMTX;
             auto exportVectors = inpJSON.get<bool>("Output.Vectors");
-            auto testName = inpJSON.get<std::string>("SurfNavierStokes.TestName");
-            auto surfNavierStokesData = SurfNavierStokesDataFactory(inpJSON);
+            auto surface = surfaceFactory(inpJSON);
+            auto testName = inpJSON.get<std::string>("SurfNavierStokes.IC.Name");
+            auto surfNavierStokesData = surfNavierStokesDataFactory(*surface, testName, inpJSON);
             FESystem surfNSystem;
             auto& gamma = surfNSystem.params.surfNavierStokesParams.gamma;
             gamma = inpJSON.get<double>("SurfNavierStokes.gamma");
@@ -120,15 +121,16 @@ int main(int argc, char* argv[]) {
             surfNSystem.params.surfNavierStokesParams.m_g = surfNavierStokesData.m_g;
             surfNSystem.params.surfNavierStokesParams.f_T = surfNavierStokesData.f_T;
             auto formulation = inpJSON.get<std::string>("SurfNavierStokes.Formulation");
-            auto stab = inpJSON.get<std::string>("SurfNavierStokes.PressureVolumestabType");
+            auto stab = inpJSON.get<std::string>("SurfNavierStokes.PressureStab.Type");
             auto useTangMassMat = inpJSON.get<bool>("SurfNavierStokes.UseTangentialMassMatrix");
             auto useInnerIters = inpJSON.get<bool>("Solver.Inner.Use");
             auto usePrevGuess = inpJSON.get<bool>("Solver.UsePreviousFrameAsInitialGuess");
             auto BDF = inpJSON.get<size_t>("SurfNavierStokes.BDF");
             if (BDF != 1 && BDF != 2) throw std::invalid_argument("use BDF = 1 or 2");
             logger.buf
-                << surfNavierStokesData.description
-                << "delta t = " << stepSize << '\n';
+                << surface->description() << '\n'
+                << surfNavierStokesData.description << '\n'
+                << "delta t = " << stepSize;
             logger.log();
         logger.end();
         logger.beg("build mesh");
@@ -151,7 +153,7 @@ int main(int argc, char* argv[]) {
             logger.end();
             logger.beg("refine towards the surface");
                 AdapTriangCL adap(mg);
-                DistMarkingStrategyCL markerLset(surfNavierStokesData.surface.phi, inpJSON.get<double>("Mesh.AdaptRef.Width"), inpJSON.get<int>("Mesh.AdaptRef.CoarsestLevel"), inpJSON.get<int>("Mesh.AdaptRef.FinestLevel"));
+                DistMarkingStrategyCL markerLset([&](Point3DCL const & x, double) { return surface->phi(x); }, inpJSON.get<double>("Mesh.AdaptRef.Width"), inpJSON.get<int>("Mesh.AdaptRef.CoarsestLevel"), inpJSON.get<int>("Mesh.AdaptRef.FinestLevel"));
                 adap.set_marking_strategy(&markerLset);
                 adap.MakeInitialTriang();
                 adap.set_marking_strategy(nullptr);
@@ -169,7 +171,7 @@ int main(int argc, char* argv[]) {
             MLIdxDescCL lstIdx(P2_FE);
             lstIdx.CreateNumbering(mg.GetLastLevel(), mg, lsetBnd);
             levelSet.SetIdx(&lstIdx);
-            levelSet.Interpolate(mg, surfNavierStokesData.surface.phi, 0.);
+            levelSet.Interpolate(mg, [&](Point3DCL const & x) { return surface->phi(x); });
         logger.end();
         logger.beg("set up FE spaces");
             IdxDescCL velIdx(vecP2IF_FE, vecBnd); {
@@ -216,18 +218,18 @@ int main(int argc, char* argv[]) {
             logger.end();
         logger.end();
         logger.beg("set up vtk");
-            VTKWriter vtkWriter(dirName + "/vtk/" + testName, mg, binary);
+            VTKWriter vtkWriter(dirName + "/vtk/" + testName + inpJSON.get<std::string>("Surface.Name"), mg, binary);
             vtkWriter.add({ "level-set", levelSet });
             if (everyStep > 0) {
                 if (inpJSON.get<bool>("Output.VTK.Velocity")) {
                     vtkWriter.add({ "u_h", u });
-                    if (surfNavierStokesData.exactSoln) vtkWriter.add({ "u_*", u_star });
+                    if (surfNavierStokesData.exact) vtkWriter.add({"u_*", u_star });
                 }
                 if (inpJSON.get<bool>("Output.VTK.SurfSpeed")) vtkWriter.add({ "u_N", u_N });
                 if (inpJSON.get<bool>("Output.VTK.Vorticity")) vtkWriter.add({ "w_h", surf_curl_u });
                 if (inpJSON.get<bool>("Output.VTK.Pressure")) {
                     vtkWriter.add({ "p_h", p });
-                    if (surfNavierStokesData.exactSoln) vtkWriter.add({ "p_*", p_star });
+                    if (surfNavierStokesData.exact) vtkWriter.add({"p_*", p_star });
                 }
             }
             auto exportVTK = vtkWriter.numVars() > 0;
@@ -430,8 +432,8 @@ int main(int argc, char* argv[]) {
             LinearProblem<ST, MV, OP> belosProblem(belosMTX, rcpFromRef(belosLHS), rcpFromRef(belosRHS));
             if (useInnerIters) belosProblem.setRightPrec(belosPRE);
         logger.end();
-        t = 0.;
         logger.beg("t = t_0 = 0");
+            t = 0.;
             logger.beg("assemble");
                 surfNSystem.matrices = { &M_u, &A_u, &AL_u, &S_u, &C_u, &M_p, &C_p, &A_p, &B_pu, &Q_pu };
                 setupFESystem(mg, surfNSystem);
@@ -442,8 +444,9 @@ int main(int argc, char* argv[]) {
             auto assembleTime = logger.end();
             auto factorizationTime = 0.;
             logger.beg("interpolate initial data");
-                u.Interpolate(mg, surfNavierStokesData.u_T, t);
-                p.Interpolate(mg, surfNavierStokesData.p, t);
+                u_N.Interpolate(mg, [&](Point3DCL const & x) { return surface->u_N(x, t); });
+                u.Interpolate(mg, [&](Point3DCL const & x) { return surfNavierStokesData.u_T(x, t); });
+                p.Interpolate(mg, [&](Point3DCL const & x) { return surfNavierStokesData.p(x, t); });
                 p.Data -= dot(M_p.Data * p.Data, I_p) / dot(M_p.Data * I_p, I_p) * I_p;
                 u_prev = u;
             auto solveTime = logger.end();
@@ -515,9 +518,9 @@ int main(int argc, char* argv[]) {
                     auto vorH1Sq = dot(surf_curl_u.Data, A_p.Data * surf_curl_u.Data);
                     tJSON.put("Integral.FESolution.Palinstrophy", .5 * vorH1Sq);
                     tJSON.put("Integral.FESolution.SurfaceVorticityH1", sqrt(vorH1Sq));
-                    if (surfNavierStokesData.exactSoln) {
-                        u_star.Interpolate(mg, surfNavierStokesData.u_T, t);
-                        p_star.Interpolate(mg, surfNavierStokesData.p, t);
+                    if (surfNavierStokesData.exact) {
+                        u_star.Interpolate(mg, [&](Point3DCL const & x) { return surfNavierStokesData.u_T(x, t); });
+                        p_star.Interpolate(mg, [&](Point3DCL const & x) { return surfNavierStokesData.p(x, t); });
                         p_star.Data -= dot(M_p.Data * p_star.Data, I_p) / dot(M_p.Data * I_p, I_p) * I_p;
                         tJSON.put("Integral.ExactSolution.PressureMean", dot(I_p, M_p.Data * p_star.Data) / surfArea);
                         tJSON.put("Integral.ExactSolution.PressureL2", sqrt(dot(p_star.Data, M_p.Data * p_star.Data)));
@@ -618,11 +621,11 @@ int main(int argc, char* argv[]) {
             std::stringstream header; header << "t = t_" << i << " = " << t << " (" << (100. * i) / numSteps << "%)";
             logger.beg(header.str());
                 logger.beg("initialize surface speed u_N");
-                    u_N.Interpolate(mg, surfNavierStokesData.surface.u_N, t);
+                    u_N.Interpolate(mg, [&](Point3DCL const & x) { return surface->u_N(x, t); });
                 logger.end();
                 logger.beg("assemble");
                     surfNSystem.matrices = {};
-                    if (surfNavierStokesData.w_T) w_T.Interpolate(mg, surfNavierStokesData.w_T, t); // Oseen (and Stokes) case
+                    if (surfNavierStokesData.w_T) w_T.Interpolate(mg, [&](Point3DCL const & x) { return surfNavierStokesData.w_T(x, t); }); // Oseen (and Stokes) case
                     else w_T.Data = 2. * u.Data - u_prev.Data; // Navier-Stokes case
                     Pe = supnorm(w_T.Data) / nu;
                     if (Pe) {

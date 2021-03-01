@@ -696,38 +696,36 @@ public:
     void Write(std::ostream&, bool binary=false) const;
     /// \brief Read Data from a stream
     void Read(std::istream&, bool binary=false);
-    VecDescBaseCL& Interpolate(MultiGridCL const & mg, InstatScalarFunction f, double t = 0.) {
+    VecDescBaseCL& Interpolate(MultiGridCL const & mg, ScalarFunction f) {
         if (!RowIdx->IsScalar()) throw std::invalid_argument(__func__ + std::string(": f must be vector-valued"));
         auto lvl = GetLevel();
         auto idx = RowIdx->GetIdx();
-        this->t = t;
         if (RowIdx->NumUnknownsVertex())
             for (auto it = mg.GetTriangVertexBegin(lvl); it != mg.GetTriangVertexEnd(lvl); ++it)
                 if (it->Unknowns.Exist(idx))
-                    Data[it->Unknowns(idx)] = f(it->GetCoord(), t);
+                    Data[it->Unknowns(idx)] = f(it->GetCoord());
         if (RowIdx->NumUnknownsEdge())
             for (auto it = mg.GetTriangEdgeBegin(lvl); it != mg.GetTriangEdgeEnd(lvl); ++it)
                 if (it->Unknowns.Exist(idx))
-                    Data[it->Unknowns(idx)] = f(GetBaryCenter(*it), t);
+                    Data[it->Unknowns(idx)] = f(GetBaryCenter(*it));
         return *this;
     }
-    VecDescBaseCL& Interpolate(MultiGridCL const & mg, InstatVectorFunction f, double t = 0.) {
+    VecDescBaseCL& Interpolate(MultiGridCL const & mg, VectorFunction f) {
         if (RowIdx->IsScalar()) throw std::invalid_argument(__func__ + std::string(": f must be scalar-valued"));
         size_t const dim = 3;
         if (RowIdx->NumUnknowns() % dim) throw std::logic_error(__func__ + std::string(": invalid numb of d.o.f."));
         auto blockSize = RowIdx->NumUnknowns() / dim;
         auto lvl = GetLevel();
         auto idx = RowIdx->GetIdx();
-        this->t = t;
         for (size_t d = 0; d < dim; ++d) {
             if (RowIdx->NumUnknownsVertex())
                 for (auto it = mg.GetTriangVertexBegin(lvl); it != mg.GetTriangVertexEnd(lvl); ++it)
                     if (it->Unknowns.Exist(idx))
-                        Data[it->Unknowns(idx) / dim /* / dim is tmp */ + d * blockSize] = f(it->GetCoord(), t)[d];
+                        Data[it->Unknowns(idx) / dim /* / dim is tmp */ + d * blockSize] = f(it->GetCoord())[d];
             if (RowIdx->NumUnknownsEdge())
                 for (auto it = mg.GetTriangEdgeBegin(lvl); it != mg.GetTriangEdgeEnd(lvl); ++it)
                     if (it->Unknowns.Exist(idx))
-                        Data[it->Unknowns(idx) / dim /* / dim is tmp */ + d * blockSize] = f(GetBaryCenter(*it), t)[d];
+                        Data[it->Unknowns(idx) / dim /* / dim is tmp */ + d * blockSize] = f(GetBaryCenter(*it))[d];
         }
         return *this;
     }
