@@ -127,6 +127,7 @@ int main(int argc, char* argv[]) {
             auto usePrevGuess = inpJSON.get<bool>("Solver.UsePreviousFrameAsInitialGuess");
             auto BDF = inpJSON.get<size_t>("SurfNavierStokes.BDF");
             if (BDF != 1 && BDF != 2) throw std::invalid_argument("use BDF = 1 or 2");
+            auto tol = inpJSON.get<double>("Solver.Outer.RelResTol");
             logger.buf
                 << surface->description() << '\n'
                 << surfNavierStokesData.description << '\n'
@@ -245,7 +246,6 @@ int main(int argc, char* argv[]) {
             auto belosParams = parameterList();
             belosParams->set("Num Blocks", inpJSON.get<int>("Solver.Outer.KrylovSubspaceSize"));
             belosParams->set("Maximum Iterations", inpJSON.get<int>("Solver.Outer.MaxIter"));
-            belosParams->set("Convergence Tolerance", inpJSON.get<double>("Solver.Outer.RelResTol"));
             belosParams->set("Output Frequency", inpJSON.get<int>("Solver.Outer.OutputFrequency"));
             belosParams->set("Verbosity", Errors + Warnings + StatusTestDetails + TimingDetails + FinalSummary + IterationDetails);
             belosParams->set<int>("Output Style", Brief);
@@ -275,6 +275,14 @@ int main(int argc, char* argv[]) {
                 C->Multiply(false, x2, y22);
                 y21.Update(1., y22, 1.);
             }));
+            auto belosRES = [&]() {
+                SV residual(mapVelocityPressure);
+                belosMTX->Apply(belosLHS, residual);
+                residual.Update(-1., belosRHS, 1.);
+                double nrm;
+                residual.Norm2(&nrm);
+                return nrm;
+            };
             logger.beg("set up preconditioners");
                 logger.beg("diffusion-convection-reaction block");
                     auto iterationA = inpJSON.get<std::string>("Solver.Inner.A.Iteration");
@@ -438,8 +446,7 @@ int main(int argc, char* argv[]) {
                 surfNSystem.matrices = { &M_u, &A_u, &AL_u, &S_u, &C_u, &M_p, &C_p, &A_p, &B_pu, &Q_pu };
                 setupFESystem(mg, surfNSystem);
                 C_p.Data *= -rho_p;
-                MatrixCL B_pu_T, A_sum;
-                transpose(B_pu.Data, B_pu_T);
+                MatrixCL A_sum;
                 VectorCL I_p(1., m);
             auto assembleTime = logger.end();
             auto factorizationTime = 0.;
@@ -476,13 +483,8 @@ int main(int argc, char* argv[]) {
                 projectVorticity();
             auto projectTime = logger.end();
             logger.beg("output");
-                double alpha, b_norm, r0_norm;
+                double alpha, b_norm, r_0_norm;
                 ReturnType belosSolverResult;
-                auto residual = [&](VectorCL const & u, VectorCL const & p) {
-                    auto velResSq = norm_sq(A_sum * u + B_pu_T * p - F_u.Data);
-                    auto preResSq = norm_sq(B_pu.Data * u + C_p.Data * p - G_p.Data);
-                    return std::tuple<double, double, double>(sqrt(velResSq), sqrt(preResSq), sqrt(velResSq + preResSq));
-                };
                 auto exportStats = [&](size_t i) {
                     std::ofstream stats(dirName + "/stats/t_" + std::to_string(i) + ".json");
                     ParamCL tJSON;
@@ -502,7 +504,7 @@ int main(int argc, char* argv[]) {
                     tJSON.put("ElapsedTime.ProjectVorticity", projectTime);
                     tJSON.put("Solver.ProjectVorticity.TotalIters", belosSolverW->getNumIters());
                     tJSON.put("Solver.ProjectVorticity.Converged", belosSolverResultW == Converged);
-                    tJSON.put("Solver.ProjectVorticity.ResidualNormRelative", belosSolverW->achievedTol());
+                    tJSON.put("Solver.ProjectVorticity.ResidualNormBelosRelative", belosSolverW->achievedTol());
                     auto surfArea = dot(I_p, M_p.Data * I_p);
                     tJSON.put("Integral.SurfacaAreaP1", surfArea);
                     tJSON.put("Integral.FESolution.PressureMean", dot(I_p, M_p.Data * p.Data) / surfArea);
@@ -534,23 +536,15 @@ int main(int argc, char* argv[]) {
                         tJSON.put("Integral.Error.VelocityH1", sqrt(dot(u_diff, A_u.Data * u_diff)));
                         auto p_diff = p_star.Data - p.Data;
                         tJSON.put("Integral.Error.PressureL2", sqrt(dot(p_diff, M_p.Data * p_diff)));
-                        if (i > 0) {
-                            auto && [velRes, preRes, fullRes] = residual(u_star.Data, p_star.Data);
-                            tJSON.put("Solver.Outer.ResidualNorm.ExactSolnAbsolute.Velocity", velRes);
-                            tJSON.put("Solver.Outer.ResidualNorm.ExactSolnAbsolute.Pressure", preRes);
-                            tJSON.put("Solver.Outer.ResidualNorm.ExactSolnAbsolute.Full", fullRes);
-                        }
                     }
                     if (i > 0) {
-                        auto && [velRes, preRes, fullRes] = residual(u.Data, p.Data);
-                        tJSON.put("Solver.Outer.ResidualNorm.TrueAbsolute.Velocity", velRes);
-                        tJSON.put("Solver.Outer.ResidualNorm.TrueAbsolute.Pressure", preRes);
-                        tJSON.put("Solver.Outer.ResidualNorm.TrueAbsolute.Full", fullRes);
+                        auto r_i_norm = belosRES();
+                        tJSON.put("Solver.Outer.ResidualNorm.r_i", r_i_norm);
                         tJSON.put("Solver.Outer.ResidualNorm.b", b_norm);
-                        tJSON.put("Solver.Outer.ResidualNorm.r_0", r0_norm);
-                        tJSON.put("Solver.Outer.ResidualNorm.r_i/b", fullRes / b_norm);
-                        tJSON.put("Solver.Outer.ResidualNorm.r_i/r_0", fullRes / r0_norm);
-                        tJSON.put("Solver.Outer.ResidualNorm.SolverRelative", belosSolver->achievedTol());
+                        tJSON.put("Solver.Outer.ResidualNorm.r_0", r_0_norm);
+                        tJSON.put("Solver.Outer.ResidualNorm.r_i/b", r_i_norm / b_norm);
+                        tJSON.put("Solver.Outer.ResidualNorm.r_i/r_0", r_i_norm / r_0_norm);
+                        tJSON.put("Solver.Outer.ResidualNorm.BelosRelative", belosSolver->achievedTol());
                         tJSON.put("Solver.Outer.TotalIters", belosSolver->getNumIters());
                         tJSON.put("Solver.Outer.Converged", belosSolverResult == Converged);
                         tJSON.put("Solver.Inner.A.TotalIters", numItersA);
@@ -686,13 +680,13 @@ int main(int argc, char* argv[]) {
                 solveWastedTime = 0.;
                 logger.beg("linear solve");
                     numItersA = numItersS_M = numItersS_L = 0;
-                    b_norm = r0_norm = sqrt(norm_sq(F_u.Data) + norm_sq(G_p.Data));
                     belosLHS.PutScalar(0.);
+                    b_norm = r_0_norm = belosRES();
                     if (usePrevGuess) {
                         belosLHS = static_cast<SV>(u.Data.append(p.Data));
-                        r0_norm = std::get<2>(residual(u.Data, p.Data));
-                        belosSolver->setParameters(rcpFromRef(belosParams->set("Convergence Tolerance", inpJSON.get<double>("Solver.Outer.RelResTol") * b_norm / r0_norm)));
+                        r_0_norm = belosRES();
                     }
+                    belosSolver->setParameters(rcpFromRef(belosParams->set("Convergence Tolerance", tol * b_norm / r_0_norm)));
                     belosProblem.setProblem();
                     belosSolver->setProblem(rcpFromRef(belosProblem));
                     belosSolverResult = belosSolver->solve();
