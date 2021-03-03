@@ -61,7 +61,7 @@
             "aa": 1.0, "ma": 16.0,
             "ab": 0.1, "mb": 20.0
           },
-          "RayleighTaylor": { "GravityScaling": 1.0 },
+          "RayleighTaylor": { "GravityScaling": 1.0, "Noise": 0.1 },
           "WanDerVaalsExact": { "AngularVelocity": 1.0 }
         }
       },
@@ -113,6 +113,7 @@
           "OutputFrequency" : 1,
           "KrylovSubspaceSize" : 100,
           "MaxIter" : 50,
+          "MaxIterCH": 50,
           "RelResTol" : 1e-8
         },
         "Inner" : {

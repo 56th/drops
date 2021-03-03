@@ -291,7 +291,7 @@ int main(int argc, char* argv[]) {
             logger.buf << "available iterations: " << belosFactory.supportedSolverNames();
             logger.log();
             auto belosSolver = belosFactory.create(inpJSON.get<std::string>("Solver.Outer.Iteration"), belosParams);
-            logger.buf << "outer solver: " << belosSolver->description();
+            logger.buf << "outer solver NS: " << belosSolver->description();
             logger.log();
             Epetra_Map mapVelocity(static_cast<int>(n), 0, comm), mapVelocityComp(static_cast<int>(n_i), 0, comm), mapVelocityPressure(static_cast<int>(n + m), 0, comm), mapPressure(static_cast<int>(m), 0, comm);
             SV belosLHS(mapVelocityPressure), belosRHS(mapVelocityPressure);
@@ -316,15 +316,19 @@ int main(int argc, char* argv[]) {
 
             // ... add outer solver for CH (can be fixed to FGMRES, no need for json parameter)
             // ... YP: using same belosParams as in NS
-
+            auto belosParamsCH = parameterList();
+            belosParamsCH->set("Num Blocks", inpJSON.get<int>("Solver.Outer.KrylovSubspaceSize"));
+            belosParamsCH->set("Maximum Iterations", inpJSON.get<int>("Solver.Outer.MaxIterCH"));
+            belosParamsCH->set("Output Frequency", inpJSON.get<int>("Solver.Outer.OutputFrequency"));
+            belosParamsCH->set("Verbosity", Errors + Warnings + StatusTestDetails + TimingDetails + FinalSummary + IterationDetails);
+            belosParamsCH->set<int>("Output Style", Brief);
             auto belosSolverCH = belosFactory.create("FLEXIBLE GMRES", belosParams);
-            logger.buf << "outer solver: " << belosSolverCH->description();
+            logger.buf << "outer solver CH: " << belosSolverCH->description();
             logger.log();
             // matrix, lhs, and rhs
-            RCP<OP> belosMTXCH;
             Epetra_Map mapChiOmega(static_cast<int>(m + m), 0, comm);
             Epetra_Vector belosLHSCH(mapChiOmega), belosRHSCH(mapChiOmega);
-            MT ABCD_Epetra(Epetra_DataAccess::Copy, mapChiOmega, 0, true);
+            RCP<MT> belosMTXCH;
 
             auto belosRES = [&]() {
                 SV residual(mapVelocityPressure);
@@ -496,7 +500,7 @@ int main(int argc, char* argv[]) {
             std::function<void()> runFactorizationCH = [](){};
             if (inpJSON.get<bool>("Solver.Inner.Use")) {
                 logger.beg("set up preconditioner for Cahn-Hilliard");
-                amesosSolverCH = Amesos2::create<MT, MV>("Klu", rcpFromRef(ABCD_Epetra));
+                amesosSolverCH = Amesos2::create<MT, MV>("Klu", rcpFromRef(belosMTXCH));
                 belosPRECH = rcp(new Epetra_OperatorApply([&](MV const &X, MV &Y) {
                     amesosSolverCH->setB(rcpFromRef(X));
                     amesosSolverCH->setX(rcpFromRef(Y));
@@ -510,10 +514,10 @@ int main(int argc, char* argv[]) {
                     logger.beg("numeric factorization");
                     amesosSolverCH->numericFactorization();
                     auto amesosStatus = amesosSolverCH->getStatus();
-                    logger.buf << "numb of nonzeros in L + U = " << amesosStatus.getNnzLU() << " (" << (100. * amesosStatus.getNnzLU()) / (static_cast<double>(ABCD_Epetra.NumGlobalRows()) * ABCD_Epetra.NumGlobalCols()) << "%)";
+                    logger.buf << "numb of nonzeros in L + U = " << amesosStatus.getNnzLU() << " (" << (100. * amesosStatus.getNnzLU()) / (static_cast<double>(belosMTXCH.NumGlobalRows()) * belosMTXCH.NumGlobalCols()) << "%)";
                     logger.log();
                     logger.end();
-                    factorizationTime = logger.end();
+                    //factorizationTime = logger.end();
                 };
                 logger.end();
             }
@@ -731,14 +735,14 @@ int main(int argc, char* argv[]) {
                     // ... add lin solve etc.
 
                     logger.beg("convert to Epetra");
-                    ABCD_Epetra = static_cast<MT>(ABCD);
+                    belosMTXCH = static_cast<MT>(ABCD);
                     auto printStat = [&](std::string const & name, MT const & A) {
                         logger.buf << name << ": " << A.NumGlobalRows() << 'x' << A.NumGlobalCols() << ", " << A.NumGlobalNonzeros() << " nonzeros";
                         if (A.NumGlobalNonzeros()) logger.buf << " (" << (100. * A.NumGlobalNonzeros()) / (static_cast<double>(A.NumGlobalRows()) * A.NumGlobalCols()) << "%)";
                         logger.log();
                     };
-                    printStat("{A, B; C, D} block mtx", ABCD_Epetra);
-                    belosMTXCH = rcpFromRef(ABCD_Epetra);
+                    printStat("{A, B; C, D} block mtx", belosMTXCH);
+                    belosMTXCH = rcpFromRef(belosMTXCH);
                     for (size_t i = 0; i < m; ++i) belosRHSCH[i] = F_c.Data[i];
                     for (size_t i = 0; i < m; ++i) belosRHSCH[i + m] = F_omega.Data[i];
                     logger.end();
