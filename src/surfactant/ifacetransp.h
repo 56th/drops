@@ -948,7 +948,8 @@ private:
     QuadDomain2DCL qDomain;
     QuadDomainCL q3Domain;
     GridFunctionCL<> qHatP2[10], qHatP1[4], qLsGradNorm, qSurfSpeed, qG, qF_c, qChi, qOmega, qCutOffFunc;
-    GridFunctionCL<Point3DCL> qGradP2[10], qSurfGradP2[10], q3DGradP2[10], qGradP1[4], qSurfGradP1[4], q3DGradP1[4], qNormal, q3DNormal, qWind, qSurfSpeedSurfGrad, qChiSurfGrad, qOmegaSurfGrad, qF, qHatP2CrossN[30];
+    GridFunctionCL<Point3DCL> qGradP2[10], qSurfGradP2[10], q3DGradP2[10], qGradP1[4], qSurfGradP1[4], q3DGradP1[4], qNormal, q3DNormal, qSurfSpeedSurfGrad, qChiSurfGrad, qOmegaSurfGrad, qF, qHatP2CrossN[30];
+    struct { GridFunctionCL<Point3DCL> NS, CH; } qWind;
     GridFunctionCL<SMatrixCL<3,3>> qP, qH, qE[30];
     mtx createMtx(size_t n, size_t m, double v) { return mtx(n, vec(v, m)); }
     mtx createMtx(size_t n, double v) { return createMtx(n, n, v); }
@@ -1098,7 +1099,7 @@ private:
         for (size_t i = 0; i < n.vecP2; ++i)
             qHatP2CrossN[i] = qHatCrossN(i, qHatP2);
     }
-    void buildWind() {
+    void buildWindNS() {
         LocalP2CL<Point3DCL> windTet;
         auto I = params.surfNavierStokesParams.w_T.RowIdx->Loc2Glo(tet);
         for (size_t i = 0; i < I.size(); ++i) {
@@ -1106,12 +1107,21 @@ private:
             windTet[is][in] = params.surfNavierStokesParams.w_T.Data[I[i]];
         }
         // windTet.assign(tet, params.surfNavierStokesParams.w_T, BndDataCL<Point3DCL>());
-        resize_and_evaluate_on_vertexes(windTet, qDomain, qWind);
+        resize_and_evaluate_on_vertexes(windTet, qDomain, qWind.NS);
         if (params.surfNavierStokesParams.u_N_max) {
             require(qNormal, &LocalAssembler::buildNormal);
             require(qSurfSpeed, &LocalAssembler::buildSurfSpeed);
-            qWind += qSurfSpeed * qNormal;
+            qWind.NS += qSurfSpeed * qNormal;
         }
+    }
+    void buildWindCH() {
+        LocalP2CL<Point3DCL> windTet;
+        auto I = params.surfCahnHilliardParams.u_T.RowIdx->Loc2Glo(tet);
+        for (size_t i = 0; i < I.size(); ++i) {
+            auto && [is, in] = ind(n.P2, i);
+            windTet[is][in] = params.surfCahnHilliardParams.u_T.Data[I[i]];
+        }
+        resize_and_evaluate_on_vertexes(windTet, qDomain, qWind.CH);
     }
     void buildSurfSpeed() {
         LocalP2CL<> uNTet;
@@ -1257,13 +1267,13 @@ public:
         require(qHatP2[0], &LocalAssembler::buildHatP2);
         require(qGradP2[0], &LocalAssembler::buildGradP2);
         require(qP, &LocalAssembler::buildProjector);
-        require(qWind, &LocalAssembler::buildWind);
+        require(qWind.NS, &LocalAssembler::buildWindNS);
         auto A = createMtx(n.vecP2);
         for (size_t i = 0; i < n.vecP2; ++i) {
             auto && [ is, in ] = ind(n.P2, i);
             for (size_t j = 0; j < n.vecP2; ++j) {
                 auto && [ js, jn ] = ind(n.P2, j);
-                A[i][j] = quad_2D(dot(qWind, qGradP2[js]) * take(qP, in, jn) * qHatP2[is], qDomain);
+                A[i][j] = quad_2D(dot(qWind.NS, qGradP2[js]) * take(qP, in, jn) * qHatP2[is], qDomain);
             }
         }
         return A;
@@ -1274,13 +1284,13 @@ public:
         require(qHatP2[0], &LocalAssembler::buildHatP2);
         require(qGradP2[0], &LocalAssembler::buildGradP2);
         require(qP, &LocalAssembler::buildProjector);
-        require(qWind, &LocalAssembler::buildWind);
+        require(qWind.NS, &LocalAssembler::buildWindNS);
         auto A = createMtx(n.vecP2);
         for (size_t i = 0; i < n.vecP2; ++i) {
             auto && [ is, in ] = ind(n.P2, i);
             for (size_t j = 0; j < n.vecP2; ++j) {
                 auto && [ js, jn ] = ind(n.P2, j);
-                A[i][j] = quad_2D(qCutOffFunc * dot(qWind, qGradP2[js]) * take(qP, in, jn) * qHatP2[is], qDomain);
+                A[i][j] = quad_2D(qCutOffFunc * dot(qWind.NS, qGradP2[js]) * take(qP, in, jn) * qHatP2[is], qDomain);
             }
         }
         return A;
@@ -1460,6 +1470,16 @@ public:
                 A[i][j] = quad_2D(qHatP1[j] * qHatP1[i], qDomain);
                 A[j][i] = A[i][j];
             }
+        return A;
+    }
+    mtx N_P1P1() {
+        require(qHatP1[0], &LocalAssembler::buildHatP1);
+        require(qSurfGradP1[0], &LocalAssembler::buildSurfGradP1);
+        require(qWind.CH, &LocalAssembler::buildWindCH);
+        auto A = createMtx(n.P1);
+        for (size_t i = 0; i < n.P1; ++i)
+            for (size_t j = 0; j < n.P1; ++j)
+                A[i][j] = quad_2D(dot(qWind.CH, qSurfGradP1[j]) * qHatP1[i], qDomain);
         return A;
     }
     vec F_continuity_P1() {

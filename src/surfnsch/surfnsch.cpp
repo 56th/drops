@@ -238,10 +238,8 @@ int main(int argc, char* argv[]) {
                     // pressure + concentration
                     M_p(&preIdx, &preIdx, &LocalAssembler::M_P1P1),
                     C_p(&preIdx, &preIdx, stab == "Normal" ? &LocalAssembler::C_n_P1P1 : &LocalAssembler::C_full_P1P1),
-                    A_p(&preIdx, &preIdx, &LocalAssembler::A_P1P1);
-
-                    // N_c(&preIdx, &preIdx, &LocalAssembler::N_P1P1);
-
+                    A_p(&preIdx, &preIdx, &LocalAssembler::A_P1P1),
+                    N_c(&preIdx, &preIdx, &LocalAssembler::N_P1P1);
                 FEVecDescCL
                     F_u(&velIdx, &LocalAssembler::F_momentum_vecP2),
                     F_p(&preIdx, &LocalAssembler::F_continuity_P1),
