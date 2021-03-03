@@ -490,36 +490,30 @@ int main(int argc, char* argv[]) {
             logger.end();
             LinearProblem<ST, MV, OP> belosProblem(belosMTX, rcpFromRef(belosLHS), rcpFromRef(belosRHS));
             if (useInnerIters) belosProblem.setRightPrec(belosPRE);
-
-            // ... add inner solver (preconditioner) for CH
-
-            RCP<OP> belosPRECH;
-            RCP<Amesos2::Solver<MT, MV>> amesosSolverCH;
-            std::function<void()> runFactorizationCH = [](){};
-            if (inpJSON.get<bool>("Solver.Inner.Use")) {
-                logger.beg("set up preconditioner for Cahn-Hilliard");
-                amesosSolverCH = Amesos2::create<MT, MV>("Klu", rcpFromRef(belosMTXCH));
-                belosPRECH = rcp(new Epetra_OperatorApply([&](MV const &X, MV &Y) {
+            logger.beg("set up preconditioner for Cahn-Hilliard");
+                RCP<Amesos2::Solver<MT, MV>> amesosSolverCH;
+                auto belosPRECH = rcp(new Epetra_OperatorApply([&](MV const &X, MV &Y) {
                     amesosSolverCH->setB(rcpFromRef(X));
                     amesosSolverCH->setX(rcpFromRef(Y));
                     amesosSolverCH->solve();
                 }));
-                runFactorizationCH = [&]() {
+                auto runFactorizationCH = [&]() {
+                    amesosSolverCH = Amesos2::create<MT, MV>("Klu", belosMTXCH);
                     logger.beg("factorization");
-                    logger.beg("symbolic factorization");
-                    amesosSolverCH->symbolicFactorization();
+                        logger.beg("symbolic factorization");
+                            amesosSolverCH->symbolicFactorization();
+                        logger.end();
+                        logger.beg("numeric factorization");
+                            amesosSolverCH->numericFactorization();
+                        logger.end();
+                        auto amesosStatus = amesosSolverCH->getStatus();
+                        logger.buf << "numb of nonzeros in L + U = " << amesosStatus.getNnzLU() << " (" << (100. * amesosStatus.getNnzLU()) / (static_cast<double>(belosMTXCH->NumGlobalRows()) * belosMTXCH->NumGlobalCols()) << "%)";
+                        logger.log();
                     logger.end();
-                    logger.beg("numeric factorization");
-                    amesosSolverCH->numericFactorization();
-                    auto amesosStatus = amesosSolverCH->getStatus();
-                    logger.buf << "numb of nonzeros in L + U = " << amesosStatus.getNnzLU() << " (" << (100. * amesosStatus.getNnzLU()) / (static_cast<double>(belosMTXCH.NumGlobalRows()) * belosMTXCH.NumGlobalCols()) << "%)";
-                    logger.log();
-                    logger.end();
-                    //factorizationTime = logger.end();
                 };
-                logger.end();
-            }
-
+            logger.end();
+            LinearProblem<ST, MV, OP> belosProblemCH(belosMTXCH, rcpFromRef(belosLHSCH), rcpFromRef(belosRHSCH));
+            if (useInnerIters) belosProblemCH.setRightPrec(belosPRECH);
         logger.end();
         logger.beg("t = t_0 = 0");
             t = 0.;
@@ -747,8 +741,6 @@ int main(int argc, char* argv[]) {
                     logger.beg("linear solve");
                     belosLHSCH.PutScalar(0.);
 
-                    LinearProblem<ST, MV, OP> belosProblemCH(belosMTXCH, rcpFromRef(belosLHSCH), rcpFromRef(belosRHSCH));
-                    if (inpJSON.get<bool>("Solver.Inner.Use")) belosProblemCH.setRightPrec(belosPRE);
                     belosProblemCH.setProblem();
                     belosSolverCH->setProblem(rcpFromRef(belosProblemCH));
                     std::cout << std::scientific;
