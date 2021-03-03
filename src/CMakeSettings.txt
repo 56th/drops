@@ -17,17 +17,17 @@ set(DROPS_BUILD_TYPE "" CACHE STRING "")
 # predefined compiler flags
 ##########################################################################
 # Intel compiler
-set(IPC_CXX_FLAGS_DEBUG "-DVALARRAY_DEBUG -wd1572 -g -std=c++11")
-set(IPC_CXX_FLAGS_RELEASE "-O3 -ip -fp-model fast=2 -std=c++11")
+set(IPC_CXX_FLAGS_DEBUG "-DVALARRAY_DEBUG -wd1572 -g -std=c++1y")
+set(IPC_CXX_FLAGS_RELEASE "-O3 -ip -fp-model fast=2 -std=c++1y")
 # GNU compiler
-set(GCC_CXX_FLAGS_DEBUG "-g -O0 -W -Wall -pedantic -std=c++11 -Wfatal-errors")
-set(GCC_CXX_FLAGS_RELEASE "-O3 --fast-math -W -Wall -pedantic -std=c++11 -Wfatal-errors")
+set(GCC_CXX_FLAGS_DEBUG "-g -O0 -W -Wall -pedantic -std=c++1y -Wfatal-errors")
+set(GCC_CXX_FLAGS_RELEASE "-O3 --fast-math -W -Wall -pedantic -std=c++1y -Wfatal-errors")
 # IBM compiler
 set(XL_CXX_FLAGS_DEBUG "-O0 -g -qlanglvl=extended0x")
 set(XL_CXX_FLAGS_RELEASE "-O5 -qlanglvl=extended0x")
 # CLANG compiler
-set(CLANG_CXX_FLAGS_DEBUG "-g -O0 -W -Wall -pedantic -Wno-unknown-pragmas -std=c++11")
-set(CLANG_CXX_FLAGS_RELEASE "-O3 -W -Wall -pedantic -Wno-unknown-pragmas -std=c++11")
+set(CLANG_CXX_FLAGS_DEBUG "-g -O0 -W -Wall -pedantic -Wno-unknown-pragmas -std=c++1y")
+set(CLANG_CXX_FLAGS_RELEASE "-O3 -W -Wall -pedantic -Wno-unknown-pragmas -std=c++1y")
 
 # MPI turned off by default
 option(MPI FALSE)

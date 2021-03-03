@@ -1470,7 +1470,7 @@ public:
             b[i] = quad_2D(qG * qHatP1[i], qDomain);
         return b;
     }
-    vec F_c_P1(){
+    vec F_concentration_P1(){
         require(qHatP1[0], &LocalAssembler::buildHatP1);
         require(qF_c, &LocalAssembler::buildF_c);
         vec b(n.P1);
