@@ -297,14 +297,12 @@ int main(int argc, char* argv[]) {
                     std::vector<std::vector<RCP<MT>>> A_block(numBlocksA, std::vector<RCP<MT>>(numBlocksA));
                     std::vector<RCP<Amesos2::Solver<MT, MV>>> amesosSolver(numBlocksA);
                     auto runFactorization = [&]() {
-                        if (!amesosSolver[0]) {
-                            for (size_t i = 0; i < numBlocksA; ++i)
-                                amesosSolver[i] = Amesos2::create<MT, MV>(iterationA, A_block[i][i]);
-                            logger.buf
-                                << "solver: " << amesosSolver[0]->name() << '\n'
-                                << "description: " << amesosSolver[0]->description();
-                            logger.log();
-                        }
+                        for (size_t i = 0; i < numBlocksA; ++i)
+                            amesosSolver[i] = Amesos2::create<MT, MV>(iterationA, A_block[i][i]);
+                        logger.buf
+                            << "solver: " << amesosSolver[0]->name() << '\n'
+                            << "description: " << amesosSolver[0]->description();
+                        logger.log();
                         #pragma omp parallel for
                         for (size_t i = 0; i < numBlocksA; ++i) {
                             amesosSolver[i]->symbolicFactorization();
@@ -637,7 +635,7 @@ int main(int argc, char* argv[]) {
                         << "Pe = " << Pe << '\n'
                         << "max |u_N| = " << u_N_max;
                     logger.log();
-                    surfNSystem.vectors = {&F_u, &G_p };
+                    surfNSystem.vectors = { &F_u, &G_p };
                     setupFESystem(mg, surfNSystem);
                     // system mtx
                     A_sum.LinComb(alpha, M_u.Data, gamma, AL_u.Data, nu, A_u.Data, tau_u, S_u.Data, rho_u, C_u.Data);
