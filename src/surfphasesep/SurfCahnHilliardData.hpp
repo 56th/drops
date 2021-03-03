@@ -26,7 +26,7 @@ namespace DROPS {
         data.raftRatio = -1;
         // cf. mathematica/rhs.wls
         if (name == "WanDerVaals") {
-            data.description = "chi_0 = .5 * (1 + tanh(z / (2 sqrt(2) eps)))\n";
+            data.description = "chi_0 = .5 * (1 + tanh(z / (2 sqrt(2) eps)))";
             auto eps = params.get<double>("SurfCahnHilliard.Epsilon");
             auto omega = params.get<double>("SurfCahnHilliard.IC.Params." + name + ".AngularVelocity");
             chi = [=](Point3DCL const & x, double t) { return .5 * (1. + tanh((x[2] * cos(omega * t) - x[1] * sin(omega * t))/(2. * std::sqrt(2.) * eps))); };
@@ -34,8 +34,8 @@ namespace DROPS {
             if (sphere && !params.get<bool>("SurfCahnHilliard.UseDegenerateMobility")) {
                 data.exact = true;
                 data.description =
-                    "chi = .5 * (1 + tanh((z cos(omega t) - y sin(omega t))/ (2 sqrt(2) eps)))\n"
-                    "rotation of Wan der Vaals 'tanh' solution around x-axis w/ velocity u = omega (0, -z, y)\n";
+                    "chi = .5 * (1 + tanh((z cos(omega t) - y sin(omega t))/ (2 sqrt(2) eps)))"
+                    "rotation of Wan der Vaals 'tanh' solution around x-axis w/ velocity u = omega (0, -z, y)";
                 auto sech = [](double x) { return 1. / cosh(x); };
                 auto M = params.get<double>("SurfCahnHilliard.MobilityScaling");
                 f = [=](Point3DCL const & x, double t) {
@@ -49,7 +49,7 @@ namespace DROPS {
             auto raftRatioNoisePercent = params.get<double>("SurfCahnHilliard.IC." + name + ".RaftRatioNoiseFraction");
             auto a = data.raftRatio - raftRatioNoisePercent * data.raftRatio;
             auto b = data.raftRatio + raftRatioNoisePercent * data.raftRatio;
-            data.description = "chi_0 ~ Uniform(" + std::to_string(a) + ", " + std::to_string(b) + ")\n";
+            data.description = "chi_0 ~ Uniform(" + std::to_string(a) + ", " + std::to_string(b) + ")";
             chi = [=](Point3DCL const &, double) mutable {
                 std::random_device rd;
                 std::mt19937 gen(rd());
@@ -59,7 +59,7 @@ namespace DROPS {
         }
         else if (name == "RandomBernoulli") {
             data.raftRatio = params.get<double>("SurfCahnHilliard.IC.Params." + name + ".RaftRatio");
-            data.description = "chi_0 ~ Bernoulli(" + std::to_string(data.raftRatio) + ")\n";
+            data.description = "chi_0 ~ Bernoulli(" + std::to_string(data.raftRatio) + ")";
             chi = [=](Point3DCL const &, double) mutable {
                 std::random_device rd;
                 std::mt19937 gen(rd());

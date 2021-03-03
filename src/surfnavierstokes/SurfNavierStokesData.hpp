@@ -27,10 +27,10 @@ namespace DROPS {
         data.description = "convection term type: " + convectionTermType + '\n';
         data.exact = false;
         // cf. mathematica/rhs.wls
-        if (name == "0") data.description += "u_0 = 0\n";
+        if (name == "0") data.description += "u_0 = 0";
         else if (name == "KelvinHelmholtz") {
             if (!surface.rotationalInvariance()[2]) throw std::invalid_argument(funcName + ": surface must be rotational invariant around z-axis for '" + name + "' test");
-            data.description += "u_0 = Kelvin-Helmholtz, cf. https://arxiv.org/abs/1909.02990\n";
+            data.description += "u_0 = Kelvin-Helmholtz, cf. https://arxiv.org/abs/1909.02990";
             auto delta_0 = params.get<double>("SurfNavierStokes.IC.Params." + name + ".delta_0");
             auto cn = params.get<double>("SurfNavierStokes.IC.Params." + name + ".cn");
             auto aa = params.get<double>("SurfNavierStokes.IC.Params." + name + ".aa");
@@ -63,7 +63,7 @@ namespace DROPS {
             auto sphere = dynamic_cast<Sphere const *>(&surface);
             if (!sphere) throw std::invalid_argument(funcName + ": test '" + name + "' is defined for sphere only");
             data.exact = true;
-            data.description += "u = P (-z^2, y, x), p = x y^3 + z\n";
+            data.description += "u = P (-z^2, y, x), p = x y^3 + z";
             u_T = [=](Point3DCL const & x, double) { return sphere->P(x) * Point3DCL(-x[2] * x[2], x[1], x[0]); };
             p = [](Point3DCL const & x, double) { return x[0] * pow(x[1], 3.) + x[2]; };
             m_g = [=](Point3DCL const & x, double t) { return -(x[0]*x[2]*(4.*x[2] - 3.) - 3.*pow(x[1],2) + pow(sphere->r(t),2) + 2.*sphere->r(t)*sphere->r_prime(t))/pow(sphere->r(t),2); };
@@ -87,7 +87,7 @@ namespace DROPS {
             auto sphere = dynamic_cast<Sphere const *>(&surface);
             if (!sphere) throw std::invalid_argument(funcName + ": test '" + name + "' is defined for sphere only");
             data.exact = true;
-            data.description += "u = P (1 - 2 t, 0, 0), p = 0\n";
+            data.description += "u = P (1 - 2 t, 0, 0), p = 0";
             u_T = [=](Point3DCL const & x, double t) { return sphere->P(x, t) * Point3DCL(1. - 2. * t, 0., 0.); };
             m_g = [=](Point3DCL const & x, double t) { return (-2.*((-1. + 2.*t)*x[0] + sphere->r(t)*sphere->r_prime(t)))/pow(sphere->r(t),2); };
             auto nu = params.get<double>("SurfNavierStokes.nu");
@@ -110,7 +110,7 @@ namespace DROPS {
             auto sphere = dynamic_cast<Sphere const *>(&surface);
             if (!sphere) throw std::invalid_argument(funcName + ": test '" + name + "' is defined for sphere only");
             data.exact = true;
-            data.description += "u = omega (0, -z, y), p = 0\n";
+            data.description += "u = omega (0, -z, y), p = 0";
             u_T = [=](Point3DCL const & x, double) { return Point3DCL(0., -x[2], x[1]); };
             m_g = [=](Point3DCL const &, double t) { return -2. * sphere->r_prime(t) / sphere->r(t); };
             auto omega = params.get<double>("SurfNavierStokes.IC.Params." + name + ".AngularVelocity");
