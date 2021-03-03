@@ -4,7 +4,7 @@
       "EveryStep":  1,
       "Binary":     true,
       "VTK": {
-        "Velocity": false,
+        "Velocity": true,
         "Vorticity": true,
         "SurfSpeed": false,
         "Pressure": false,
@@ -37,7 +37,7 @@
     },
 
     "Surface": {
-      "Name": "Torus",
+      "Name": "Sphere",
       "Params": {
         "Sphere": {
           "r_0": 1.0,
@@ -52,7 +52,6 @@
     },
 
     "SurfNSCH": {
-      "BDF": 2,
       "NumbOfVirtualSubEdges": 2,
       "IC": {
         "Name": "KelvinHelmholtz",
@@ -93,17 +92,17 @@
       "CH": {
         "Epsilon": 0.01,
         "MobilityScaling": 1.0,
-        "c_0" : 0.5,
         "ChemicalPotentialScaling": 1.0,
         "UseDegenerateMobility": false
       }
     },
 
     "Time": {
-      "Read":         0,
-      "Write":        "yes",
-      "NumbOfSteps":  20,
-      "FinalTime":    20.0
+      "BDF": 2,
+      "Read": 0,
+      "Write": "yes",
+      "NumbOfSteps": 1,
+      "FinalTime": 1.0
     },
 
     "Solver": {

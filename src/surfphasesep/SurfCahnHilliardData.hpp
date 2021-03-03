@@ -34,7 +34,7 @@ namespace DROPS {
             if (sphere && !params.get<bool>("SurfCahnHilliard.UseDegenerateMobility")) {
                 data.exact = true;
                 data.description =
-                    "chi = .5 * (1 + tanh((z cos(omega t) - y sin(omega t))/ (2 sqrt(2) eps)))"
+                    "chi = .5 * (1 + tanh((z cos(omega t) - y sin(omega t))/ (2 sqrt(2) eps)))\n"
                     "rotation of Wan der Vaals 'tanh' solution around x-axis w/ velocity u = omega (0, -z, y)";
                 auto sech = [](double x) { return 1. / cosh(x); };
                 auto M = params.get<double>("SurfCahnHilliard.MobilityScaling");
