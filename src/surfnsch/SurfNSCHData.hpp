@@ -39,10 +39,8 @@ namespace DROPS {
             auto g = params.get<double>("SurfNSCH.IC.Params." + name + ".GravityScaling");
             dataNS.f_T = [=, &surface](Point3DCL const & x, double t) { return surface.P(surface.ext(x, t), t) * Point3DCL(0., 0., -g); };
             params.put("SurfCahnHilliard.IC.Params.WanDerVaals.AngularVelocity", 0.);
+            params.put("SurfCahnHilliard.IC.Params.WanDerVaals.Noise", params.get<double>("SurfNSCH.IC.Params." + name + ".Noise"));
             dataCH = surfCahnHilliardDataFactory(surface, "WanDerVaals", params);
-            // perturb chi ...
-            dataCH.exact = false;
-            dataCH.f = zeroInstatScalarFunction;
         }
         else throw std::invalid_argument(funcName + ": IC '" + name + "' is not defined");
         return { dataNS, dataCH };
