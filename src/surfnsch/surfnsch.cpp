@@ -1,6 +1,6 @@
 /// \file surfnsch.cpp
 /// \brief Trace FEM discretization of a surface Navier-Stokes-Cahn-Hilliard problem
-/// \author Alexander Zhiliakov alex@math.uh.edu, Yerbol Palzhanov palzhanov@math.uh.edu
+/// \author Alexander Zhiliakov alex@math.uh.edu, Yerbol Palzhanov yerbol@math.uh.edu
 
 /*
  * This file is part of DROPS.
@@ -23,6 +23,9 @@
 */
 
 #include <fstream>
+
+//YP: needed for chemical potential...
+#include "hermite_cubic.hpp"
 
 #include "misc/params.h"
 #include "geom/builder.h"
@@ -127,7 +130,7 @@ int main(int argc, char* argv[]) {
             surfNSCHSystem.params.surfNavierStokesParams.m_g = surfNavierStokesData.m_g;
             surfNSCHSystem.params.surfNavierStokesParams.f_T = surfNavierStokesData.f_T;
             surfNSCHSystem.params.surfCahnHilliardParams.f = surfCahnHilliardData.f;
-            auto formulation = inpJSON.get<std::string>("SurfNSCH.NS.Formulation") == "Consistent" ? "Consistent" : "Inonsistent";
+            auto formulation = inpJSON.get<std::string>("SurfNSCH.NS.Formulation") == "Consistent" ? "Consistent" : "Inconsistent";
             auto stab = inpJSON.get<std::string>("SurfNSCH.NS.PressureVolumestabType") == "Normal" ? "Normal" : "Full";
             auto useTangMassMat = inpJSON.get<bool>("SurfNSCH.NS.UseTangentialMassMatrix");
             auto useInnerIters = inpJSON.get<bool>("Solver.Inner.Use");
@@ -144,6 +147,22 @@ int main(int argc, char* argv[]) {
                 << "penalty formulation type: " << formulation << '\n'
                 << "pressure volume stabilization type: " << stab << '\n';
             logger.log();
+        logger.end();
+        logger.beg("set up chemical potential");
+        auto xi = inpJSON.get<double>("SurfNSCH.CH.ChemicalPotentialScaling");
+        auto c0 = inpJSON.get<double>("SurfNSCH.CH.c_0");
+        auto c0_l = std::min(c0, 1. - c0) / sqrt(3.);
+        auto chemicalPotential = [&](double c) {
+            if (c < 0.) return xi * (1. - c0) * c;
+            if (c > 1.) return xi * c0 * (c - 1.);
+            double x[1], f[1], d[1], s[1], t[1];
+            x[0] = c;
+            if      (c < c0 - c0_l) hermite_cubic_value(0., 0., 1. - c0, c0 - c0_l, 1. / (12. * sqrt(3.)), 0., 1, x, f, d, s, t);
+            else if (c < c0)        hermite_cubic_value(c0 - c0_l, 1. / (12. * sqrt(3.)), 0., c0, 0., -std::max(c0 * c0, (1. - c0) * (1. - c0)), 1, x, f, d, s, t);
+            else if (c < c0 + c0_l) hermite_cubic_value(c0, 0., -std::max(c0 * c0, (1. - c0) * (1. - c0)), c0 + c0_l, -1. / (12. * sqrt(3.)), 0., 1, x, f, d, s, t);
+            else                    hermite_cubic_value(c0 + c0_l, -1. / (12. * sqrt(3.)), 0., 1., 0., c0, 1, x, f, d, s, t);
+            return xi * f[0];
+        };
         logger.end();
         logger.beg("build mesh");
             logger.beg("build initial bulk mesh");
@@ -230,18 +249,22 @@ int main(int argc, char* argv[]) {
                 FEVecDescCL
                     F_u(&velIdx, &LocalAssembler::F_momentum_vecP2),
                     F_p(&preIdx, &LocalAssembler::F_continuity_P1),
-                    F_c(&preIdx, &LocalAssembler::F_c_P1); // ... add F_c_P1 (rhs for $c$, linear form corresponding to surfNSCHSystem.params.surfCahnHilliardParams.f)
+                    F_c(&preIdx, &LocalAssembler::F_c_P1); // ...+ add F_c_P1 (rhs for $c$, linear form corresponding to surfNSCHSystem.params.surfCahnHilliardParams.f)
                 VecDescCL
                     u_star(&velIdx), u(&velIdx), u_prev(&velIdx), surf_curl_u(&preIdx),
                     p_star(&preIdx), p(&preIdx),
-                    chi_star(&preIdx), chi(&preIdx), chi_prev(&preIdx), omega(&preIdx);
+                    chi_star(&preIdx), chi(&preIdx), chi_prev(&preIdx), chi_extrap(&preIdx), omega(&preIdx), F_omega(&preIdx), well_potential(&preIdx);
             logger.end();
         logger.end();
         logger.beg("set up vtk");
             VTKWriter vtkWriter(dirName + "/vtk/" + testName, mg, inpJSON.get<bool>("Output.Binary"));
             vtkWriter.add({ "level-set", levelSet });
             if (everyStep > 0) {
-                // ... add $c$
+                // ... update exactSoln after a test to surfnsch added
+                if (inpJSON.get<bool>("Output.Concentration")){
+                    vtkWriter.add({"c_h", chi});
+                    if (surfnsch.exactSoln) vtkWriter.add({"c_*", chi_star});
+                }
                 if (inpJSON.get<bool>("Output.Velocity")) {
                     vtkWriter.add({ "u_h", u });
                     if (surfNavierStokesData.exactSoln) vtkWriter.add({ "u_*", u_star });
@@ -434,7 +457,8 @@ int main(int argc, char* argv[]) {
             auto assembleTime = logger.end();
             auto factorizationTime = 0.;
             logger.beg("interpolate initial data");
-                // ... add $c$
+                // ...+ add $c$
+                chi.Interpolate(mg , surfCahnHilliardData.chi, t);
                 u.Interpolate(mg, surfNavierStokesData.u_T, t);
                 p.Interpolate(mg, surfNavierStokesData.p, t);
                 p.Data -= dot(M_p.Data * p.Data, I_p) / dot(M_p.Data * I_p, I_p) * I_p;
@@ -483,6 +507,8 @@ int main(int argc, char* argv[]) {
                     tJSON.put("rho_max", rho_max);
                     tJSON.put("nu", nu);
                     tJSON.put("gamma", gamma);
+                    tJSON.put("c_h.Max", chi.Data.max());
+                    tJSON.put("c_h.Min", chi.Data.min());
                     tJSON.put("MeshDepParams.rho_p", rho_p);
                     tJSON.put("MeshDepParams.rho_u", rho_u);
                     tJSON.put("MeshDepParams.tau_u", tau_u);
@@ -598,12 +624,26 @@ int main(int argc, char* argv[]) {
                         logger.buf << "alpha = " << alpha;
                         logger.log();
                         setupFESystem(mg, surfNSCHSystem);
-                        // system mtx
+                        // CH system mtx
                         MatrixCL ABCD(
                             MatrixCL(alpha, M_p.Data, 1., N_c.Data), MatrixCL(mobilityScaling, A_p.Data, rho_p, C_p.Data),
                             MatrixCL(eps * eps, A_p.Data, beta_s, M_p.Data, rho_p * eps * eps, C_p.Data), MatrixCL(-1., M_p.Data)
                         );
-                        // ... set system rhs
+                        // CH system rhs
+                        //YP: surfphasesep code uses chi_prev_prev, but I thought we don't need it since, chi and chi_prev not changed yet, or do we?
+                        if (i == 1 || BDF == 1) {
+                            for (int i = 0; i < well_potential.Data.size(); i++)
+                                well_potential.Data[i] = chemicalPotential(chi.Data[i]);
+                            F_c.Data += (1. / stepSize) * (M_p.Data * chi.Data);
+                            F_omega.Data = beta_s * (M_p.Data * chi.Data) - M_p.Data * well_potential.Data;
+                        }
+                        else {
+                            for (int i = 0; i < well_potential.Data.size(); i++)
+                                well_potential.Data[i] = 2. * chemicalPotential(chi.Data[i]) - chemicalPotential(chi_prev.Data[i]);
+                            chi_extrap.Data = 2. * chi.Data - chi_prev.Data; // will need extrapolation of $c$ for degenerate mobility
+                            F_c.Data += (2. / stepSize) * (M_p * chi.Data) - (.5 / stepSize) * (M_p.data * chi_prev.Data);
+                            F_omega.Data = beta_s * (M_p.Data * chi_extrap.Data) - M_p.Data * well_potential.Data;
+                        }
                     logger.end();
                     // ... add lin solve etc.
                 logger.end();
