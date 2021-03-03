@@ -75,6 +75,7 @@
         "MobilityScaling": 1.0,
         "c_0" : 0.5,
         "ChemicalPotentialScaling": 1.0,
+        "Beta_s": 1.0,
         "UseDegenerateMobility": false
       }
     },
