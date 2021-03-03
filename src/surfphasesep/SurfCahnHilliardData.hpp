@@ -29,9 +29,16 @@ namespace DROPS {
             data.description = "chi_0 = .5 * (1 + tanh(z / (2 sqrt(2) eps)))";
             auto eps = params.get<double>("SurfCahnHilliard.Epsilon");
             auto omega = params.get<double>("SurfCahnHilliard.IC.Params." + name + ".AngularVelocity");
-            chi = [=](Point3DCL const & x, double t) { return .5 * (1. + tanh((x[2] * cos(omega * t) - x[1] * sin(omega * t))/(2. * std::sqrt(2.) * eps))); };
+            auto noise = params.get<double>("SurfCahnHilliard.IC.Params." + name + ".Noise");
+            auto a = noise * eps;
+            chi = [=](Point3DCL const & x, double t) mutable {
+                std::random_device rd;
+                std::mt19937 gen(rd());
+                std::uniform_real_distribution<> dis(-a, a);
+                return .5 * (1. + tanh((x[2] * cos(omega * t) - x[1] * sin(omega * t) + dis(gen))/(2. * std::sqrt(2.) * eps)));
+            };
             auto sphere = dynamic_cast<Sphere const *>(&surface);
-            if (sphere && !params.get<bool>("SurfCahnHilliard.UseDegenerateMobility")) {
+            if (!noise && sphere && !params.get<bool>("SurfCahnHilliard.UseDegenerateMobility")) {
                 data.exact = true;
                 data.description =
                     "chi = .5 * (1 + tanh((z cos(omega t) - y sin(omega t))/ (2 sqrt(2) eps)))\n"
