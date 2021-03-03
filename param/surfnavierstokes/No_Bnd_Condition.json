@@ -70,7 +70,6 @@
         }
       },
       "UseTangentialMassMatrix": false,
-      "BDF": 2,
       "NormalPenalty": {
         "Power": -2.0,
         "Scaling": 1.0
@@ -90,10 +89,11 @@
     },
 
     "Time": {
-      "Read":         0,
-      "Write":        "yes",
-      "NumbOfSteps":  50,
-      "FinalTime":    1.0
+      "BDF": 2,
+      "Read": 0,
+      "Write": "yes",
+      "NumbOfSteps": 10,
+      "FinalTime": 7.0
     },
 
     "Solver": {

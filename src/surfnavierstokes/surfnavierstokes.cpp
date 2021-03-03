@@ -92,6 +92,8 @@ int main(int argc, char* argv[]) {
             auto tau_u = inpJSON.get<double>("SurfNavierStokes.NormalPenalty.Scaling") * pow(h, inpJSON.get<double>("SurfNavierStokes.NormalPenalty.Power")); // constant for normal penalty
             auto rho_u = inpJSON.get<double>("SurfNavierStokes.VelocityStab.Scaling")  * pow(h, inpJSON.get<double>("SurfNavierStokes.VelocityStab.Power")); // constant for velocity stabilisation
             auto rho_p = inpJSON.get<double>("SurfNavierStokes.PressureStab.Scaling")  * pow(h, inpJSON.get<double>("SurfNavierStokes.PressureStab.Power")); // constant for pressure stabilisation
+            auto BDF = inpJSON.get<size_t>("Time.BDF");
+            if (BDF != 1 && BDF != 2) throw std::invalid_argument("use BDF = 1 or 2");
             auto numSteps = inpJSON.get<size_t>("Time.NumbOfSteps");
             auto finalTime = inpJSON.get<double>("Time.FinalTime");
             auto stepSize = finalTime / numSteps;
@@ -124,8 +126,6 @@ int main(int argc, char* argv[]) {
             auto useTangMassMat = inpJSON.get<bool>("SurfNavierStokes.UseTangentialMassMatrix");
             auto useInnerIters = inpJSON.get<bool>("Solver.Inner.Use");
             auto usePrevGuess = inpJSON.get<bool>("Solver.UsePreviousFrameAsInitialGuess");
-            auto BDF = inpJSON.get<size_t>("SurfNavierStokes.BDF");
-            if (BDF != 1 && BDF != 2) throw std::invalid_argument("use BDF = 1 or 2");
             auto tol = inpJSON.get<double>("Solver.Outer.RelResTol");
             logger.buf
                 << surface->description() << '\n'
