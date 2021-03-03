@@ -947,7 +947,7 @@ private:
     double absDet, rho_delta;
     QuadDomain2DCL qDomain;
     QuadDomainCL q3Domain;
-    GridFunctionCL<> qHatP2[10], qHatP1[4], qLsGradNorm, qSurfSpeed, qG, qChi, qOmega, qCutOffFunc;
+    GridFunctionCL<> qHatP2[10], qHatP1[4], qLsGradNorm, qSurfSpeed, qG, qF_c, qChi, qOmega, qCutOffFunc;
     GridFunctionCL<Point3DCL> qGradP2[10], qSurfGradP2[10], q3DGradP2[10], qGradP1[4], qSurfGradP1[4], q3DGradP1[4], qNormal, q3DNormal, qWind, qSurfSpeedSurfGrad, qChiSurfGrad, qOmegaSurfGrad, qF, qHatP2CrossN[30];
     GridFunctionCL<SMatrixCL<3,3>> qP, qH, qE[30];
     mtx createMtx(size_t n, size_t m, double v) { return mtx(n, vec(v, m)); }
@@ -1121,6 +1121,9 @@ private:
     }
     void buildF() {
         resize_and_evaluate_on_vertexes(params.surfNavierStokesParams.f_T, tet, qDomain, params.t, qF);
+    }
+    void buildF_c() {
+        resize_and_evaluate_on_vertexes(params.surfCahnHilliardParams.f, tet, qDomain, params.t, qF_c);
     }
     void buildG() {
         resize_and_evaluate_on_vertexes(params.surfNavierStokesParams.m_g, tet, qDomain, params.t, qG);
@@ -1465,6 +1468,14 @@ public:
         vec b(n.P1);
         for (size_t i = 0; i < n.P1; ++i)
             b[i] = quad_2D(qG * qHatP1[i], qDomain);
+        return b;
+    }
+    vec F_c_P1(){
+        require(qHatP1[0], &LocalAssembler::buildHatP1);
+        require(qF_c, &LocalAssembler::buildF_c);
+        vec b(n.P1);
+        for (size_t i = 0; i < n.P1; ++i)
+            b[i] = quad_2D(qF_c * qHatP1[i], qDomain);
         return b;
     }
 };
