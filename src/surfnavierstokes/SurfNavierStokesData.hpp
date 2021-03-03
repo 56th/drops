@@ -27,10 +27,11 @@ namespace DROPS {
         data.description = "convection term type: " + convectionTermType + '\n';
         data.exact = false;
         // cf. mathematica/rhs.wls
-        if (name == "KelvinHelmholtz") {
+        if (name == "0") data.description += "u_0 = 0\n";
+        else if (name == "KelvinHelmholtz") {
             if (!surface.rotationalInvariance()[2]) throw std::invalid_argument(funcName + ": surface must be rotational invariant around z-axis for '" + name + "' test");
-            data.description += "u_0 = Kelvin-Helmholtz, cf. https://arxiv.org/abs/1909.02990, p = 0\n";
-            auto delta_0 = params.get<double>("SurfNavierStokes.IC.Params." + name + ".Delta_0");
+            data.description += "u_0 = Kelvin-Helmholtz, cf. https://arxiv.org/abs/1909.02990\n";
+            auto delta_0 = params.get<double>("SurfNavierStokes.IC.Params." + name + ".delta_0");
             auto cn = params.get<double>("SurfNavierStokes.IC.Params." + name + ".cn");
             auto aa = params.get<double>("SurfNavierStokes.IC.Params." + name + ".aa");
             auto ab = params.get<double>("SurfNavierStokes.IC.Params." + name + ".ab");
@@ -112,7 +113,7 @@ namespace DROPS {
             data.description += "u = omega (0, -z, y), p = 0\n";
             u_T = [=](Point3DCL const & x, double) { return Point3DCL(0., -x[2], x[1]); };
             m_g = [=](Point3DCL const &, double t) { return -2. * sphere->r_prime(t) / sphere->r(t); };
-            auto omega = params.get<double>("SurfNavierStokes.IC.Params." + name + ".omega");
+            auto omega = params.get<double>("SurfNavierStokes.IC.Params." + name + ".AngularVelocity");
             f_T.stokesTerm = [=](Point3DCL const & x, double t) { return Point3DCL(0., -x[2] * omega * sphere->r_prime(t) / sphere->r(t), x[1] * omega * sphere->r_prime(t) / sphere->r(t)); };
             f_T.convTerm = [=](Point3DCL const & x, double t) {
                 return Point3DCL(
@@ -140,7 +141,6 @@ namespace DROPS {
             data.f_T = [=, &surface](Point3DCL const & x, double t) { return f_T.stokesTerm(surface.ext(x, t), t) + f_T.convTerm(surface.ext(x, t), t); };
         }
         else throw std::invalid_argument(funcName + ": convection term type '" + convectionTermType + "' is not defined");
-        data.description += data.exact ? "exact solution is available and the errors will be computed" : "exact solution is NOT available and the errors will NOT be computed";
         return data;
     }
 

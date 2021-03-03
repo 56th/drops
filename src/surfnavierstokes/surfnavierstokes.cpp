@@ -23,7 +23,6 @@
 */
 
 #include <fstream>
-
 #include "misc/params.h"
 #include "geom/builder.h"
 #include "levelset/levelset.h"
@@ -131,6 +130,7 @@ int main(int argc, char* argv[]) {
             logger.buf
                 << surface->description() << '\n'
                 << surfNavierStokesData.description << '\n'
+                << "exact soln: " << surfNavierStokesData.exact << '\n'
                 << "delta t = " << stepSize;
             logger.log();
         logger.end();

@@ -3,10 +3,15 @@
       "Directory":  "../../output/tmp",
       "EveryStep":  1,
       "Binary":     true,
-      "Velocity": false,
-      "Vorticity": true,
-      "SurfSpeed": false,
-      "Pressure": false
+      "VTK": {
+        "Velocity": false,
+        "Vorticity": true,
+        "SurfSpeed": false,
+        "Pressure": false,
+        "Concentration": true
+      },
+      "Matrices": false,
+      "Vectors": false
     },
 
     "Mesh": {
@@ -31,46 +36,61 @@
         }
     },
 
-    "SurfNSCH": {
-      "BDF":                      2,
-      "NumbOfVirtualSubEdges":    2,
-      "ExportMatrices":           false,
-      "ExportMatricesFormat":     "mat",
-      "IC" : {
-        "Comment" : "initial condition parameters",
-        "KelvinHelmholtzCristoph" : {
-          "Delta_0" : 0.05,
-          "cn" : 0.01,
-          "aa" : 1.0,
-          "ma" : 16.0,
-          "ab" : 0.1,
-          "mb" : 20.0
+    "Surface": {
+      "Name": "Torus",
+      "Params": {
+        "Sphere": {
+          "r_0": 1.0,
+          "A": 0.0
         },
-        "TorusVarTube" : {
-          "R"   : 1.0,
-          "r_0" : 0.3,
-          "r_1" : 0.5
+        "Torus": {
+          "R": 1.0,
+          "r_min": 0.5,
+          "r_max": 0.5
+        }
+      }
+    },
+
+    "SurfNSCH": {
+      "BDF": 2,
+      "NumbOfVirtualSubEdges": 2,
+      "IC": {
+        "Name": "KelvinHelmholtz",
+        "Params": {
+          "KelvinHelmholtz": {
+            "cn": 0.01,
+            "aa": 1.0, "ma": 16.0,
+            "ab": 0.1, "mb": 20.0
+          },
+          "RayleighTaylor": { "GravityScaling": 1.0 },
+          "WanDerVaalsExact": { "AngularVelocity": 1.0 }
         }
       },
-      "rho" : {
-        "max" : 1.0,
-        "min" : 1.0
-      },
-      "NS" : {
+      "NS": {
+        "rho" : { "max" : 1.0, "min" : 1.0 },
+        "nu": 1.0,
         "gamma": 1.0,
-        "nu": 1e-5,
+        "LineTension": 0.0,
+        "Comment": "Use ConvectionTermType = Stokes (zero convection term), Oseen (convection term is given and equal to velocity), or NavierStokes (convection term will be extrapolated from prev time steps)",
+        "ConvectionTermType": "NavierStokes",
         "UseTangentialMassMatrix": false,
-        "TestName": "KelvinHelmholtzCristophSphere",
-        "PressureVolumestabType": "Normal",
-        "NormalPenaltyPower": -2,
-        "NormalPenaltyFactor": 1,
-        "VelocityVolumestabPower": -1,
-        "VelocityVolumestabFactor": 1,
-        "PressureVolumestabPower": 1,
-        "PressureVolumestabFactor": 1,
+        "NormalPenalty": {
+          "Power": -2.0,
+          "Scaling": 1.0
+        },
+        "VelocityStab":  {
+          "Power": -1.0,
+          "Scaling": 1.0
+        },
+        "PressureStab":  {
+          "Comment": "use Type = Normal for normal derivative stabilization or Full for full grad stabilization",
+          "Type": "Normal",
+          "Power": 1.0,
+          "Scaling": 1.0
+        },
         "Formulation": "Consistent"
       },
-      "CH" : {
+      "CH": {
         "Epsilon": 0.01,
         "MobilityScaling": 1.0,
         "UseDegenerateMobility": false
