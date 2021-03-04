@@ -599,6 +599,7 @@ int main(int argc, char* argv[]) {
                     auto vorH1Sq = dot(surf_curl_u.Data, A_p.Data * surf_curl_u.Data);
                     tJSON.put("Integral.FESolution.Palinstrophy", .5 * vorH1Sq);
                     tJSON.put("Integral.FESolution.SurfaceVorticityH1", sqrt(vorH1Sq));
+                    tJSON.put("Integral.RaftFraction", dot(M_p.Data * chi.Data, I_p) / surfArea);
                     if (exactSoln) {
                         chi_star.Interpolate(mg, [&](Point3DCL const & x) { return surfCahnHilliardData.chi(x, t); });
                         u_star.Interpolate(mg, [&](Point3DCL const & x) { return surfNavierStokesData.u_T(x, t); });
@@ -616,17 +617,22 @@ int main(int argc, char* argv[]) {
                         tJSON.put("Integral.Error.VelocityH1", sqrt(dot(u_diff, A_u.Data * u_diff)));
                         auto p_diff = p_star.Data - p.Data;
                         tJSON.put("Integral.Error.PressureL2", sqrt(dot(p_diff, M_p.Data * p_diff)));
+                        auto c_diff = chi_star.Data - chi.Data;
+                        tJSON.put("Integral.Error.ConcentrationL2", sqrt(dot(c_diff, M_p.Data * c_diff)));
                     }
                     if (i > 0) {
                         auto r_i_norm = belosRES();
-                        tJSON.put("Solver.Outer.ResidualNorm.r_i", r_i_norm);
-                        tJSON.put("Solver.Outer.ResidualNorm.b", b_norm);
-                        tJSON.put("Solver.Outer.ResidualNorm.r_0", r_0_norm);
-                        tJSON.put("Solver.Outer.ResidualNorm.r_i/b", r_i_norm / b_norm);
-                        tJSON.put("Solver.Outer.ResidualNorm.r_i/r_0", r_i_norm / r_0_norm);
-                        tJSON.put("Solver.Outer.ResidualNorm.BelosRelative", belosSolver->achievedTol());
-                        tJSON.put("Solver.Outer.TotalIters", belosSolver->getNumIters());
-                        tJSON.put("Solver.Outer.Converged", belosSolverResult == Converged);
+                        tJSON.put("Solver.NSOuter.ResidualNorm.r_i", r_i_norm);
+                        tJSON.put("Solver.NSOuter.ResidualNorm.b", b_norm);
+                        tJSON.put("Solver.NSOuter.ResidualNorm.r_0", r_0_norm);
+                        tJSON.put("Solver.NSOuter.ResidualNorm.r_i/b", r_i_norm / b_norm);
+                        tJSON.put("Solver.NSOuter.ResidualNorm.r_i/r_0", r_i_norm / r_0_norm);
+                        tJSON.put("Solver.NSOuter.ResidualNorm.BelosRelative", belosSolver->achievedTol());
+                        tJSON.put("Solver.NSOuter.TotalIters", belosSolver->getNumIters());
+                        tJSON.put("Solver.NSOuter.Converged", belosSolverResult == Converged);
+                        tJSON.put("Solver.CHOuter.ResidualNorm.BelosRelative", belosSolverCH->achievedTol());
+                        tJSON.put("Solver.CHOuter.TotalIters", belosSolver->getNumIters());
+                        tJSON.put("Solver.CHOuter.Converged", belosSolverResultCH == Converged);
                         tJSON.put("Solver.Inner.A.TotalIters", numItersA);
                         tJSON.put("Solver.Inner.A.MeanIters", static_cast<double>(numItersA) / belosSolver->getNumIters());
                         tJSON.put("Solver.Inner.S.TotalIters.S_M", numItersS_M);
