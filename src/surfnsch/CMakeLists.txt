@@ -19,6 +19,10 @@ if (Trilinos_FOUND)
     )
 endif()
 
+# hermite interpolation
+add_library(${HOME}-hermite STATIC ../hermite_cubic/hermite_cubic.cpp)
+target_link_libraries(${HOME} ${HOME}-hermite)
+
 # matlab for sparse mtx .mat binary output
 if(Matlab_FOUND)
     add_library(${HOME}-matlab1 SHARED IMPORTED)

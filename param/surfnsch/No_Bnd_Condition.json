@@ -90,7 +90,8 @@
         "Formulation": "Consistent"
       },
       "CH": {
-        "Epsilon": 0.01,
+        "c_0": 0.5,
+        "Epsilon": 0.05,
         "MobilityScaling": 1.0,
         "ChemicalPotentialScaling": 1.0,
         "Beta_s": 1.0,

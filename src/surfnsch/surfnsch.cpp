@@ -32,6 +32,7 @@
 #include "num/bndData.h"
 #include "surfactant/ifacetransp.h"
 #include "out/VTKWriter.hpp"
+#include "hermite_cubic/hermite_cubic.hpp"
 #include "SurfNSCHData.hpp"
 #include "SingletonLogger.hpp"
 // belos (iterative solvers)
@@ -136,6 +137,7 @@ int main(int argc, char* argv[]) {
             auto useTangMassMat = inpJSON.get<bool>("SurfNSCH.NS.UseTangentialMassMatrix");
             auto useInnerIters = inpJSON.get<bool>("Solver.Inner.Use");
             auto usePrevGuess = inpJSON.get<bool>("Solver.UsePreviousFrameAsInitialGuess");
+            auto tol = inpJSON.get<double>("Solver.Outer.RelResTol");
             if (surfNavierStokesData.exact != surfCahnHilliardData.exact) logger.wrn("exact soln is available only for either NS or CH");
             auto exactSoln = surfNavierStokesData.exact && surfCahnHilliardData.exact;
             logger.buf
@@ -146,7 +148,6 @@ int main(int argc, char* argv[]) {
                 << "delta t = " << stepSize;
             logger.log();
         logger.end();
-        /*
         logger.beg("set up chemical potential");
         auto xi = inpJSON.get<double>("SurfNSCH.CH.ChemicalPotentialScaling");
         auto c0 = inpJSON.get<double>("SurfNSCH.CH.c_0");
@@ -163,7 +164,6 @@ int main(int argc, char* argv[]) {
             return xi * f[0];
         };
         logger.end();
-        */
         logger.beg("build mesh");
             logger.beg("build initial bulk mesh");
                 std::auto_ptr<MGBuilderCL> builder(make_MGBuilder(inpJSON));
@@ -248,7 +248,8 @@ int main(int argc, char* argv[]) {
                 VecDescCL
                     u_star(&velIdx), u(&velIdx), surf_curl_u(&preIdx),
                     p_star(&preIdx), p(&preIdx),
-                    chi_star(&preIdx), chi(&preIdx), omega(&preIdx);
+                    chi_star(&preIdx), chi(&preIdx), omega(&preIdx),
+                    F_omega(&preIdx), chi_extrap(&preIdx), well_potential(&preIdx);
             logger.end();
         logger.end();
         logger.beg("set up vtk");
@@ -695,7 +696,6 @@ int main(int argc, char* argv[]) {
                 exportStats(0);
             logger.end();
         logger.end();
-        /*
         for (size_t i = 1; i <= numSteps; ++i) {
             t = i * stepSize;
             std::stringstream header; header << "t = t_" << i << " = " << t << " (" << (100. * i) / numSteps << "%)";
@@ -715,54 +715,44 @@ int main(int argc, char* argv[]) {
                             MatrixCL(eps * eps, A_p.Data, beta_s, M_p.Data, rho_p * eps * eps, C_p.Data), MatrixCL(-1., M_p.Data)
                         );
                         // CH system rhs
-                        //YP: surfphasesep code uses chi_prev_prev, but I thought we don't need it since, chi and chi_prev not changed yet, or do we?
                         if (i == 1 || BDF == 1) {
-                            for (int i = 0; i < well_potential.Data.size(); i++)
-                                well_potential.Data[i] = chemicalPotential(chi.Data[i]);
+                            for (size_t i = 0; i < well_potential.Data.size(); i++) well_potential.Data[i] = chemicalPotential(chi.Data[i]);
                             F_c.Data += (1. / stepSize) * (M_p.Data * chi.Data);
                             F_omega.Data = beta_s * (M_p.Data * chi.Data) - M_p.Data * well_potential.Data;
                         }
                         else {
-                            for (int i = 0; i < well_potential.Data.size(); i++)
-                                well_potential.Data[i] = 2. * chemicalPotential(chi.Data[i]) - chemicalPotential(chi_prev.Data[i]);
+                            for (size_t i = 0; i < well_potential.Data.size(); i++) well_potential.Data[i] = 2. * chemicalPotential(chi.Data[i]) - chemicalPotential(chi_prev.Data[i]);
                             chi_extrap.Data = 2. * chi.Data - chi_prev.Data; // will need extrapolation of $c$ for degenerate mobility
                             F_c.Data += (2. / stepSize) * (M_p.Data * chi.Data) - (.5 / stepSize) * (M_p.Data * chi_prev.Data);
                             F_omega.Data = beta_s * (M_p.Data * chi_extrap.Data) - M_p.Data * well_potential.Data;
                         }
                     logger.end();
-                    // ... add lin solve etc.
-
                     logger.beg("convert to Epetra");
-                    belosMTXCH = static_cast<MT>(ABCD);
-                    auto printStat = [&](std::string const & name, MT const & A) {
-                        logger.buf << name << ": " << A.NumGlobalRows() << 'x' << A.NumGlobalCols() << ", " << A.NumGlobalNonzeros() << " nonzeros";
-                        if (A.NumGlobalNonzeros()) logger.buf << " (" << (100. * A.NumGlobalNonzeros()) / (static_cast<double>(A.NumGlobalRows()) * A.NumGlobalCols()) << "%)";
-                        logger.log();
-                    };
-                    printStat("{A, B; C, D} block mtx", belosMTXCH);
-                    belosMTXCH = rcpFromRef(belosMTXCH);
-                    for (size_t i = 0; i < m; ++i) belosRHSCH[i] = F_c.Data[i];
-                    for (size_t i = 0; i < m; ++i) belosRHSCH[i + m] = F_omega.Data[i];
+                        belosMTXCH = static_cast<RCP<MT>>(MatrixCL(
+                            MatrixCL(alpha, M_p.Data, 1., N_c.Data), MatrixCL(mobilityScaling, A_p.Data, rho_p, C_p.Data),
+                            MatrixCL(eps * eps, A_p.Data, beta_s, M_p.Data, rho_p * eps * eps, C_p.Data), MatrixCL(-1., M_p.Data)
+                        ));
+                        logCRS(*belosMTXCH, "{A, B; C, D} block mtx");
+                        belosRHSCH = static_cast<SV>(F_c.Data.append(F_omega.Data));
                     logger.end();
                     logger.beg("linear solve");
-                    belosLHSCH.PutScalar(0.);
-
-                    belosProblemCH.setProblem();
-                    belosSolverCH->setProblem(rcpFromRef(belosProblemCH));
-                    std::cout << std::scientific;
-                    belosSolverResult = belosSolverCH->solve();
-                    if (myRank == 0) {
-                        if (belosSolverResult == Belos::Converged) logger.log("belos converged");
-                        else logger.wrn("belos did not converge");
-                    }
-                    solveTime = logger.end();
-                    logger.beg("convert from Epetra");
-                    for (size_t i = 0; i < m; ++i) F_c.Data[i] = belosLHSCH[i];
-                    for (size_t i = 0; i < m; ++i) F_omega.Data[i] = belosLHSCH[i + m];
+                        /*
+                        belosLHSCH.PutScalar(0.);
+                        belosProblemCH.setProblem();
+                        belosSolverCH->setProblem(rcpFromRef(belosProblemCH));
+                        std::cout << std::scientific;
+                        belosSolverResult = belosSolverCH->solve();
+                        if (myRank == 0) {
+                            if (belosSolverResult == Belos::Converged) logger.log("belos converged");
+                            else logger.wrn("belos did not converge");
+                        }
+                        solveTime = logger.end();
+                         */
                     logger.end();
-
-
-
+                    logger.beg("convert from Epetra");
+                        for (size_t i = 0; i < m; ++i) chi.Data[i] = belosLHSCH[i];
+                        for (size_t i = 0; i < m; ++i) omega.Data[i] = belosLHSCH[i + m];
+                    logger.end();
                 logger.end();
                 logger.beg("Navier-Stokes step");
                     logger.beg("assemble");
@@ -773,9 +763,9 @@ int main(int argc, char* argv[]) {
                             logger.log("assembling mass mtx scaled w/ cut-off function");
                             surfNSCHSystem.matrices.push_back(&rho_M_u);
                         }
-                        if (surfNavierStokesData.w_T) w_T.Interpolate(mg, surfNavierStokesData.w_T, t); // Oseen (and Stokes) case
-                        else w_T.Data = 2. * u.Data - u_prev.Data; // Navier-Stokes case
-                        Pe = supnorm(w_T.Data) / nu;
+                        if (surfNavierStokesData.w_T) surfNSCHSystem.params.surfNavierStokesParams.w_T.Interpolate(mg, [&](Point3DCL const & x) { return surfNavierStokesData.w_T(x, t); }); // Oseen (and Stokes) case
+                        else surfNSCHSystem.params.surfNavierStokesParams.w_T.Data = 2. * u.Data - u_prev.Data; // Navier-Stokes case
+                        Pe = supnorm(surfNSCHSystem.params.surfNavierStokesParams.w_T.Data) / nu;
                         logger.buf << "Pe = " << Pe;
                         logger.log();
                         if (Pe) {
@@ -786,87 +776,91 @@ int main(int argc, char* argv[]) {
                         }
                         surfNSCHSystem.vectors = { &F_u, &F_p };
                         setupFESystem(mg, surfNSCHSystem);
+                        auto rho_M = rho_delta ? rho_M_u.Data : MatrixCL(rho_max, M_u.Data);
                         // system mtx
-                        A_sum.LinComb(alpha, rho_prev_M_u, gamma, AL_u.Data, nu, A_u.Data, tau_u, S_u.Data, rho_u, C_u.Data);
+                        A_sum.LinComb(alpha, rho_M, gamma, AL_u.Data, nu, A_u.Data, tau_u, S_u.Data, rho_u, C_u.Data);
                         if (Pe) A_sum.LinComb(1., MatrixCL(A_sum), rho_delta ? 1. : rho_max , N_u.Data);
                         // system rhs
-                        if (i == 1 || BDF == 1) F_u.Data += (1. / stepSize) * (rho_prev_M_u * u.Data);
-                        else F_u.Data += (2. / stepSize) * (rho_prev_M_u * u.Data) - (.5 / stepSize) * (rho_prev_M_u * u_prev.Data);
+                        if (i == 1 || BDF == 1) F_u.Data += (1. / stepSize) * (rho_M * u.Data);
+                        else F_u.Data += (2. / stepSize) * (rho_M * u.Data) - (.5 / stepSize) * (rho_M * u_prev.Data);
                         F_p.Data -= (dot(F_p.Data, I_p) / dot(I_p, I_p)) * I_p;
                         // for the next step
-                        rho_prev_M_u = rho_delta ? rho_M_u.Data : MatrixCL(rho_max, M_u.Data);
                         u_prev = u;
                     assembleTime = logger.end();
-                    logger.beg("convert to Epetra");
-                        A = static_cast<MT>(A_sum);
-                        // ... YP: printstats moved above with CH.
-                        printStat("A", A);
-                        B = static_cast<MT>(B_pu.Data);
-                        printStat("B", B);
-                        C = static_cast<MT>(C_p.Data);
-                        printStat("C := -rho_p (pressure volume stabilization mtx)", C);
-                        S_M = static_cast<MT>(MatrixCL(1. / (gamma + nu), M_p.Data, -1., C_p.Data));
-                        printStat("S_M := (\\nu + \\gamma)^{-1} M_p - C", S_M);
-                        S_L = static_cast<MT>(MatrixCL(1. / alpha, A_p.Data, -1., C_p.Data));
-                        printStat("S_L := \\alpha^{-1} L_p - C", S_L);
-                        belosRHS = static_cast<SV>(F_u.Data.append(F_p.Data));
-                    logger.end();
-                    factorizationTime = 0.;
-                    if (useInnerIters && i == 1) {
-                        logger.beg("build initial factorization");
+                logger.beg("convert to Epetra");
+                    A = static_cast<RCP<MT>>(A_sum);
+                    logCRS(*A, "A");
+                    {
+                        auto A_sum_blocks = A_sum.Split(numBlocksA, numBlocksA);
+                        for (size_t i = 0; i < numBlocksA; ++i)
+                            for (size_t j = 0; j < numBlocksA; ++j)
+                                A_block[i][j] = static_cast<RCP<MT>>(A_sum_blocks[i][j]);
+                        if (numBlocksA != 1)
+                            logCRS(*A_block[0][0], "A_{ij}");
+                    }
+                    B = static_cast<RCP<MT>>(B_pu.Data);
+                    logCRS(*B, "B");
+                    C = static_cast<RCP<MT>>(C_p.Data);
+                    logCRS(*C, "C := -rho_p (pressure volume stabilization mtx)");
+                    S_M = static_cast<RCP<MT>>(MatrixCL(1. / (gamma + nu), M_p.Data, -1., C_p.Data));
+                    logCRS(*S_M, "S_M := (nu + gamma)^{-1} M_p - C");
+                    S_L = static_cast<RCP<MT>>(MatrixCL(1. / alpha, A_p.Data, -1., C_p.Data));
+                    logCRS(*S_L, "S_L := \\alpha^{-1} L_p - C");
+                    belosRHS = static_cast<SV>(F_u.Data.append(F_p.Data));
+                logger.end();
+                factorizationTime = 0.;
+                if (useInnerIters && i == 1) {
+                    logger.beg("build initial factorization");
+                        runFactorization();
+                    factorizationTime = logger.end();
+                }
+                solveWastedTime = 0.;
+                logger.beg("linear solve");
+                    numItersA = numItersS_M = numItersS_L = 0;
+                    belosLHS.PutScalar(0.);
+                    b_norm = r_0_norm = belosRES();
+                    if (usePrevGuess) {
+                        belosLHS = static_cast<SV>(u.Data.append(p.Data));
+                        r_0_norm = belosRES();
+                    }
+                    belosSolver->setParameters(rcpFromRef(belosParams->set("Convergence Tolerance", tol * b_norm / r_0_norm)));
+                    belosProblem.setProblem();
+                    belosSolver->setProblem(rcpFromRef(belosProblem));
+                    belosSolverResult = belosSolver->solve();
+                solveTime = logger.end();
+                if (belosSolverResult == Converged) logger.log("belos converged");
+                else {
+                    logger.wrn("belos did not converge");
+                    if (useInnerIters && i > 1) {
+                        solveWastedTime = solveTime;
+                        numItersA = numItersS_M = numItersS_L = 0;
+                        logger.beg("build new factorization");
                             runFactorization();
                         factorizationTime = logger.end();
+                        logger.beg("linear solve w/ new factorization");
+                            if (usePrevGuess) belosLHS = static_cast<SV>(u.Data.append(p.Data));
+                            else belosLHS.PutScalar(0.);
+                            belosProblem.setProblem();
+                            belosSolver->setProblem(rcpFromRef(belosProblem));
+                            belosSolverResult = belosSolver->solve();
+                            if (belosSolverResult == Converged) logger.log("belos converged");
+                            else logger.wrn("belos did not converge");
+                        solveTime = logger.end();
                     }
-                    solveWastedTime = 0.;
-                    logger.beg("linear solve");
-                        numItersA = numItersS_M = numItersS_L = 0;
-                        b_norm = r0_norm = sqrt(norm_sq(F_u.Data) + norm_sq(F_p.Data));
-                        belosLHS.PutScalar(0.);
-                        if (usePrevGuess) {
-                            belosLHS = static_cast<SV>(u.Data.append(p.Data));
-                            r0_norm = std::get<2>(residual(u.Data, p.Data));
-                            belosParams->set("Convergence Tolerance", inpJSON.get<double>("Solver.Outer.RelResTol") * b_norm / r0_norm);
-                            belosSolver = belosFactory.create(inpJSON.get<std::string>("Solver.Outer.Iteration"), belosParams);
-                        }
-                        belosProblem.setProblem();
-                        belosSolver->setProblem(rcpFromRef(belosProblem));
-                        belosSolverResult = belosSolver->solve();
-                    solveTime = logger.end();
-                    if (belosSolverResult == Converged) logger.log("belos converged");
-                    else {
-                        logger.wrn("belos did not converge");
-                        if (useInnerIters && i > 1) {
-                            solveWastedTime = solveTime;
-                            numItersA = numItersS_M = numItersS_L = 0;
-                            logger.beg("build new factorization");
-                                runFactorization();
-                            factorizationTime = logger.end();
-                            logger.beg("linear solve w/ new factorization");
-                                if (usePrevGuess) belosLHS = static_cast<SV>(u.Data.append(p.Data));
-                                else belosLHS.PutScalar(0.);
-                                belosProblem.setProblem();
-                                belosSolver->setProblem(rcpFromRef(belosProblem));
-                                belosSolverResult = belosSolver->solve();
-                                if (belosSolverResult == Converged) logger.log("belos converged");
-                                else logger.wrn("belos did not converge");
-                            solveTime = logger.end();
-                        }
-                    }
-                    logger.beg("convert from Epetra");
-                        for (size_t i = 0; i < n; ++i) u.Data[i] = belosLHS[i];
-                        for (size_t i = 0; i < m; ++i) p.Data[i] = belosLHS[n + i];
-                        p.Data -= dot(M_p.Data * p.Data, I_p) / dot(M_p.Data * I_p, I_p) * I_p;
-                    logger.end();
-                    logger.beg("project surface vorticity");
-                        projectVorticity();
-                    projectTime = logger.end();
+                }
+                logger.beg("convert from Epetra");
+                    for (size_t i = 0; i < n; ++i) u.Data[i] = belosLHS[i];
+                    for (size_t i = 0; i < m; ++i) p.Data[i] = belosLHS[n + i];
+                    p.Data -= dot(M_p.Data * p.Data, I_p) / dot(M_p.Data * I_p, I_p) * I_p;
                 logger.end();
+                logger.beg("project surface vorticity");
+                    projectVorticity();
+                projectTime = logger.end();
                 logger.beg("output");
                     exportStats(i);
                 logger.end();
             logger.end();
         }
-        */
         #ifdef HAVE_MPI
             MPI_Finalize() ;
         #endif

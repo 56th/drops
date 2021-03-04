@@ -708,7 +708,7 @@ public:
     SparseMatBaseCL(); ///< empty zero-matrix
     SparseMatBaseCL(const SparseMatBaseCL&);
     SparseMatBaseCL(double a, SparseMatBaseCL const & A) : SparseMatBaseCL(A) {
-        A *= a;
+        (*this) *= a;
     }
     template <typename ...Args>
     SparseMatBaseCL(double a, SparseMatBaseCL const & A, double b, SparseMatBaseCL const & B, Args... args) : SparseMatBaseCL(A) {
