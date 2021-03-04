@@ -321,7 +321,7 @@ int main(int argc, char* argv[]) {
             belosParamsCH->set("Output Frequency", inpJSON.get<int>("Solver.Outer.OutputFrequency"));
             belosParamsCH->set("Verbosity", Errors + Warnings + StatusTestDetails + TimingDetails + FinalSummary + IterationDetails);
             belosParamsCH->set<int>("Output Style", Brief);
-            auto belosSolverCH = belosFactory.create("FLEXIBLE GMRES", belosParams);
+            auto belosSolverCH = belosFactory.create("FLEXIBLE GMRES", belosParamsCH);
             logger.buf << "outer solver CH: " << belosSolverCH->description();
             logger.log();
             // matrix, lhs, and rhs
@@ -333,6 +333,14 @@ int main(int argc, char* argv[]) {
                 SV residual(mapVelocityPressure);
                 belosMTX->Apply(belosLHS, residual);
                 residual.Update(-1., belosRHS, 1.);
+                double nrm;
+                residual.Norm2(&nrm);
+                return nrm;
+            };
+            auto belosRESCH = [&]() {
+                SV residual(mapChiOmega);
+                belosMTXCH->Apply(belosLHSCH, residual);
+                residual.Update(-1., belosRHSCH, 1.);
                 double nrm;
                 residual.Norm2(&nrm);
                 return nrm;
@@ -513,8 +521,8 @@ int main(int argc, char* argv[]) {
                     logger.end();
                 };
             logger.end();
-            LinearProblem<ST, MV, OP> belosProblemCH(belosMTXCH, rcpFromRef(belosLHSCH), rcpFromRef(belosRHSCH));
-            if (useInnerIters) belosProblemCH.setRightPrec(belosPRECH);
+/*            LinearProblem<ST, MV, OP> belosProblemCH(belosMTXCH, rcpFromRef(belosLHSCH), rcpFromRef(belosRHSCH));
+            if (useInnerIters) belosProblemCH.setRightPrec(belosPRECH);*/
         logger.end();
         logger.beg("t = t_0 = 0");
             t = 0.;
@@ -560,8 +568,8 @@ int main(int argc, char* argv[]) {
                 projectVorticity();
             auto projectTime = logger.end();
             logger.beg("output");
-                double alpha, b_norm, r_0_norm;
-                ReturnType belosSolverResult;
+                double alpha, b_norm, r_0_norm, b_norm_CH, r_0_norm_CH;
+                ReturnType belosSolverResult, belosSolverResultCH;
                 auto exportStats = [&](size_t i) {
                     std::ofstream stats(dirName + "/stats/t_" + std::to_string(i) + ".json");
                     ParamCL tJSON;
@@ -632,7 +640,7 @@ int main(int argc, char* argv[]) {
                         tJSON.put("Solver.NSOuter.TotalIters", belosSolver->getNumIters());
                         tJSON.put("Solver.NSOuter.Converged", belosSolverResult == Converged);
                         tJSON.put("Solver.CHOuter.ResidualNorm.BelosRelative", belosSolverCH->achievedTol());
-                        tJSON.put("Solver.CHOuter.TotalIters", belosSolver->getNumIters());
+                        tJSON.put("Solver.CHOuter.TotalIters", belosSolverCH->getNumIters());
                         tJSON.put("Solver.CHOuter.Converged", belosSolverResultCH == Converged);
                         tJSON.put("Solver.Inner.A.TotalIters", numItersA);
                         tJSON.put("Solver.Inner.A.MeanIters", static_cast<double>(numItersA) / belosSolver->getNumIters());
@@ -735,19 +743,40 @@ int main(int argc, char* argv[]) {
                         logCRS(*belosMTXCH, "{A, B; C, D} block mtx");
                         belosRHSCH = static_cast<SV>(F_c.Data.append(F_omega.Data));
                     logger.end();
-                    logger.beg("linear solve");
-                        /*
+                    auto factorizationTimeCH = 0.;
+                    if (useInnerIters && i == 1) {
+                        logger.beg("build initial factorization for CH");
+                        runFactorizationCH();
+                        factorizationTimeCH = logger.end();
+                    }
+                    logger.beg("linear solve CH");
+                        LinearProblem<ST, MV, OP> belosProblemCH(belosMTXCH, rcpFromRef(belosLHSCH), rcpFromRef(belosRHSCH));
+                        if (useInnerIters) belosProblemCH.setRightPrec(belosPRECH);
                         belosLHSCH.PutScalar(0.);
+                        b_norm_CH = r_0_norm_CH = belosRESCH();
+                        belosSolverCH->setParameters(rcpFromRef(belosParamsCH->set("Convergence Tolerance", tol * b_norm_CH / r_0_norm_CH)));
                         belosProblemCH.setProblem();
                         belosSolverCH->setProblem(rcpFromRef(belosProblemCH));
                         std::cout << std::scientific;
-                        belosSolverResult = belosSolverCH->solve();
+                        belosSolverResultCH = belosSolverCH->solve();
                         if (myRank == 0) {
-                            if (belosSolverResult == Belos::Converged) logger.log("belos converged");
-                            else logger.wrn("belos did not converge");
+                            if (belosSolverResultCH == Belos::Converged) logger.log("belos converged");
+                            else {
+                                logger.wrn("belos did not converge");
+                                if (useInnerIters && i > 1) {
+                                    logger.beg("build new factorization");
+                                    runFactorizationCH();
+                                    factorizationTimeCH = logger.end();
+                                    logger.beg("linear solve w/ new factorization");
+                                    belosLHSCH.PutScalar(0.);
+                                    belosProblemCH.setProblem();
+                                    belosSolverCH->setProblem(rcpFromRef(belosProblemCH));
+                                    belosSolverResultCH = belosSolverCH->solve();
+                                    if (belosSolverResultCH == Converged) logger.log("belos converged");
+                                    else logger.wrn("belos did not converge");
+                                }
+                            }
                         }
-                        solveTime = logger.end();
-                         */
                     logger.end();
                     logger.beg("convert from Epetra");
                         for (size_t i = 0; i < m; ++i) chi.Data[i] = belosLHSCH[i];
