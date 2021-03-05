@@ -269,14 +269,6 @@ int main(int argc, char* argv[]) {
                 C->Multiply(false, x2, y22);
                 y21.Update(1., y22, 1.);
             }));
-            auto belosRES = [&]() {
-                SV residual(mapVelocityPressure);
-                belosMTX->Apply(belosLHS, residual);
-                residual.Update(-1., belosRHS, 1.);
-                double nrm;
-                residual.Norm2(&nrm);
-                return nrm;
-            };
             logger.beg("set up preconditioners");
                 logger.beg("diffusion-convection-reaction block");
                     auto iterationA = inpJSON.get<std::string>("Solver.Inner.A.Iteration");
@@ -530,7 +522,7 @@ int main(int argc, char* argv[]) {
                         tJSON.put("Integral.Error.PressureL2", sqrt(dot(p_diff, M_p.Data * p_diff)));
                     }
                     if (i > 0) {
-                        auto r_i_norm = belosRES();
+                        auto r_i_norm = residualNorm(*belosMTX, belosLHS, belosRHS);
                         tJSON.put("Solver.Outer.ResidualNorm.r_i", r_i_norm);
                         tJSON.put("Solver.Outer.ResidualNorm.b", b_norm);
                         tJSON.put("Solver.Outer.ResidualNorm.r_0", r_0_norm);
@@ -675,12 +667,12 @@ int main(int argc, char* argv[]) {
                 logger.beg("linear solve");
                     numItersA = numItersS_M = numItersS_L = 0;
                     belosLHS.PutScalar(0.);
-                    b_norm = r_0_norm = belosRES();
+                    b_norm = r_0_norm = residualNorm(*belosMTX, belosLHS, belosRHS);
                     if (usePrevGuess) {
                         belosLHS = static_cast<SV>(u.Data.append(p.Data));
-                        r_0_norm = belosRES();
+                        r_0_norm = residualNorm(*belosMTX, belosLHS, belosRHS);
                     }
-                    belosSolver->setParameters(rcpFromRef(belosParams->set("Convergence Tolerance", tol * b_norm / r_0_norm)));
+                    belosSolver->setParameters(rcpFromRef(belosParams->set("Convergence Tolerance", r_0_norm ? tol * b_norm / r_0_norm : 0.)));
                     belosProblem.setProblem();
                     belosSolver->setProblem(rcpFromRef(belosProblem));
                     belosSolverResult = belosSolver->solve();

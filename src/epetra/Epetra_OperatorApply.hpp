@@ -68,6 +68,15 @@ namespace DROPS {
         logger.log();
     }
 
+    double residualNorm(Epetra_Operator const & A, Epetra_Vector const & x, Epetra_Vector const & b) {
+        Epetra_Vector residual(b.Map(), true);
+        A.Apply(x, residual);
+        residual.Update(-1., b, 1.);
+        double nrm;
+        residual.Norm2(&nrm);
+        return nrm;
+    }
+
 }
 
 #endif //DROPS_BELOSDROPSADAPTER_HPP
