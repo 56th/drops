@@ -5,8 +5,7 @@
       "Binary":     true,
       "VTK": {
         "Velocity": true,
-        "Vorticity": true,
-        "SurfSpeed": false,
+        "Vorticity": false,
         "Pressure": false,
         "Concentration": true
       },
@@ -54,24 +53,24 @@
     "SurfNSCH": {
       "NumbOfVirtualSubEdges": 2,
       "IC": {
-        "Name": "KelvinHelmholtz",
+        "Name": "WanDerVaalsExact",
         "Params": {
           "KelvinHelmholtz": {
             "cn": 0.01,
             "aa": 1.0, "ma": 16.0,
             "ab": 0.1, "mb": 20.0
           },
-          "RayleighTaylor": { "GravityScaling": 1.0, "Noise": 0.1 },
-          "WanDerVaalsExact": { "AngularVelocity": 1.0 }
+          "RayleighTaylor": { "GravityScaling": 1.0, "Noise": 1.0 },
+          "WanDerVaalsExact": { "AngularVelocity": 3.14159265359 }
         }
       },
       "NS": {
         "rho" : { "max" : 1.0, "min" : 1.0 },
         "nu": 1.0,
-        "gamma": 1.0,
+        "gamma": 0.0,
         "LineTension": 0.0,
         "Comment": "Use ConvectionTermType = Stokes (zero convection term), Oseen (convection term is given and equal to velocity), or NavierStokes (convection term will be extrapolated from prev time steps)",
-        "ConvectionTermType": "NavierStokes",
+        "ConvectionTermType": "Stokes",
         "UseTangentialMassMatrix": false,
         "NormalPenalty": {
           "Power": -2.0,
@@ -103,34 +102,41 @@
       "BDF": 2,
       "Read": 0,
       "Write": "yes",
-      "NumbOfSteps": 1,
+      "NumbOfSteps": 100,
       "FinalTime": 1.0
     },
 
     "Solver": {
         "UsePreviousFrameAsInitialGuess" : false,
-        "Outer" : {
-          "Iteration" : "FLEXIBLE GMRES",
-          "OutputFrequency" : 1,
-          "KrylovSubspaceSize" : 100,
-          "MaxIter" : 50,
-          "MaxIterCH": 50,
-          "RelResTol" : 1e-8
+        "RelResTol": 1e-8,
+        "CH" : {
+            "Iteration": "FLEXIBLE GMRES",
+            "OutputFrequency": 1,
+            "KrylovSubspaceSize": 50,
+            "MaxIter": 50
         },
-        "Inner" : {
-            "Use" : true,
-            "Type" : "BlockTriangular",
-            "A" : {
-              "Comment" : "use Iteration = Amesos2_* (e.g. Amesos2_Klu, Amesos2_SuperLU etc.) for the sparse-direct; Type = Full for full factorization, BlockTriangular for block Gauss-Seidel, BlockDiagonal for block Jacobi",
-              "Iteration" : "Amesos2_KLU",
-              "Type" : "Full"
+        "NS" : {
+          "Outer": {
+            "Iteration": "FLEXIBLE GMRES",
+            "OutputFrequency": 1,
+            "KrylovSubspaceSize": 100,
+            "MaxIter": 50
+          },
+          "Inner": {
+            "Use": true,
+            "Type": "BlockTriangular",
+            "A": {
+              "Comment": "use Iteration = Amesos2_* (e.g. Amesos2_Klu, Amesos2_SuperLU etc.) for the sparse-direct; Type = Full for full factorization, BlockTriangular for block Gauss-Seidel, BlockDiagonal for block Jacobi",
+              "Iteration": "Amesos2_KLU",
+              "Type": "Full"
             },
-            "S" : {
-              "S_L" : true,
-              "Iteration" : "CG",
-              "MaxIter" : 200,
-              "RelResTol" : 1e-2
+            "S": {
+              "S_L": true,
+              "Iteration": "CG",
+              "MaxIter": 200,
+              "RelResTol": 1e-2
             }
+          }
         }
     },
 
