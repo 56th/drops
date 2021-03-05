@@ -110,10 +110,12 @@ namespace DROPS {
             auto sphere = dynamic_cast<Sphere const *>(&surface);
             if (!sphere) throw std::invalid_argument(funcName + ": test '" + name + "' is defined for sphere only");
             data.exact = true;
-            data.description += "u = omega (0, -z, y), p = 0";
-            u_T = [=](Point3DCL const & x, double) { return Point3DCL(0., -x[2], x[1]); };
-            m_g = [=](Point3DCL const &, double t) { return -2. * sphere->r_prime(t) / sphere->r(t); };
             auto omega = params.get<double>("SurfNavierStokes.IC.Params." + name + ".AngularVelocity");
+            data.description +=
+                "u = omega (0, -z, y), p = 0\n"
+                "omega = " + std::to_string(omega);
+            u_T = [=](Point3DCL const & x, double) { return omega * Point3DCL(0., -x[2], x[1]); };
+            m_g = [=](Point3DCL const &, double t) { return -2. * sphere->r_prime(t) / sphere->r(t); };
             f_T.stokesTerm = [=](Point3DCL const & x, double t) { return Point3DCL(0., -x[2] * omega * sphere->r_prime(t) / sphere->r(t), x[1] * omega * sphere->r_prime(t) / sphere->r(t)); };
             f_T.convTerm = [=](Point3DCL const & x, double t) {
                 return Point3DCL(
