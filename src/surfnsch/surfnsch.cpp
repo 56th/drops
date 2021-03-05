@@ -114,8 +114,8 @@ int main(int argc, char* argv[]) {
             auto& nu = surfNSCHSystem.params.surfNavierStokesParams.nu;
             nu = inpJSON.get<double>("SurfNSCH.NS.nu");
             if (nu <= 0.) throw std::invalid_argument("viscosity must be non-negative");
-            auto& rho_min = surfNSCHSystem.params.surfNavierStokesParams.rho_min;
-            auto& rho_max = surfNSCHSystem.params.surfNavierStokesParams.rho_max;
+            auto& rho_min = surfNSCHSystem.params.surfNavierStokesParams.rho.min;
+            auto& rho_max = surfNSCHSystem.params.surfNavierStokesParams.rho.max;
             rho_min = inpJSON.get<double>("SurfNSCH.NS.rho.min");
             rho_max = inpJSON.get<double>("SurfNSCH.NS.rho.max");
             if (rho_max < rho_min) throw std::invalid_argument("rho_max < rho_min");
@@ -124,7 +124,6 @@ int main(int argc, char* argv[]) {
             mobilityScaling = inpJSON.get<double>("SurfNSCH.CH.MobilityScaling");
             auto beta_s = inpJSON.get<double>("SurfNSCH.CH.Beta_s");
             auto& t = surfNSCHSystem.params.t;
-            auto& Pe = surfNSCHSystem.params.surfNavierStokesParams.Pe;
             auto& levelSet = surfNSCHSystem.params.levelSet;
             surfNSCHSystem.params.surfCahnHilliardParams.useDegenerateMobility = inpJSON.get<bool>("SurfNSCH.CH.UseDegenerateMobility");
             surfNSCHSystem.params.surfNavierStokesParams.lineTension = inpJSON.get<double>("SurfNSCH.NS.LineTension");
@@ -221,15 +220,12 @@ int main(int argc, char* argv[]) {
             auto n_i = n / 3;
             size_t m = preIdx.NumUnknowns();
             logger.beg("set up FE system");
-                surfNSCHSystem.params.surfNavierStokesParams.chi.SetIdx(&preIdx);
-                surfNSCHSystem.params.surfNavierStokesParams.omega.SetIdx(&preIdx);
-                surfNSCHSystem.params.surfNavierStokesParams.w_T.SetIdx(&velIdx);
                 FEMatDescCL
                     // velocity
                     M_u(&velIdx, &velIdx, useTangMassMat ? &LocalAssembler::M_t_vecP2vecP2 : &LocalAssembler::M_vecP2vecP2),
                     rho_M_u(&velIdx, &velIdx, useTangMassMat ? &LocalAssembler::rho_M_t_vecP2vecP2 : &LocalAssembler::rho_M_vecP2vecP2),
+                    rho_N_u(&velIdx, &velIdx, &LocalAssembler::rho_N_vecP2vecP2),
                     AL_u(&velIdx, &velIdx, &LocalAssembler::AL_vecP2vecP2),
-                    N_u(&velIdx, &velIdx, rho_delta ? &LocalAssembler::rho_N_vecP2vecP2 : &LocalAssembler::N_vecP2vecP2),
                     A_u(&velIdx, &velIdx, formulation == "Consistent" ? &LocalAssembler::A_consistent_vecP2vecP2 : &LocalAssembler::A_vecP2vecP2),
                     S_u(&velIdx, &velIdx, &LocalAssembler::S_vecP2vecP2),
                     C_u(&velIdx, &velIdx, &LocalAssembler::C_n_vecP2vecP2),
@@ -246,7 +242,7 @@ int main(int argc, char* argv[]) {
                     F_p(&preIdx, &LocalAssembler::F_continuity_P1),
                     F_c(&preIdx, &LocalAssembler::F_concentration_P1);
                 VecDescCL
-                    u_star(&velIdx), u(&velIdx), surf_curl_u(&preIdx),
+                    u_star(&velIdx), u(&velIdx), surf_curl_u(&preIdx), w_T(&velIdx),
                     p_star(&preIdx), p(&preIdx),
                     chi_star(&preIdx), chi(&preIdx), omega(&preIdx),
                     F_omega(&preIdx), chi_extrap(&preIdx), well_potential(&preIdx);
@@ -337,7 +333,7 @@ int main(int argc, char* argv[]) {
                 residual.Norm2(&nrm);
                 return nrm;
             };
-            logger.beg("set up preconditioners");
+            logger.beg("set up preconditioners for Navier-Stokes");
                 logger.beg("diffusion-convection-reaction block");
                     auto iterationA = inpJSON.get<std::string>("Solver.Inner.A.Iteration");
                     if (!Amesos2::query(iterationA)) throw std::invalid_argument("solver " + iterationA + " is not available for Amesos2");
@@ -560,7 +556,7 @@ int main(int argc, char* argv[]) {
                 projectVorticity();
             auto projectTime = logger.end();
             logger.beg("output");
-                double alpha, b_norm, r_0_norm;
+                double Pe, alpha, b_norm, r_0_norm;
                 ReturnType belosSolverResult;
                 auto exportStats = [&](size_t i) {
                     std::ofstream stats(dirName + "/stats/t_" + std::to_string(i) + ".json");
@@ -696,7 +692,7 @@ int main(int argc, char* argv[]) {
             logger.beg(header.str());
                 logger.beg("Cahn-Hilliard step");
                     logger.beg("assemble");
-                        surfNSCHSystem.params.surfCahnHilliardParams.u_T = u;
+                        surfNSCHSystem.params.surfCahnHilliardParams.u_T = &u;
                         surfNSCHSystem.matrices = { &N_c };
                         surfNSCHSystem.vectors = { &F_c };
                         alpha = i == 1 || BDF == 1 ? 1. / stepSize : 1.5 / stepSize;
@@ -750,33 +746,32 @@ int main(int argc, char* argv[]) {
                 logger.end();
                 logger.beg("Navier-Stokes step");
                     logger.beg("assemble");
-                        surfNSCHSystem.params.surfNavierStokesParams.chi = chi;
-                        surfNSCHSystem.params.surfNavierStokesParams.omega = omega;
+                        if (surfNavierStokesData.w_T) w_T.Interpolate(mg, [&](Point3DCL const & x) { return surfNavierStokesData.w_T(x, t); }); // Oseen (and Stokes) case
+                        else w_T.Data = 2. * u.Data - u_prev.Data; // Navier-Stokes case
+                        Pe = supnorm(w_T.Data) / nu;
+                        logger.buf << "Pe = " << Pe;
+                        logger.log();
+                        surfNSCHSystem.params.surfNavierStokesParams.w_T = &w_T;
+                        surfNSCHSystem.params.surfNavierStokesParams.chi = &chi;
+                        surfNSCHSystem.params.surfNavierStokesParams.omega = &omega;
                         surfNSCHSystem.matrices = {};
                         if (rho_delta) {
                             logger.log("assembling mass mtx scaled w/ cut-off function");
                             surfNSCHSystem.matrices.push_back(&rho_M_u);
                         }
-                        if (surfNavierStokesData.w_T) surfNSCHSystem.params.surfNavierStokesParams.w_T.Interpolate(mg, [&](Point3DCL const & x) { return surfNavierStokesData.w_T(x, t); }); // Oseen (and Stokes) case
-                        else surfNSCHSystem.params.surfNavierStokesParams.w_T.Data = 2. * u.Data - u_prev.Data; // Navier-Stokes case
-                        Pe = supnorm(surfNSCHSystem.params.surfNavierStokesParams.w_T.Data) / nu;
-                        logger.buf << "Pe = " << Pe;
-                        logger.log();
                         if (Pe) {
-                            logger.buf << "assembling convection mtx";
-                            if (rho_delta) logger.buf << " scaled w/ cut-off function";
-                            logger.log();
-                            surfNSCHSystem.matrices.push_back(&N_u);
+                            logger.log("assembling convection mtx");
+                            surfNSCHSystem.matrices.push_back(&rho_N_u);
                         }
                         surfNSCHSystem.vectors = { &F_u, &F_p };
                         setupFESystem(mg, surfNSCHSystem);
-                        auto rho_M = rho_delta ? rho_M_u.Data : MatrixCL(rho_max, M_u.Data);
+                        if (!rho_delta) rho_M_u.Data = MatrixCL(rho_max, M_u.Data);
                         // system mtx
-                        A_sum.LinComb(alpha, rho_M, gamma, AL_u.Data, nu, A_u.Data, tau_u, S_u.Data, rho_u, C_u.Data);
-                        if (Pe) A_sum.LinComb(1., MatrixCL(A_sum), rho_delta ? 1. : rho_max , N_u.Data);
+                        A_sum.LinComb(alpha, rho_M_u.Data, gamma, AL_u.Data, nu, A_u.Data, tau_u, S_u.Data, rho_u, C_u.Data);
+                        if (Pe) A_sum.LinComb(1., MatrixCL(A_sum), 1., rho_N_u.Data);
                         // system rhs
-                        if (i == 1 || BDF == 1) F_u.Data += (1. / stepSize) * (rho_M * u.Data);
-                        else F_u.Data += (2. / stepSize) * (rho_M * u.Data) - (.5 / stepSize) * (rho_M * u_prev.Data);
+                        if (i == 1 || BDF == 1) F_u.Data += (1. / stepSize) * (rho_M_u.Data * u.Data);
+                        else F_u.Data += (2. / stepSize) * (rho_M_u.Data * u.Data) - (.5 / stepSize) * (rho_M_u.Data * u_prev.Data);
                         F_p.Data -= (dot(F_p.Data, I_p) / dot(I_p, I_p)) * I_p;
                         // for the next step
                         u_prev = u;
