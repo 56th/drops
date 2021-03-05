@@ -23,6 +23,7 @@ namespace DROPS {
             params.put("SurfNavierStokes.IC.Params.KillingExact.AngularVelocity", omega);
             dataNS = surfNavierStokesDataFactory(surface, "KillingExact", params);
             params.put("SurfCahnHilliard.IC.Params.WanDerVaals.AngularVelocity", omega);
+            params.put("SurfCahnHilliard.IC.Params.WanDerVaals.Noise", 0.);
             dataCH = surfCahnHilliardDataFactory(surface, "WanDerVaals", params);
         }
         else if (name == "KelvinHelmholtz") {
@@ -30,6 +31,7 @@ namespace DROPS {
             params.put("SurfNavierStokes.IC.Params." + name + ".delta_0", params.get<double>("SurfNSCH.CH.Epsilon"));
             dataNS = surfNavierStokesDataFactory(surface, name, params);
             params.put("SurfCahnHilliard.IC.Params.WanDerVaals.AngularVelocity", 0.);
+            params.put("SurfCahnHilliard.IC.Params.WanDerVaals.Noise", 0.);
             dataCH = surfCahnHilliardDataFactory(surface, "WanDerVaals", params);
             dataCH.exact = false;
             dataCH.f = zeroInstatScalarFunction;
@@ -41,6 +43,8 @@ namespace DROPS {
             params.put("SurfCahnHilliard.IC.Params.WanDerVaals.AngularVelocity", 0.);
             params.put("SurfCahnHilliard.IC.Params.WanDerVaals.Noise", params.get<double>("SurfNSCH.IC.Params." + name + ".Noise"));
             dataCH = surfCahnHilliardDataFactory(surface, "WanDerVaals", params);
+            dataCH.exact = false;
+            dataCH.f = zeroInstatScalarFunction;
         }
         else throw std::invalid_argument(funcName + ": IC '" + name + "' is not defined");
         return { dataNS, dataCH };
