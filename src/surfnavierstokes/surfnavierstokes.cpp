@@ -113,10 +113,6 @@ int main(int argc, char* argv[]) {
             nu = inpJSON.get<double>("SurfNavierStokes.nu");
             if (nu <= 0.) throw std::invalid_argument("viscosity must be non-negative");
             auto& t = surfNSystem.params.t;
-            auto& w_T = surfNSystem.params.surfNavierStokesParams.w_T;
-            auto& Pe = surfNSystem.params.surfNavierStokesParams.Pe;
-            auto& u_N = surfNSystem.params.surfNavierStokesParams.u_N;
-            auto& u_N_max = surfNSystem.params.surfNavierStokesParams.u_N_max;
             auto& levelSet = surfNSystem.params.levelSet;
             surfNSystem.params.numbOfVirtualSubEdges = inpJSON.get<size_t>("SurfNavierStokes.NumbOfVirtualSubEdges");
             surfNSystem.params.surfNavierStokesParams.m_g = surfNavierStokesData.m_g;
@@ -195,13 +191,11 @@ int main(int argc, char* argv[]) {
             auto n_i = n / 3;
             size_t m = preIdx.NumUnknowns();
             logger.beg("set up FE system");
-                u_N.SetIdx(&speedIdx);
-                w_T.SetIdx(&velIdx);
                 FEMatDescCL
                     M_u(&velIdx, &velIdx, useTangMassMat ? &LocalAssembler::M_t_vecP2vecP2 : &LocalAssembler::M_vecP2vecP2),
                     AL_u(&velIdx, &velIdx, &LocalAssembler::AL_vecP2vecP2),
-                    N_u(&velIdx, &velIdx, &LocalAssembler::N_vecP2vecP2),
-                    H_u(&velIdx, &velIdx, &LocalAssembler::H_vecP2vecP2),
+                    N_u(&velIdx, &velIdx, &LocalAssembler::rho_N_vecP2vecP2),
+                    H_u(&velIdx, &velIdx, &LocalAssembler::rho_H_vecP2vecP2),
                     A_u(&velIdx, &velIdx, formulation == "Consistent" ? &LocalAssembler::A_consistent_vecP2vecP2 : &LocalAssembler::A_vecP2vecP2),
                     S_u(&velIdx, &velIdx, &LocalAssembler::S_vecP2vecP2),
                     C_u(&velIdx, &velIdx, &LocalAssembler::C_n_vecP2vecP2),
@@ -214,7 +208,7 @@ int main(int argc, char* argv[]) {
                     F_u(&velIdx, &LocalAssembler::F_momentum_vecP2),
                     G_p(&preIdx, &LocalAssembler::F_continuity_P1);
                 VecDescCL
-                    u_star(&velIdx), u(&velIdx), u_prev(&velIdx), surf_curl_u(&preIdx),
+                    u_star(&velIdx), u(&velIdx), u_prev(&velIdx), surf_curl_u(&preIdx), w_T(&velIdx), u_N(&speedIdx),
                     p_star(&preIdx), p(&preIdx);
             logger.end();
         logger.end();
@@ -481,7 +475,7 @@ int main(int argc, char* argv[]) {
                 projectVorticity();
             auto projectTime = logger.end();
             logger.beg("output");
-                double alpha, b_norm, r_0_norm;
+                double Pe, u_N_max, alpha, b_norm, r_0_norm;
                 ReturnType belosSolverResult;
                 auto exportStats = [&](size_t i) {
                     std::ofstream stats(dirName + "/stats/t_" + std::to_string(i) + ".json");
@@ -616,30 +610,32 @@ int main(int argc, char* argv[]) {
                     u_N.Interpolate(mg, [&](Point3DCL const & x) { return surface->u_N(x, t); });
                 logger.end();
                 logger.beg("assemble");
-                    surfNSystem.matrices = {};
+                    alpha = i == 1 || BDF == 1 ? 1. / stepSize : 1.5 / stepSize;
                     if (surfNavierStokesData.w_T) w_T.Interpolate(mg, [&](Point3DCL const & x) { return surfNavierStokesData.w_T(x, t); }); // Oseen (and Stokes) case
                     else w_T.Data = 2. * u.Data - u_prev.Data; // Navier-Stokes case
                     Pe = supnorm(w_T.Data) / nu;
-                    if (Pe) {
-                        logger.log("assembling convection mtx");
-                        surfNSystem.matrices.push_back(&N_u);
-                    }
                     u_N_max = supnorm(u_N.Data);
-                    if (u_N_max) {
-                        logger.log("assembling surf speed mtx");
-                        surfNSystem.matrices.push_back(&H_u);
-                    }
-                    alpha = i == 1 || BDF == 1 ? 1. / stepSize : 1.5 / stepSize;
                     logger.buf
                         << "alpha = " << alpha << '\n'
                         << "Pe = " << Pe << '\n'
                         << "max |u_N| = " << u_N_max;
                     logger.log();
+                    surfNSystem.matrices = {};
+                    surfNSystem.params.surfNavierStokesParams.w_T = Pe ? &w_T : nullptr;
+                    surfNSystem.params.surfNavierStokesParams.u_N = u_N_max ? &u_N : nullptr;
+                    if (Pe || u_N_max) {
+                        logger.log("assembling convection mtx");
+                        surfNSystem.matrices.push_back(&N_u);
+                    }
+                    if (u_N_max) {
+                        logger.log("assembling surf speed mtx");
+                        surfNSystem.matrices.push_back(&H_u);
+                    }
                     surfNSystem.vectors = { &F_u, &G_p };
                     setupFESystem(mg, surfNSystem);
                     // system mtx
                     A_sum.LinComb(alpha, M_u.Data, gamma, AL_u.Data, nu, A_u.Data, tau_u, S_u.Data, rho_u, C_u.Data);
-                    if (Pe) A_sum.LinComb(1., MatrixCL(A_sum), 1., N_u.Data);
+                    if (Pe || u_N_max) A_sum.LinComb(1., MatrixCL(A_sum), 1., N_u.Data);
                     if (u_N_max) A_sum.LinComb(1., MatrixCL(A_sum), 1., H_u.Data);
                     // system rhs
                     if (i == 1 || BDF == 1) F_u.Data += (1. / stepSize) * (M_u.Data * u.Data);

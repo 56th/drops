@@ -43,6 +43,8 @@ namespace DROPS {
             params.put("SurfCahnHilliard.IC.Params.WanDerVaals.AngularVelocity", 0.);
             params.put("SurfCahnHilliard.IC.Params.WanDerVaals.Noise", params.get<double>("SurfNSCH.IC.Params." + name + ".Noise"));
             dataCH = surfCahnHilliardDataFactory(surface, "WanDerVaals", params);
+            dataCH.exact = false;
+            dataCH.f = zeroInstatScalarFunction;
         }
         else throw std::invalid_argument(funcName + ": IC '" + name + "' is not defined");
         return { dataNS, dataCH };
