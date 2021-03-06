@@ -18,7 +18,6 @@ namespace DROPS {
         if (name == "WanDerVaalsExact") {
             if (params.get<double>("SurfNSCH.NS.LineTension")) throw std::invalid_argument(funcName + ": use zero line tension for '" + name + "' test");
             if (params.get<double>("SurfNSCH.NS.rho.min") != params.get<double>("SurfNSCH.NS.rho.max") || params.get<double>("SurfNSCH.NS.rho.max") != 1.) throw std::invalid_argument(funcName + ": use rho_min = rho_max = 1 for '" + name + "' test");
-            if (params.get<bool>("SurfNSCH.CH.UseDegenerateMobility")) throw std::invalid_argument(funcName + ": use constant mobility for '" + name + "' test");
             auto omega = params.get<double>("SurfNSCH.IC.Params." + name + ".AngularVelocity");
             params.put("SurfNavierStokes.IC.Params.KillingExact.AngularVelocity", omega);
             dataNS = surfNavierStokesDataFactory(surface, "KillingExact", params);

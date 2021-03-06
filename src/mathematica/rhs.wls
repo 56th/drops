@@ -1,7 +1,7 @@
 #!/usr/bin/env wolframscript
 (* ::Package:: *)
 
-surface = "Torus";
+surface = "Sphere";
 solution = "KillingExact";
 
 
@@ -115,7 +115,7 @@ Print["(Convective term) f_T += ", MatrixForm[fConv[{x, y, z}, t]]]
 
 
 f0[c_] := 1/4 c^2 (1 - c)^2
-M[c_] := 1
+M[c_] := c (1 - c)
 \[Mu][{x_, y_, z_}, t_] := Evaluate@simplify[f0'[c[{x, y, z}, t]] - \[Epsilon]^2 surfVectDiv[{x, y, z}, t][surfGrad[{x, y, z}, t][c[{x, y, z}, t]]], \[Phi][{x, y, z}, t] == 0]
 Print["mu = ", \[Mu][{x, y, z}, t]]
 

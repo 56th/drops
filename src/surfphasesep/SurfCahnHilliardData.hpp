@@ -38,7 +38,7 @@ namespace DROPS {
                 return .5 * (1. + tanh((x[2] * cos(omega * t) - x[1] * sin(omega * t) + dis(gen))/(2. * std::sqrt(2.) * eps)));
             };
             auto sphere = dynamic_cast<Sphere const *>(&surface);
-            if (!noise && sphere && !params.get<bool>("SurfCahnHilliard.UseDegenerateMobility")) {
+            if (!noise && sphere) {
                 data.exact = true;
                 data.description =
                     "chi = .5 * (1 + tanh((z cos(omega t) - y sin(omega t))/ (2 sqrt(2) eps)))\n"
@@ -49,6 +49,11 @@ namespace DROPS {
                     auto arg = x[2] * cos(omega * t) - x[1] * sin(omega * t);
                     return 0.015625 * M * (pow(sech((0.35355339059327373*arg)/eps),5)*pow(arg,3)*(11.313708498984761*eps*cosh((1.0606601717798212*arg)/eps) - arg*sinh((1.0606601717798212*arg)/eps)) + 16.*pow(eps,2)*pow(sech((0.35355339059327373*arg)/eps),2)*(2.8284271247461903*eps*arg - (-3.*pow(sphere->r(t),2) + 7.*pow(arg,2))*tanh((0.35355339059327373*arg)/eps)) + pow(sech((0.35355339059327373*arg)/eps),4)*arg*(-33.941125496954285*pow(x[2],2)*eps*pow(cos(t*omega),2) + 16.970562748477143*eps*((2. - cosh((0.7071067811865475*arg)/eps))*pow(sphere->r(t),2) - 2.*x[1]*(x[1]*pow(sin(t*omega),2) - x[2]*sin(2.*t*omega))) + arg*(2.*(-5. + cosh((0.7071067811865475*arg)/eps))*pow(sphere->r(t),2) + 11.*pow(arg,2))*tanh((0.35355339059327373*arg)/eps)))/(pow(eps,2)*pow(sphere->r(t),4));
                 };
+                if (params.get<bool>("SurfCahnHilliard.UseDegenerateMobility"))
+                    f = [=](Point3DCL const & x, double t) {
+                        auto arg = x[2] * cos(omega * t) - x[1] * sin(omega * t);
+                        return 0.0078125 * M * (pow(sech((0.35355339059327373*arg)/eps),7)*arg*(1.4142135623730951*eps*cosh((1.0606601717798212*arg)/eps)*(-5.*pow(sphere->r(t),2) + 6.*pow(arg,2)) - arg*(arg - sphere->r(t))*(arg + sphere->r(t))*sinh((1.0606601717798212*arg)/eps)) + pow(sech((0.35355339059327373*arg)/eps),6)*arg*(1.4142135623730951*eps*(11.*pow(sphere->r(t),2) - 14.*pow(arg,2)) + 8.*arg*(arg - sphere->r(t))*(arg + sphere->r(t))*tanh((0.35355339059327373*arg)/eps)) + 16.*pow(eps,2)*pow(sech((0.35355339059327373*arg)/eps),4)*(1.4142135623730951*eps*arg - 2.*(-pow(sphere->r(t),2) + 2.*pow(arg,2))*tanh((0.35355339059327373*arg)/eps)))/(pow(eps,2)*pow(sphere->r(t),4));
+                    };
             }
         }
         else if (name == "RandomUniform") {
