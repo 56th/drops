@@ -268,11 +268,12 @@ void ExtractComponent( const VectorCL& vecFE, VectorCL& scalarFE, Uint comp, Uin
         scalarFE[i]= vecFE[i*stride+comp];
 }
 
-IdxDescCL& IdxDescCL::DistributeDOFs(Uint level, MultiGridCL& mg, VecDescCL const * levelSet, double dist) {
+size_t IdxDescCL::DistributeDOFs(Uint level, MultiGridCL& mg, VecDescCL const * levelSet, double dist) {
     auto idx = GetIdx();
     TriangLevel_ = level;
     NumUnknowns_ = 0;
     auto n = NumUnknownsEdge_ ? NumAllVertsC : NumVertsC;
+    size_t numTetra = 0;
     for (auto it = mg.GetTriangTetraBegin(level); it != mg.GetTriangTetraEnd(level); ++it) {
         auto distTetra = 0.;
         if (levelSet) {
@@ -284,6 +285,7 @@ IdxDescCL& IdxDescCL::DistributeDOFs(Uint level, MultiGridCL& mg, VecDescCL cons
             distTetra = distance(levelSetTet);
         }
         if (distTetra <= dist) {
+            ++numTetra;
             it->Unknowns.Prepare(idx);
             it->Unknowns(idx) = idx; // mark tetrahedron
             for (size_t i = 0; i < n; ++i) {
@@ -296,7 +298,7 @@ IdxDescCL& IdxDescCL::DistributeDOFs(Uint level, MultiGridCL& mg, VecDescCL cons
     }
     size_t dim = IsScalar() ? 1 : 3;
     NumUnknowns_ *= dim;
-    return *this;
+    return numTetra;
 }
 
 void CreateNumbOnTetra( const Uint idx, IdxT& counter, Uint stride,

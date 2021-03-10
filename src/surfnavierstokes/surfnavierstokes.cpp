@@ -139,11 +139,10 @@ int main(int argc, char* argv[]) {
                     ch = &inpJSON.get_child("Mesh.Periodicity");
                 } catch (DROPSParamErrCL) {}
                 if (ch) read_PeriodicBoundaries(mg, *ch);
-                // levelset shift
-                auto shift = inpJSON.get<Point3DCL>("Levelset.ShiftDir", Point3DCL(0., 0., 0.));
-                shift /= shift.norm();
-                auto shiftNorm = fabs(inpJSON.get<double>("Levelset.ShiftNorm", 0.));
-                shift *= shiftNorm;
+                auto shift = inpJSON.get<Point3DCL>("Surface.Shift.Dir", Point3DCL(0., 0., 0.)); {
+                    if (shift.norm()) shift /= shift.norm();
+                    shift *= std::abs(inpJSON.get<double>("Surface.Shift.Norm", 0.));
+                }
                 mg.Transform([&](Point3DCL const & p) { return p - shift; });
                 logger.buf << "surface shift: " << shift;
                 logger.log();
@@ -154,25 +153,32 @@ int main(int argc, char* argv[]) {
                 adap.set_marking_strategy(&markerLset);
                 adap.MakeInitialTriang();
                 adap.set_marking_strategy(nullptr);
-                auto numbOfTetras = mg.GetNumTriangTetra();
                 logger.buf
                     << "h = " << h << '\n'
-                    << "numb of tetras = " << numbOfTetras;
+                    << "numb of tetras = " << mg.GetNumTriangTetra();
                 logger.log();
             logger.end();
         logger.end();
         logger.beg("interpolate level-set");
-            // MLIdxDescCL lstIdx(P2_FE);
-            IdxDescCL lstIdx(P2_FE);
-            lstIdx.DistributeDOFs(mg.GetLastLevel(), mg);
+            IdxDescCL lstIdx(P2_FE); {
+                auto n = lstIdx.DistributeDOFs(mg.GetLastLevel(), mg);
+                logger.buf << "numb of active tetras for levelset: " << n << " (" << (100. * n) / mg.GetNumTriangTetra() << "%)";
+                logger.log();
+            }
             levelSet.SetIdx(&lstIdx);
             levelSet.Interpolate(mg, [&](Point3DCL const & x) { return surface->dist(x); });
         logger.end();
         logger.beg("set up FE spaces");
-            IdxDescCL velIdx(vecP2IF_FE);
-            velIdx.DistributeDOFs(mg.GetLastLevel(), mg, &levelSet);
-            IdxDescCL preIdx(P1IF_FE);
-            preIdx.DistributeDOFs(mg.GetLastLevel(), mg, &levelSet);
+            IdxDescCL velIdx(vecP2IF_FE); {
+                auto n = velIdx.DistributeDOFs(mg.GetLastLevel(), mg, &levelSet);
+                logger.buf << "numb of active tetras for velocity: " << n << " (" << (100. * n) / mg.GetNumTriangTetra() << "%)";
+                logger.log();
+            }
+            IdxDescCL preIdx(P1IF_FE); {
+                auto n = preIdx.DistributeDOFs(mg.GetLastLevel(), mg, &levelSet);
+                logger.buf << "numb of active tetras for pressure: " << n << " (" << (100. * n) / mg.GetNumTriangTetra() << "%)";
+                logger.log();
+            }
             IdxDescCL speedIdx(P2IF_FE);
             speedIdx.DistributeDOFs(mg.GetLastLevel(), mg, &levelSet);
             size_t n = velIdx.NumUnknowns();
