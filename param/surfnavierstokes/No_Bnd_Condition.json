@@ -1,13 +1,13 @@
 {
     "Output": {
       "Directory":  "../../output/tmp",
-      "EveryStep":  10,
+      "EveryStep":  1,
       "Binary":     true,
       "VTK": {
-        "Velocity": false,
+        "Velocity": true,
         "Vorticity": true,
-        "SurfSpeed": false,
-        "Pressure": false
+        "SurfSpeed": true,
+        "Pressure": true
       },
       "Matrices": false,
       "Vectors": false
@@ -16,21 +16,17 @@
     "Mesh": {
         "Type": "BrickBuilder",
         "Origin": [-1.66666,-1.66666,-1.66666],
-        "E1": [3.33333, 0,0],
-        "E2": [0,3.33333,0],
-        "E3": [0,0,3.33333],
-        "N1": 2,
-        "N2": 2,
-        "N3": 2,
+        "E1": [3.33333, 0,0], "E2": [0,3.33333,0], "E3": [0,0,3.33333],
+        "N1": 2, "N2": 2, "N3": 2,
         "RestartFile": "",
         "AdaptRef": {
-            "Comment":      "adaptive refinement",
-            "Freq":          0,
-            "Width":         0,
+            "Comment": "adaptive refinement",
+            "Freq": 0,
+            "Width": 0,
             "CoarsestLevel": 0,
-            "FinestLevel":   4,
-            "SD":            0.1,
-            "CurvDiff":      -1,
+            "FinestLevel": 3,
+            "SD": 0.1,
+            "CurvDiff": -1,
             "Discontinuous": 0
         }
     },
@@ -51,12 +47,12 @@
     },
 
     "SurfNavierStokes": {
-      "nu": 1e-3,
-      "gamma": 1.0,
+      "nu": 1.0,
+      "gamma": 0.0,
       "Comment": "Use ConvectionTermType = Stokes (zero convection term), Oseen (convection term is given and equal to velocity), or NavierStokes (convection term will be extrapolated from prev time steps)",
-      "ConvectionTermType": "NavierStokes",
+      "ConvectionTermType": "Stokes",
       "IC": {
-        "Name": "DirectionChangeExact",
+        "Name": "PolynomialExact",
         "Params": {
           "KelvinHelmholtz": {
             "delta_0": 0.05,
@@ -90,10 +86,8 @@
 
     "Time": {
       "BDF": 2,
-      "Read": 0,
-      "Write": "yes",
-      "NumbOfSteps": 10,
-      "FinalTime": 7.0
+      "NumbOfSteps": 1,
+      "FinalTime": 1.0
     },
 
     "Solver": {
@@ -122,60 +116,9 @@
         }
     },
 
-    "Levelset": {
-      "Theta":         1,
-      "VolCorrection": 0,
-      "SD":            0.1,
-      "CurvDiff":      -1,
-      "Discontinuous": 0,
-      "BndData": {
-        "Default": ["NoBC"], "0" : ["NoBC"], "1" : ["NoBC"], "2" : ["NoBC"], "3" : ["NoBC"], "4" : ["NoBC"], "5" : ["NoBC"]
-      },
-      "Solver": {
-        "Tol":  1e-10,
-        "Iter": 500
-      },
-      "ShiftNorm": 0.0,
-      "ShiftDir":  [1, 1, 1]
-    },
-
     "General": {
-      "ProgressBar":  1,
       "DynamicLibsPrefix": "../",
       "DynamicLibs": []
-    },
+    }
 
-    "Stokes": {
-      "VelocityBndData":       { "Default": ["NoBC"], "0": ["NoBC"], "1": ["NoBC"], "2": ["NoBC"], "3": ["NoBC"], "4": ["NoBC"], "5": ["NoBC"] },
-      "PressureBndData":       { "Default": ["NoBC"], "0": ["NoBC"], "1": ["NoBC"], "2": ["NoBC"], "3": ["NoBC"], "4": ["NoBC"], "5": ["NoBC"] },
-      "VolumeFractionBndData": { "Default": ["NoBC"], "0": ["NoBC"], "1": ["NoBC"], "2": ["NoBC"], "3": ["NoBC"], "4": ["NoBC"], "5": ["NoBC"] },
-      "ChemPotentialBndData":  { "Default": ["NoBC"], "0": ["NoBC"], "1": ["NoBC"], "2": ["NoBC"], "3": ["NoBC"], "4": ["NoBC"], "5": ["NoBC"] }
-    },
-
-    "Reparam": {
-        "Comment": "re-initialization of levelset function",
-        "Freq":		0,
-        "Method":	1
-    },
-
-    "Exp": {
-        "Comment": "experimental conditions",
-        "RadDrop":		[1, 1, 1 ],
-        "PosDrop":		[0, 0, 0 ],
-        "Velocity":		[0, 0, 0.5 ]
-    },
-
-    "SurfTransp": {
-        "Comment":  "surfactant transport",
-        "Theta":     0.5,
-        "OmitBound": -1,
-        "Visc":      0.05,
-        "FEdegree":  2
-    },
-
-    "TestCase":         1,
-    "InitialDivisions": 2,
-    "EnsightCase":      "none",
-    "EnsightDir":       "CNmass-lvl3",
-    "LB":               1
 }
