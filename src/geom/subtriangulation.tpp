@@ -35,32 +35,14 @@ namespace DROPS {
         return static_cast<size_t>(std::abs(sum)) == f.size(); // std::abs return a signed type --> silence g++ warning
     }
 
-    template<class GridFunT>
-    inline bool isInCutMesh(GridFunT const &f) {
-        if (equalSigns(f)) return false;
-        std::vector<size_t> zerosIndicies;
-        zerosIndicies.reserve(f.size());
-        for (size_t i = 0; i < f.size(); ++i)
-            if (f[i] == 0.)
-                zerosIndicies.push_back(i);
-        if (zerosIndicies.size() == 0) return true;
-        std::stringstream err;
-        err << __func__ << ": levelset is exactly zero at node(s); not implemented yet";
-        throw std::invalid_argument(err.str());
-    }
-
     template <class GridFunT>
-    double  distance (const GridFunT& f)
-    {
-        double min_val= 10000;
-        if(equalSigns(f))
-        {
-            for (Uint i= 0; i < f.size(); ++i)
-                min_val= std::min( std::fabs(f[i]),min_val);
-        }
-        else
-            min_val=0;
-        return min_val;
+    double  distance(const GridFunT& f) {
+        if (f.size() == 0) throw std::invalid_argument(__func__ + std::string(": empty levelset levelset"));
+        if (equalSigns(f))
+            return std::abs(*std::min_element(std::begin(f), std::end(f), [](double a, double b) { return std::abs(a) < std::abs(b); }));
+        if (std::count(std::begin(f), std::end(f), 0.))
+            throw std::invalid_argument(__func__ + std::string(": levelset is exactly zero at node(s); not implemented yet"));
+        return 0.;
     }
 ///\brief Write the sign of the levelset function src to the sequence dst.
     inline void

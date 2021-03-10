@@ -268,6 +268,37 @@ void ExtractComponent( const VectorCL& vecFE, VectorCL& scalarFE, Uint comp, Uin
         scalarFE[i]= vecFE[i*stride+comp];
 }
 
+IdxDescCL& IdxDescCL::DistributeDOFs(Uint level, MultiGridCL& mg, VecDescCL const * levelSet, double dist) {
+    auto idx = GetIdx();
+    TriangLevel_ = level;
+    NumUnknowns_ = 0;
+    auto n = NumUnknownsEdge_ ? NumAllVertsC : NumVertsC;
+    for (auto it = mg.GetTriangTetraBegin(level); it != mg.GetTriangTetraEnd(level); ++it) {
+        auto distTetra = 0.;
+        if (levelSet) {
+            auto I = levelSet->RowIdx->Loc2Glo(*it);
+            if (I.empty()) throw std::invalid_argument(__func__ + std::string(": undefined levelset"));
+            LocalP2CL<> levelSetTet;
+            for (size_t i = 0; i < I.size(); ++i)
+                levelSetTet[i] = levelSet->Data[I[i]];
+            distTetra = distance(levelSetTet);
+        }
+        if (distTetra <= dist) {
+            it->Unknowns.Prepare(idx);
+            it->Unknowns(idx) = idx; // mark tetrahedron
+            for (size_t i = 0; i < n; ++i) {
+                auto& unknowns = i < NumVertsC ? const_cast<VertexCL *>(it->GetVertex(i))->Unknowns : const_cast<EdgeCL *>(it->GetEdge(i - NumVertsC))->Unknowns;
+                if (unknowns.Exist(idx)) continue;
+                unknowns.Prepare(idx);
+                unknowns(idx) = NumUnknowns_++;
+            }
+        }
+    }
+    size_t dim = IsScalar() ? 1 : 3;
+    NumUnknowns_ *= dim;
+    return *this;
+}
+
 void CreateNumbOnTetra( const Uint idx, IdxT& counter, Uint stride,
                         const MultiGridCL::TriangTetraIteratorCL& begin,
                         const MultiGridCL::TriangTetraIteratorCL& end, const Uint level)
@@ -326,7 +357,7 @@ size_t CreateNumbOnInterfaceVertex (const Uint idx, IdxT& counter, Uint stride,
     for (MultiGridCL::TriangTetraIteratorCL it = begin; it != end; ++it) {
         locp2_ls.assign(*it, ls, lsetbnd);
         evaluate_on_vertexes(locp2_ls, lat, Addr(ls_loc));
-        if (!isInCutMesh(ls_loc)) continue;
+        if (distance(ls_loc) != 0.) continue;
         const double limit = omit_bound < 0. ? 0. : omit_bound*std::pow(it->GetVolume()*6, 4./3.);
         patch.make_patch<MergeCutPolicyCL>(lat, ls_loc);
         if (patch.empty()) continue;
@@ -467,7 +498,7 @@ size_t CreateNumbOnInterfaceP2 (const Uint idx, IdxT& counter, Uint stride,
 //                std::cout << u << ' ';
 //            std::cout << '\n';
 //        }
-        if (!isInCutMesh(ls_loc)) continue;
+        if (distance(ls_loc) != 0.) continue;
         const double limit = omit_bound < 0. ? 0. : omit_bound*std::pow(it->GetVolume()*6, 4./3.);
         patch.make_patch<MergeCutPolicyCL>(lat, ls_loc);
         if (patch.empty()) continue;

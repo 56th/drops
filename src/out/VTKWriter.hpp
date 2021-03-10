@@ -104,11 +104,11 @@ namespace DROPS {
                             for (auto it = mg.GetTriangVertexBegin(); it != mg.GetTriangVertexEnd(); ++it)
                                 if (it->Unknowns.Exist(idx))
                                     for (size_t d = 0; d < dim; ++d)
-                                        value[dim * vertexIndex[&*it] + d] = var.vec.Data[it->Unknowns(idx) / dim /* / dim is tmp */ + d * blockSize];
+                                        value[dim * vertexIndex[&*it] + d] = var.vec.Data[it->Unknowns(idx) + d * blockSize];
                             for (auto it = mg.GetTriangEdgeBegin(); it != mg.GetTriangEdgeEnd(); ++it)
                                 if (it->Unknowns.Exist(idx))
                                     for (size_t d = 0; d < dim; ++d)
-                                        value[dim * edgeIndex[&*it] + d] = var.vec.Data[it->Unknowns(idx) / dim /* / dim is tmp */ + d * blockSize];
+                                        value[dim * edgeIndex[&*it] + d] = var.vec.Data[it->Unknowns(idx) + d * blockSize];
                                 else { // P1
                                     auto i0 = dim * vertexIndex[it->GetVertex(0)];
                                     auto i1 = dim * vertexIndex[it->GetVertex(1)];

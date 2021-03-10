@@ -150,7 +150,7 @@ int main(int argc, char* argv[]) {
             logger.end();
             logger.beg("refine towards the surface");
                 AdapTriangCL adap(mg);
-                DistMarkingStrategyCL markerLset([&](Point3DCL const & x, double) { return surface->phi(x); }, inpJSON.get<double>("Mesh.AdaptRef.Width"), inpJSON.get<int>("Mesh.AdaptRef.CoarsestLevel"), inpJSON.get<int>("Mesh.AdaptRef.FinestLevel"));
+                DistMarkingStrategyCL markerLset([&](Point3DCL const & x, double) { return surface->dist(x); }, inpJSON.get<double>("Mesh.AdaptRef.Width"), inpJSON.get<int>("Mesh.AdaptRef.CoarsestLevel"), inpJSON.get<int>("Mesh.AdaptRef.FinestLevel"));
                 adap.set_marking_strategy(&markerLset);
                 adap.MakeInitialTriang();
                 adap.set_marking_strategy(nullptr);
@@ -160,33 +160,21 @@ int main(int argc, char* argv[]) {
                     << "numb of tetras = " << numbOfTetras;
                 logger.log();
             logger.end();
-            BndDataCL<double> lsetBnd(0); read_BndData(lsetBnd, mg, inpJSON.get_child("Levelset.BndData"));
-            BndDataCL<Point3DCL> vecBnd(0); read_BndData(vecBnd, mg, inpJSON.get_child("Stokes.VelocityBndData"));
-            BndDataCL<double> scaBnd(0); read_BndData(scaBnd, mg, inpJSON.get_child("Stokes.PressureBndData"));
         logger.end();
         logger.beg("interpolate level-set");
-            MLIdxDescCL lstIdx(P2_FE);
-            lstIdx.CreateNumbering(mg.GetLastLevel(), mg, lsetBnd);
+            // MLIdxDescCL lstIdx(P2_FE);
+            IdxDescCL lstIdx(P2_FE);
+            lstIdx.DistributeDOFs(mg.GetLastLevel(), mg);
             levelSet.SetIdx(&lstIdx);
-            levelSet.Interpolate(mg, [&](Point3DCL const & x) { return surface->phi(x); });
+            levelSet.Interpolate(mg, [&](Point3DCL const & x) { return surface->dist(x); });
         logger.end();
         logger.beg("set up FE spaces");
-            IdxDescCL velIdx(vecP2IF_FE, vecBnd); {
-                velIdx.GetXidx().SetBound(inpJSON.get<double>("SurfTransp.OmitBound"));
-                auto numbOfActiveTetras = velIdx.CreateNumbering(mg.GetLastLevel(), mg, &levelSet, &lsetBnd);
-                logger.buf
-                    << "numb of active (cut) tetras is: " << numbOfActiveTetras << " ("
-                    << (100. * numbOfActiveTetras) / numbOfTetras << "%)\n";
-                logger.log();
-            }
-            IdxDescCL preIdx(P1IF_FE, scaBnd); {
-                preIdx.GetXidx().SetBound(inpJSON.get<double>("SurfTransp.OmitBound"));
-                preIdx.CreateNumbering(mg.GetLastLevel(), mg, &levelSet, &lsetBnd);
-            }
-            IdxDescCL speedIdx(P2IF_FE, scaBnd); {
-                speedIdx.GetXidx().SetBound(inpJSON.get<double>("SurfTransp.OmitBound"));
-                speedIdx.CreateNumbering(mg.GetLastLevel(), mg, &levelSet, &lsetBnd);
-            }
+            IdxDescCL velIdx(vecP2IF_FE);
+            velIdx.DistributeDOFs(mg.GetLastLevel(), mg, &levelSet);
+            IdxDescCL preIdx(P1IF_FE);
+            preIdx.DistributeDOFs(mg.GetLastLevel(), mg, &levelSet);
+            IdxDescCL speedIdx(P2IF_FE);
+            speedIdx.DistributeDOFs(mg.GetLastLevel(), mg, &levelSet);
             size_t n = velIdx.NumUnknowns();
             auto n_i = n / 3;
             size_t m = preIdx.NumUnknowns();
@@ -241,7 +229,7 @@ int main(int argc, char* argv[]) {
             belosParams->set("Num Blocks", inpJSON.get<int>("Solver.Outer.KrylovSubspaceSize"));
             belosParams->set("Maximum Iterations", inpJSON.get<int>("Solver.Outer.MaxIter"));
             belosParams->set("Output Frequency", inpJSON.get<int>("Solver.Outer.OutputFrequency"));
-            belosParams->set("Verbosity", Errors + Warnings + StatusTestDetails + TimingDetails + FinalSummary + IterationDetails);
+            belosParams->set("Verbosity", Errors + Warnings + StatusTestDetails/* + TimingDetails + FinalSummary + IterationDetails*/);
             belosParams->set<int>("Output Style", Brief);
             SolverFactory<ST, MV, OP> belosFactory;
             logger.buf << "available iterations: " << belosFactory.supportedSolverNames();
@@ -429,7 +417,6 @@ int main(int argc, char* argv[]) {
             logger.beg("assemble");
                 surfNSystem.matrices = { &M_u, &A_u, &AL_u, &S_u, &C_u, &M_p, &C_p, &A_p, &B_pu, &Q_pu };
                 setupFESystem(mg, surfNSystem);
-                C_p.Data *= -rho_p;
                 MatrixCL A_sum;
                 VectorCL I_p(1., m);
             auto assembleTime = logger.end();
@@ -452,7 +439,7 @@ int main(int argc, char* argv[]) {
                 auto belosSolverW = belosFactory.create("CG", belosParamsW);
                 ReturnType belosSolverResultW;
                 auto projectVorticity = [&]() {
-                    auto mtx = static_cast<RCP<MT>>(MatrixCL(1., M_p.Data, -1., C_p.Data));
+                    auto mtx = static_cast<RCP<MT>>(MatrixCL(1., M_p.Data, rho_p, C_p.Data));
                     auto rhs = static_cast<SV>(Q_pu.Data * u.Data);
                     auto sln = static_cast<SV>(surf_curl_u.Data);
                     sln.PutScalar(0.);
@@ -649,11 +636,11 @@ int main(int argc, char* argv[]) {
                     }
                     B = static_cast<RCP<MT>>(B_pu.Data);
                     logCRS(*B, "B");
-                    C = static_cast<RCP<MT>>(C_p.Data);
+                    C = static_cast<RCP<MT>>(MatrixCL(-rho_p, C_p.Data));
                     logCRS(*C, "C := -rho_p (pressure volume stabilization mtx)");
-                    S_M = static_cast<RCP<MT>>(MatrixCL(1. / (gamma + nu), M_p.Data, -1., C_p.Data));
+                    S_M = static_cast<RCP<MT>>(MatrixCL(1. / (gamma + nu), M_p.Data, rho_p, C_p.Data));
                     logCRS(*S_M, "S_M := (nu + gamma)^{-1} M_p - C");
-                    S_L = static_cast<RCP<MT>>(MatrixCL(1. / alpha, A_p.Data, -1., C_p.Data));
+                    S_L = static_cast<RCP<MT>>(MatrixCL(1. / alpha, A_p.Data, rho_p, C_p.Data));
                     logCRS(*S_L, "S_L := \\alpha^{-1} L_p - C");
                     belosRHS = static_cast<SV>(F_u.Data.append(G_p.Data));
                 logger.end();

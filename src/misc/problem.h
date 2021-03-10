@@ -312,19 +312,20 @@ private:
     void CreateNumbNearInterface(Uint level, MultiGridCL& mg, const VecDescCL& ls, const BndDataCL<>& lsetbnd,double width, double dist=0./*default to using dof in cut tetra*/);
 public:
     std::vector<IdxT> Loc2Glo(TetraCL const & tet) {
+        auto idx = GetIdx();
+        if (!tet.Unknowns.Exist(idx)) return {};
         size_t dim = IsScalar() ? 1 : 3;
         if (NumUnknowns_ % dim) throw std::logic_error(__func__ + std::string(": invalid numb of d.o.f."));
         auto blockSize = NumUnknowns_ / dim;
-        auto idx = GetIdx();
         std::vector<IdxT> res;
-        res.reserve(4 * NumUnknownsVertex_ + 6 * NumUnknownsEdge_);
+        res.reserve(NumVertsC * NumUnknownsVertex_ + NumEdgesC * NumUnknownsEdge_);
         for (size_t d = 0; d < dim; ++d) {
             if (NumUnknownsVertex_)
-                for (size_t i = 0; i < 4; ++i)
-                    res.push_back(tet.GetVertex(i)->Unknowns(idx) / dim /* / dim is tmp */ + d * blockSize);
+                for (size_t i = 0; i < NumVertsC; ++i)
+                    res.push_back(tet.GetVertex(i)->Unknowns(idx) + d * blockSize);
             if (NumUnknownsEdge_)
-                for (size_t i = 0; i < 6; ++i)
-                    res.push_back(tet.GetEdge(i)->Unknowns(idx) / dim /* / dim is tmp */ + d * blockSize);
+                for (size_t i = 0; i < NumEdgesC; ++i)
+                    res.push_back(tet.GetEdge(i)->Unknowns(idx) + d * blockSize);
         }
         return res;
     }
@@ -369,10 +370,10 @@ public:
     ///     unknown-numbers on it are compared, too.
     static bool
     Equal(IdxDescCL& i, IdxDescCL& j, const MultiGridCL* mg= 0);
-
     /// \name Numbering
     /// \{
     /// \brief Used to number unknowns.
+    IdxDescCL& DistributeDOFs(Uint level, MultiGridCL& mg, VecDescCL const * levelSet = nullptr, double dist = 0.);
     size_t CreateNumbering( Uint level, MultiGridCL& mg, const VecDescCL* lsetp= 0, const BndDataCL<>* lsetbnd =0);
     // void CreateNumbering(MultiGridCL&, std::vector<MultiGridCL::const_TriangTetraIteratorCL> const &);
     /// \brief Used to number unknowns and store boundary condition.
@@ -721,11 +722,11 @@ public:
             if (RowIdx->NumUnknownsVertex())
                 for (auto it = mg.GetTriangVertexBegin(lvl); it != mg.GetTriangVertexEnd(lvl); ++it)
                     if (it->Unknowns.Exist(idx))
-                        Data[it->Unknowns(idx) / dim /* / dim is tmp */ + d * blockSize] = f(it->GetCoord())[d];
+                        Data[it->Unknowns(idx) + d * blockSize] = f(it->GetCoord())[d];
             if (RowIdx->NumUnknownsEdge())
                 for (auto it = mg.GetTriangEdgeBegin(lvl); it != mg.GetTriangEdgeEnd(lvl); ++it)
                     if (it->Unknowns.Exist(idx))
-                        Data[it->Unknowns(idx) / dim /* / dim is tmp */ + d * blockSize] = f(GetBaryCenter(*it))[d];
+                        Data[it->Unknowns(idx) + d * blockSize] = f(GetBaryCenter(*it))[d];
         }
         return *this;
     }

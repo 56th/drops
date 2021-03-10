@@ -915,7 +915,7 @@ class LocalAssembler {
 public:
     struct LocalAssemblerParams {
         size_t numbOfVirtualSubEdges = 2;
-        double t = 0.;
+        double t = 0., dist = 0.;
         VecDescCL levelSet;
         struct {
             double nu = 1., gamma = 0., lineTension = 0.;
@@ -938,7 +938,6 @@ public:
     using mtx = std::vector<vec>;
     using LinearForm = vec(LocalAssembler::*)();
     using BilinearForm = mtx(LocalAssembler::*)();
-    LocalP2CL<> levelSetTet;
 private:
     struct {
         size_t P1 = 4;
@@ -946,16 +945,17 @@ private:
         size_t vecP2 = 30;
     } const n;
     LocalAssemblerParams const & params;
+    LocalP2CL<> levelSetTet;
     TetraCL const & tet;
     SMatrixCL<3, 3> T;
-    double absDet, rho_delta;
+    double absDet;
     QuadDomain2DCL qDomain;
     QuadDomainCL q3Domain;
     GridFunctionCL<> qHatP2[10], qHatP1[4], qLsGradNorm, qSurfSpeed, qContinuityF, qConcentrationF, qChi, qOmega, qRho;
     GridFunctionCL<Point3DCL> qGradP2[10], qSurfGradP2[10], q3DGradP2[10], qGradP1[4], qSurfGradP1[4], q3DGradP1[4], qNormal, q3DNormal, qSurfSpeedSurfGrad, qChiSurfGrad, qOmegaSurfGrad, qMomentumF, qHatP2CrossN[30];
     struct { GridFunctionCL<Point3DCL> NS, CH; } qWind;
     GridFunctionCL<SMatrixCL<3,3>> qP, qH, qE[30];
-    mtx createMtx(size_t n, size_t m, double v) { return mtx(n, vec(v, m)); }
+    mtx createMtx(size_t n, size_t m, double v) { return mtx(n, vec(m, v)); }
     mtx createMtx(size_t n, double v) { return createMtx(n, n, v); }
     mtx createMtx(size_t n, size_t m) { return mtx(n, vec(m)); }
     mtx createMtx(size_t n) { return createMtx(n, n); }
@@ -1179,6 +1179,8 @@ private:
     void buildRho() {
         qRho.resize(qDomain.vertex_size());
         qRho = params.surfNavierStokesParams.rho.min;
+        auto rho_delta = params.surfNavierStokesParams.rho.max - params.surfNavierStokesParams.rho.min;
+        if (rho_delta < 0.) throw std::invalid_argument(__func__ + std::string(": rho_max < rho_min"));
         if (rho_delta) {
             require(qChi, &LocalAssembler::buildConcentration);
             qRho += rho_delta * qChi;
@@ -1189,20 +1191,27 @@ private:
     }
 public:
     LocalAssembler(TetraCL const & tet, LocalAssemblerParams const & params) : tet(tet), params(params) {
-        levelSetTet.assign(tet, params.levelSet, BndDataCL<>());
-        auto const & lattice = PrincipalLatticeCL::instance(params.numbOfVirtualSubEdges);
-        GridFunctionCL<> levelSetTetLat(lattice.vertex_size());
-        evaluate_on_vertexes(levelSetTet, lattice, Addr(levelSetTetLat));
-        SurfacePatchCL spatch;
-        spatch.make_patch<MergeCutPolicyCL>(lattice, levelSetTetLat);
-        make_CompositeQuad5Domain2D(qDomain, spatch, tet);
-        make_SimpleQuadDomain<Quad5DataCL>(q3Domain, AllTetraC);
-        GetTrafoTr(T, absDet, tet);
-        absDet = std::fabs(absDet);
-        rho_delta = params.surfNavierStokesParams.rho.max - params.surfNavierStokesParams.rho.min;
-        if (rho_delta < 0.) throw std::invalid_argument(__func__ + std::string(": rho_max < rho_min"));
+        auto I = params.levelSet.RowIdx->Loc2Glo(tet);
+        if (I.empty()) throw std::invalid_argument(__func__ + std::string(": undefined levelset"));
+        for (size_t i = 0; i < I.size(); ++i)
+            levelSetTet[i] = params.levelSet.Data[I[i]];
+        auto distTetra = distance(levelSetTet);
+        if (distTetra == 0.) {
+            auto const & lattice = PrincipalLatticeCL::instance(params.numbOfVirtualSubEdges);
+            GridFunctionCL<> levelSetTetLat(lattice.vertex_size());
+            evaluate_on_vertexes(levelSetTet, lattice, Addr(levelSetTetLat));
+            SurfacePatchCL spatch;
+            spatch.make_patch<MergeCutPolicyCL>(lattice, levelSetTetLat);
+            make_CompositeQuad5Domain2D(qDomain, spatch, tet);
+        }
+        if (distTetra <= params.dist) {
+            make_SimpleQuadDomain<Quad5DataCL>(q3Domain, AllTetraC);
+            GetTrafoTr(T, absDet, tet);
+            absDet = std::fabs(absDet);
+        }
     }
     mtx A_vecP2vecP2() {
+        if (qDomain.empty()) return createMtx(n.vecP2, 0.);
         require(qE[0], &LocalAssembler::buildRateOfStrainTensor);
         auto A = createMtx(n.vecP2);
         for (size_t i = 0; i < n.vecP2; ++i)
@@ -1213,6 +1222,7 @@ public:
         return A;
     }
     mtx A_consistent_vecP2vecP2() {
+        if (qDomain.empty()) return createMtx(n.vecP2, 0.);
         require(qHatP2[0], &LocalAssembler::buildHatP2);
         require(qNormal, &LocalAssembler::buildNormal);
         require(qH, &LocalAssembler::buildShapeOp);
@@ -1231,6 +1241,7 @@ public:
         return A;
     }
     mtx M_vecP2vecP2() {
+        if (qDomain.empty()) return createMtx(n.vecP2, 0.);
         require(qHatP2[0], &LocalAssembler::buildHatP2);
         auto A = createMtx(n.vecP2);
         for (size_t i = 0; i < n.vecP2; ++i) {
@@ -1244,6 +1255,7 @@ public:
         return A;
     }
     mtx rho_M_vecP2vecP2() {
+        if (qDomain.empty()) return createMtx(n.vecP2, 0.);
         require(qRho, &LocalAssembler::buildRho);
         require(qHatP2[0], &LocalAssembler::buildHatP2);
         auto A = createMtx(n.vecP2);
@@ -1258,6 +1270,7 @@ public:
         return A;
     }
     mtx M_t_vecP2vecP2() {
+        if (qDomain.empty()) return createMtx(n.vecP2, 0.);
         require(qHatP2[0], &LocalAssembler::buildHatP2);
         require(qP, &LocalAssembler::buildProjector);
         auto A = createMtx(n.vecP2);
@@ -1272,6 +1285,7 @@ public:
         return A;
     }
     mtx rho_M_t_vecP2vecP2() {
+        if (qDomain.empty()) return createMtx(n.vecP2, 0.);
         require(qRho, &LocalAssembler::buildRho);
         require(qHatP2[0], &LocalAssembler::buildHatP2);
         require(qP, &LocalAssembler::buildProjector);
@@ -1287,6 +1301,7 @@ public:
         return A;
     }
     mtx rho_N_vecP2vecP2() {
+        if (qDomain.empty()) return createMtx(n.vecP2, 0.);
         require(qRho, &LocalAssembler::buildRho);
         require(qHatP2[0], &LocalAssembler::buildHatP2);
         require(qGradP2[0], &LocalAssembler::buildGradP2);
@@ -1303,6 +1318,7 @@ public:
         return A;
     }
     mtx AL_vecP2vecP2() {
+        if (qDomain.empty()) return createMtx(n.vecP2, 0.);
         require(qE[0], &LocalAssembler::buildRateOfStrainTensor);
         auto A = createMtx(n.vecP2);
         for (size_t i = 0; i < n.vecP2; ++i)
@@ -1313,6 +1329,7 @@ public:
         return A;
     }
     mtx rho_H_vecP2vecP2() {
+        if (qDomain.empty()) return createMtx(n.vecP2, 0.);
         require(qRho, &LocalAssembler::buildRho);
         require(qHatP2[0], &LocalAssembler::buildHatP2);
         require(qH, &LocalAssembler::buildShapeOp);
@@ -1329,6 +1346,7 @@ public:
         return A;
     }
     mtx S_vecP2vecP2() {
+        if (qDomain.empty()) return createMtx(n.vecP2, 0.);
         require(qHatP2[0], &LocalAssembler::buildHatP2);
         require(qNormal, &LocalAssembler::buildNormal);
         auto A = createMtx(n.vecP2);
@@ -1345,6 +1363,7 @@ public:
         return A;
     }
     mtx C_n_vecP2vecP2() {
+        if (q3Domain.empty()) return createMtx(n.vecP2, 0.);
         require(q3DGradP2[0], &LocalAssembler::buildGradP2);
         require(q3DNormal, &LocalAssembler::buildNormal);
         auto A = createMtx(n.vecP2);
@@ -1359,6 +1378,7 @@ public:
         return A;
     }
     vec F_momentum_vecP2() {
+        if (qDomain.empty()) return vec(n.vecP2, 0.);
         require(qHatP2[0], &LocalAssembler::buildHatP2);
         require(qMomentumF, &LocalAssembler::buildMomentumF);
         vec b(n.vecP2);
@@ -1383,6 +1403,7 @@ public:
         return b;
     }
     mtx B_P1vecP2() {
+        if (qDomain.empty()) return createMtx(n.P1, n.vecP2, 0.);
         require(qSurfGradP1[0], &LocalAssembler::buildSurfGradP1);
         require(qHatP2[0], &LocalAssembler::buildHatP2);
         auto A = createMtx(n.P1, n.vecP2);
@@ -1395,6 +1416,7 @@ public:
         return A;
     }
     mtx Q_P1vecP2() { // rhs-curl-projection mtx
+        if (qDomain.empty()) return createMtx(n.P1, n.vecP2, 0.);
         require(qSurfGradP1[0], &LocalAssembler::buildSurfGradP1);
         require(qHatP2CrossN[0], &LocalAssembler::buildHatP2CrossN);
         auto A = createMtx(n.P1, n.vecP2);
@@ -1404,6 +1426,7 @@ public:
         return A;
     }
     mtx A_P1P1() {
+        if (qDomain.empty()) return createMtx(n.P1, 0.);
         require(qSurfGradP1[0], &LocalAssembler::buildSurfGradP1);
         auto A = createMtx(n.P1);
         for (size_t i = 0; i < n.P1; ++i)
@@ -1414,6 +1437,7 @@ public:
         return A;
     }
     mtx C_n_P1P1() {
+        if (q3Domain.empty()) return createMtx(n.P1, 0.);
         require(q3DGradP1[0], &LocalAssembler::buildGradP1);
         require(q3DNormal, &LocalAssembler::buildNormal);
         auto A = createMtx(n.P1);
@@ -1425,6 +1449,7 @@ public:
         return A;
     }
     mtx C_full_P1P1() {
+        if (q3Domain.empty()) return createMtx(n.P1, 0.);
         require(q3DGradP1[0], &LocalAssembler::buildGradP1);
         auto A = createMtx(n.P1);
         for (size_t i = 0; i < n.P1; ++i)
@@ -1435,6 +1460,7 @@ public:
         return A;
     }
     mtx M_P1P1() {
+        if (qDomain.empty()) return createMtx(n.P1, 0.);
         require(qHatP1[0], &LocalAssembler::buildHatP1);
         auto A = createMtx(n.P1);
         for (size_t i = 0; i < n.P1; ++i)
@@ -1445,6 +1471,7 @@ public:
         return A;
     }
     mtx N_P1P1() {
+        if (qDomain.empty()) return createMtx(n.P1, 0.);
         require(qHatP1[0], &LocalAssembler::buildHatP1);
         require(qSurfGradP1[0], &LocalAssembler::buildSurfGradP1);
         require(qWind.CH, &LocalAssembler::buildWindCH);
@@ -1455,6 +1482,7 @@ public:
         return A;
     }
     vec F_continuity_P1() {
+        if (qDomain.empty()) return vec(n.P1, 0.);
         require(qHatP1[0], &LocalAssembler::buildHatP1);
         require(qContinuityF, &LocalAssembler::buildContinuityF);
         vec b(n.P1);
@@ -1462,7 +1490,8 @@ public:
             b[i] = quad_2D(qContinuityF * qHatP1[i], qDomain);
         return b;
     }
-    vec F_concentration_P1(){
+    vec F_concentration_P1() {
+        if (qDomain.empty()) return vec(n.P1, 0.);
         require(qHatP1[0], &LocalAssembler::buildHatP1);
         require(qConcentrationF, &LocalAssembler::buildConcentrationF);
         vec b(n.P1);

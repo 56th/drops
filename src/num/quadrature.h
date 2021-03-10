@@ -224,6 +224,8 @@ class QuadDomainCL
     /// \brief copy assignment: resize the valarray for weights to make it behave like a container
     QuadDomainCL& operator= (const QuadDomainCL&);
 
+    bool empty () const { return vertexes_.empty(); } ///< True, iff there are no quadrature-points
+
     /// \brief sequence of the indices of the vertexes (quadrature points) for the given domain
     ///@{
     Uint dof_begin (TetraSignEnum s= AllTetraC) const

@@ -582,26 +582,24 @@ public:
         }
     }
     void visit(TetraCL const & tet) {
+        std::string funcName = __func__;
         LocalAssembler assembler(tet, system.params);
-        if (!isInCutMesh(assembler.levelSetTet)) return;
         for (auto& matrix : system.matrices) {
-            auto form = (assembler.*matrix->form)();
             auto I = matrix->RowIdx->Loc2Glo(tet);
             auto J = matrix->ColIdx->Loc2Glo(tet);
-            for (size_t i = 0; i < I.size(); ++i) {
-                if (I[i] == NoIdx) throw std::logic_error("invalid FE space idx");
-                for (size_t j = 0; j < J.size(); ++j) {
-                    if (J[j] == NoIdx) throw std::logic_error("invalid FE space idx");
-                    (*builders[matrix])(I[i], J[j]) += form[i][j];
-                }
+            if (!I.empty() && !J.empty()) {
+                auto form = (assembler.*matrix->form)();
+                for (size_t i = 0; i < I.size(); ++i)
+                    for (size_t j = 0; j < J.size(); ++j)
+                        (*builders[matrix])(I[i], J[j]) += form[i][j];
             }
         }
         for (auto& vector : system.vectors) {
-            auto form = (assembler.*vector->form)();
             auto I = vector->RowIdx->Loc2Glo(tet);
-            for (size_t i = 0; i < I.size(); ++i) {
-                if (I[i] == NoIdx) throw std::logic_error("invalid FE space idx");
-                vector->Data[I[i]] += form[i];
+            if (!I.empty()) {
+                auto form = (assembler.*vector->form)();
+                for (size_t i = 0; i < I.size(); ++i)
+                    vector->Data[I[i]] += form[i];
             }
         }
     }
@@ -2775,9 +2773,7 @@ void STP1P1IdxDescCL::CreateNumbering (Uint level, MultiGridCL& mg, const VecDes
     DROPS_FOR_TRIANG_TETRA (mg, level, it) {
         local_st_lset.assign(*it, oldls, newls, lsetbnd);
         evaluate_on_vertexes(local_st_lset, lat, Addr(ls_loc));
-        if (!isInCutMesh(ls_loc))
-            continue;
-
+        if (distance(ls_loc) != 0.) continue;
         patch.make_patch<MergeCutPolicyCL>(lat, ls_loc);
         make_CompositeQuad5DomainSTCodim1(qdom, patch, TetraPrismCL(*it, t0, t1));
         shape.resize(qdom.vertex_size());
@@ -3649,13 +3645,10 @@ void CahnHilliardIFAccumulator_P1P1CL::visit (const TetraCL& tet)
     ls_loc.assign(tet, lset, lset_bnd);
     v_loc.assign(tet, velocity, velocity_bnd);
     chi_loc.assign(tet, volume_fraction, volume_fraction_bnd);
-
-    if (isInCutMesh(ls_loc))
-    {
+    if (distance(ls_loc) == 0.) {
         local_setup(tet);
         update_global_system();
     }
-
 }
 
 void CahnHilliardIFAccumulator_P1P1CL::local_setup (const TetraCL& tet)
