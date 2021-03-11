@@ -23,33 +23,43 @@ namespace DROPS {
             std::string name;
             VecDescCL& vec;
         };
+        using GridBuilder = void(VTKWriter::*)();
+        struct VTKParams {
+            std::string path;
+            MultiGridCL const * mg = nullptr;
+            bool binary = true;
+            bool staticGrid = true;
+            GridBuilder builder = &VTKWriter::buildFullGrid;
+        };
     private:
-        bool binary;
+        VTKParams const & params;
         std::vector<VTKVar> vars;
-        MultiGridCL const & mg;
-        std::string path;
         std::unordered_map<VertexCL const *, size_t> vertexIndex;
         std::unordered_map<EdgeCL const *, size_t> edgeIndex;
         size_t frame = 0;
         #ifdef _VTK
-            vtkSmartPointer<vtkUnstructuredGrid> unstructuredGrid = vtkSmartPointer<vtkUnstructuredGrid>::New();
+            vtkSmartPointer<vtkUnstructuredGrid> unstructuredGrid;
         #endif
     public:
-        VTKWriter(std::string const & path, MultiGridCL const & mg, bool binary = true) : path(path), mg(mg), binary(binary) {
+        VTKWriter(VTKParams const & params) : params(params) {}
+        void buildFullGrid() { // update mesh, cf. https://lorensen.github.io/VTKExamples/site/Cxx/IO/WriteVTU/
             #ifdef _VTK
+                vertexIndex.clear();
+                edgeIndex.clear();
+                unstructuredGrid = vtkSmartPointer<vtkUnstructuredGrid>::New();
                 size_t n = 0;
                 auto points = vtkSmartPointer<vtkPoints>::New();
-                for (auto it = mg.GetTriangVertexBegin(); it != mg.GetTriangVertexEnd(); ++it) {
+                for (auto it = params.mg->GetTriangVertexBegin(); it != params.mg->GetTriangVertexEnd(); ++it) {
                     points->InsertNextPoint(it->GetCoord()[0], it->GetCoord()[1], it->GetCoord()[2]);
                     vertexIndex[&*it] = n++;
                 }
-                for (auto it = mg.GetTriangEdgeBegin(); it != mg.GetTriangEdgeEnd(); ++it) {
+                for (auto it = params.mg->GetTriangEdgeBegin(); it != params.mg->GetTriangEdgeEnd(); ++it) {
                     auto p = GetBaryCenter(*it);
                     points->InsertNextPoint(p[0], p[1], p[2]);
                     edgeIndex[&*it] = n++;
                 }
                 auto cellArray = vtkSmartPointer<vtkCellArray>::New();
-                for (auto it = mg.GetTetrasBegin(); it != mg.GetTetrasEnd(); ++it) {
+                for (auto it = params.mg->GetTriangTetraBegin(); it != params.mg->GetTriangTetraEnd(); ++it) {
                     auto tetra = vtkSmartPointer<vtkLagrangeTetra>::New();
                     tetra->GetPointIds()->SetNumberOfIds(10);
                     tetra->GetPoints()->SetNumberOfPoints(10);
@@ -69,21 +79,66 @@ namespace DROPS {
                 unstructuredGrid->SetCells(VTK_LAGRANGE_TETRAHEDRON, cellArray);
             #endif
         }
-        size_t numVars() const {
-            return vars.size();
+        void buildInterfaceGrid() {
+            #ifdef _VTK
+                vertexIndex.clear();
+                edgeIndex.clear();
+                unstructuredGrid = vtkSmartPointer<vtkUnstructuredGrid>::New();
+                auto points = vtkSmartPointer<vtkPoints>::New();
+                auto cellArray = vtkSmartPointer<vtkCellArray>::New();
+                size_t n = 0;
+                auto isActive = [&](TetraCL const & tet) {
+                    for (auto const & var : vars)
+                        if (var.vec.RowIdx->IsOnInterface() && tet.Unknowns.Exist(var.vec.RowIdx->GetIdx()))
+                            return true;
+                    return false;
+                };
+                for (auto it = params.mg->GetTriangTetraBegin(); it != params.mg->GetTriangTetraEnd(); ++it) {
+                    if (!isActive(*it)) continue;
+                    for (auto vit = it->GetVertBegin(); vit != it->GetVertEnd(); ++vit)
+                        if (!vertexIndex.count(*vit)) {
+                            points->InsertNextPoint((*vit)->GetCoord()[0], (*vit)->GetCoord()[1], (*vit)->GetCoord()[2]);
+                            vertexIndex[*vit] = n++;
+                        }
+                    for (auto eit = it->GetEdgesBegin(); eit != it->GetEdgesEnd(); ++eit)
+                        if (!edgeIndex.count(*eit)) {
+                            auto p = GetBaryCenter(**eit);
+                            points->InsertNextPoint(p[0], p[1], p[2]);
+                            edgeIndex[*eit] = n++;
+                        }
+                    auto tetra = vtkSmartPointer<vtkLagrangeTetra>::New();
+                    tetra->GetPointIds()->SetNumberOfIds(10);
+                    tetra->GetPoints()->SetNumberOfPoints(10);
+                    tetra->Initialize();
+                    for (size_t i : {0, 1, 2, 3})
+                        tetra->GetPointIds()->SetId(i, vertexIndex[it->GetVertex(i)]);
+                    tetra->GetPointIds()->SetId(4, edgeIndex[it->GetEdge(EdgeByVert(0, 1))]);
+                    tetra->GetPointIds()->SetId(5, edgeIndex[it->GetEdge(EdgeByVert(1, 2))]);
+                    tetra->GetPointIds()->SetId(6, edgeIndex[it->GetEdge(EdgeByVert(0, 2))]);
+                    tetra->GetPointIds()->SetId(7, edgeIndex[it->GetEdge(EdgeByVert(0, 3))]);
+                    tetra->GetPointIds()->SetId(8, edgeIndex[it->GetEdge(EdgeByVert(1, 3))]);
+                    tetra->GetPointIds()->SetId(9, edgeIndex[it->GetEdge(EdgeByVert(2, 3))]);
+                    cellArray->InsertNextCell(tetra);
+                }
+                unstructuredGrid->SetPoints(points);
+                unstructuredGrid->SetCells(VTK_LAGRANGE_TETRAHEDRON, cellArray);
+            #endif
         }
+        size_t numVars() const { return vars.size(); }
         VTKWriter& add(VTKVar const & var) {
             vars.push_back(var);
             return *this;
         }
         VTKWriter& write(double time) {
             std::string funcName = __func__;
+            if (!params.mg) throw std::invalid_argument(funcName + ": provide mg");
             #ifdef _VTK
-                // update mesh, cf. https://lorensen.github.io/VTKExamples/site/Cxx/IO/WriteVTU/
-                // vertexIndex.clear();
-                // edgeIndex.clear();
-                // ...
                 auto& logger = SingletonLogger::instance();
+                if (!unstructuredGrid || !params.staticGrid) {
+                    logger.beg("build grid");
+                        (this->*params.builder)();
+                    logger.end();
+                }
                 logger.beg("prepare vars");
                     auto n = unstructuredGrid->GetNumberOfPoints();
                     for (auto& var : vars) {
@@ -101,11 +156,11 @@ namespace DROPS {
                             logger.log();
                             auto* value = new double[size];
                             for (size_t i = 0; i < size; ++i) value[i] = 0.;
-                            for (auto it = mg.GetTriangVertexBegin(); it != mg.GetTriangVertexEnd(); ++it)
+                            for (auto it = params.mg->GetTriangVertexBegin(); it != params.mg->GetTriangVertexEnd(); ++it)
                                 if (it->Unknowns.Exist(idx))
                                     for (size_t d = 0; d < dim; ++d)
                                         value[dim * vertexIndex[&*it] + d] = var.vec.Data[it->Unknowns(idx) + d * blockSize];
-                            for (auto it = mg.GetTriangEdgeBegin(); it != mg.GetTriangEdgeEnd(); ++it)
+                            for (auto it = params.mg->GetTriangEdgeBegin(); it != params.mg->GetTriangEdgeEnd(); ++it)
                                 if (it->Unknowns.Exist(idx))
                                     for (size_t d = 0; d < dim; ++d)
                                         value[dim * edgeIndex[&*it] + d] = var.vec.Data[it->Unknowns(idx) + d * blockSize];
@@ -124,16 +179,16 @@ namespace DROPS {
                 logger.end();
                 logger.beg("write .vtu");
                     auto writer = vtkSmartPointer<vtkXMLUnstructuredGridWriter>::New();
-                    auto name = path + '_' + std::to_string(frame) + ".vtu";
+                    auto name = params.path + '_' + std::to_string(frame) + ".vtu";
                     writer->SetFileName(name.c_str());
                     writer->SetInputData(unstructuredGrid);
-                    if (!binary) writer->SetDataModeToAscii();
+                    if (!params.binary) writer->SetDataModeToAscii();
                     writer->Write();
                 logger.end();
                 logger.beg("write .pvd");
                     name = name.substr(name.find_last_of("/\\") + 1);
                     if  (frame == 0) {
-                        std::ofstream pvd(path + ".pvd");
+                        std::ofstream pvd(params.path + ".pvd");
                         pvd <<
                             "<?xml version=\"1.0\"?>\n"
                             "<VTKFile type=\"Collection\" version=\"0.1\" byte_order=\"LittleEndian\">\n"
@@ -143,7 +198,7 @@ namespace DROPS {
                             "</VTKFile>";
                     } else {
                         std::ofstream pvd;
-                        pvd.open(path + ".pvd", std::ios_base::in);
+                        pvd.open(params.path + ".pvd", std::ios_base::in);
                         if(!pvd.is_open()) std::logic_error(funcName + ": cannot reopen .pvd file");
                         pvd.seekp(-24, std::ios_base::end);
                         pvd <<

@@ -4,6 +4,7 @@
       "EveryStep":  1,
       "Binary":     true,
       "VTK": {
+        "ExportFullGrid": false,
         "Velocity": true,
         "Vorticity": true,
         "SurfSpeed": true,

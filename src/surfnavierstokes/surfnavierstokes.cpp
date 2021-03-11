@@ -207,7 +207,14 @@ int main(int argc, char* argv[]) {
             logger.end();
         logger.end();
         logger.beg("set up vtk");
-            VTKWriter vtkWriter(dirName + "/vtk/" + testName + inpJSON.get<std::string>("Surface.Name"), mg, binary);
+            VTKWriter::VTKParams vtkParams; {
+                vtkParams.path = dirName + "/vtk/" + testName + inpJSON.get<std::string>("Surface.Name");
+                vtkParams.mg = &mg;
+                vtkParams.binary = binary;
+                vtkParams.staticGrid = surface->isStationary();
+                vtkParams.builder = inpJSON.get<bool>("Output.VTK.ExportFullGrid") ? &VTKWriter::buildFullGrid : &VTKWriter::buildInterfaceGrid;
+            }
+            VTKWriter vtkWriter(vtkParams);
             vtkWriter.add({ "level-set", levelSet });
             if (everyStep > 0) {
                 if (inpJSON.get<bool>("Output.VTK.Velocity")) {
