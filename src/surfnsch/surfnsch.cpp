@@ -171,11 +171,10 @@ int main(int argc, char* argv[]) {
                     ch = &inpJSON.get_child("Mesh.Periodicity");
                 } catch (DROPSParamErrCL) {}
                 if (ch) read_PeriodicBoundaries(mg, *ch);
-                // levelset shift
-                auto shift = inpJSON.get<Point3DCL>("Levelset.ShiftDir", Point3DCL(0., 0., 0.));
-                shift /= shift.norm();
-                auto shiftNorm = fabs(inpJSON.get<double>("Levelset.ShiftNorm", 0.));
-                shift *= shiftNorm;
+                auto shift = inpJSON.get<Point3DCL>("Surface.Shift.Dir", Point3DCL(0., 0., 0.)); {
+                    if (shift.norm()) shift /= shift.norm();
+                    shift *= std::abs(inpJSON.get<double>("Surface.Shift.Norm", 0.));
+                }
                 mg.Transform([&](Point3DCL const & p) { return p - shift; });
                 logger.buf << "surface shift: " << shift;
                 logger.log();
@@ -192,28 +191,26 @@ int main(int argc, char* argv[]) {
                     << "numb of tetras = " << numbOfTetras;
                 logger.log();
             logger.end();
-            BndDataCL<double> lsetBnd(0); read_BndData(lsetBnd, mg, inpJSON.get_child("Levelset.BndData"));
-            BndDataCL<Point3DCL> vecBnd(0); read_BndData(vecBnd, mg, inpJSON.get_child("Stokes.VelocityBndData"));
-            BndDataCL<double> scaBnd(0); read_BndData(scaBnd, mg, inpJSON.get_child("Stokes.PressureBndData"));
         logger.end();
         logger.beg("interpolate level-set");
-            MLIdxDescCL lstIdx(P2_FE);
-            lstIdx.CreateNumbering(mg.GetLastLevel(), mg, lsetBnd);
+            IdxDescCL lstIdx(P2_FE); {
+                auto n = lstIdx.DistributeDOFs(mg.GetLastLevel(), mg);
+                logger.buf << "numb of active tetras for levelset: " << n << " (" << (100. * n) / mg.GetNumTriangTetra() << "%)";
+                logger.log();
+            }
             levelSet.SetIdx(&lstIdx);
             levelSet.Interpolate(mg, [&](Point3DCL const & x) { return surface->phi(x); });
         logger.end();
         logger.beg("set up FE spaces");
-            IdxDescCL velIdx(vecP2IF_FE, vecBnd); {
-                velIdx.GetXidx().SetBound(inpJSON.get<double>("SurfTransp.OmitBound"));
-                auto numbOfActiveTetras = velIdx.CreateNumbering(mg.GetLastLevel(), mg, &levelSet, &lsetBnd);
-                logger.buf
-                    << "numb of active (cut) tetras is: " << numbOfActiveTetras << " ("
-                    << (100. * numbOfActiveTetras) / numbOfTetras << "%)\n";
+            IdxDescCL velIdx(vecP2IF_FE); {
+                auto n = velIdx.DistributeDOFs(mg.GetLastLevel(), mg, &levelSet);
+                logger.buf << "numb of active tetras for velocity: " << n << " (" << (100. * n) / mg.GetNumTriangTetra() << "%)";
                 logger.log();
             }
-            IdxDescCL preIdx(P1IF_FE, scaBnd); {
-                preIdx.GetXidx().SetBound(inpJSON.get<double>("SurfTransp.OmitBound"));
-                preIdx.CreateNumbering(mg.GetLastLevel(), mg, &levelSet, &lsetBnd);
+            IdxDescCL preIdx(P1IF_FE); {
+                auto n = preIdx.DistributeDOFs(mg.GetLastLevel(), mg, &levelSet);
+                logger.buf << "numb of active tetras for pressure: " << n << " (" << (100. * n) / mg.GetNumTriangTetra() << "%)";
+                logger.log();
             }
             size_t n = velIdx.NumUnknowns();
             auto n_i = n / 3;
@@ -248,7 +245,14 @@ int main(int argc, char* argv[]) {
             logger.end();
         logger.end();
         logger.beg("set up vtk");
-            VTKWriter vtkWriter(dirName + "/vtk/" + testName + inpJSON.get<std::string>("Surface.Name"), mg, inpJSON.get<bool>("Output.Binary"));
+            VTKWriter::VTKParams vtkParams; {
+                vtkParams.path = dirName + "/vtk/" + testName + inpJSON.get<std::string>("Surface.Name");
+                vtkParams.mg = &mg;
+                vtkParams.binary = binary;
+                vtkParams.staticGrid = surface->isStationary();
+                vtkParams.builder = inpJSON.get<bool>("Output.VTK.ExportFullGrid") ? &VTKWriter::buildFullGrid : &VTKWriter::buildInterfaceGrid;
+            }
+            VTKWriter vtkWriter(vtkParams);
             vtkWriter.add({ "level-set", levelSet });
             if (everyStep > 0) {
                 if (inpJSON.get<bool>("Output.VTK.Concentration")) {

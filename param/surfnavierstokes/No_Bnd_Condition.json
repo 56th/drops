@@ -1,8 +1,8 @@
 {
     "Output": {
-      "Directory":  "../../output/tmp",
-      "EveryStep":  1,
-      "Binary":     true,
+      "Directory": "../../output/tmp",
+      "EveryStep": 1,
+      "Binary": true,
       "VTK": {
         "ExportFullGrid": false,
         "Velocity": true,
@@ -121,5 +121,4 @@
       "DynamicLibsPrefix": "../",
       "DynamicLibs": []
     }
-
 }

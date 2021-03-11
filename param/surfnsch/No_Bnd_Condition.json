@@ -1,9 +1,10 @@
 {
     "Output": {
-      "Directory":  "../../output/tmp",
-      "EveryStep":  1,
-      "Binary":     true,
+      "Directory": "../../output/tmp",
+      "EveryStep": 1,
+      "Binary": true,
       "VTK": {
+        "ExportFullGrid": false,
         "Velocity": true,
         "Vorticity": false,
         "Pressure": false,
@@ -16,21 +17,17 @@
     "Mesh": {
         "Type": "BrickBuilder",
         "Origin": [-1.66666,-1.66666,-1.66666],
-        "E1": [3.33333, 0,0],
-        "E2": [0,3.33333,0],
-        "E3": [0,0,3.33333],
-        "N1": 2,
-        "N2": 2,
-        "N3": 2,
+        "E1": [3.33333, 0,0], "E2": [0,3.33333,0], "E3": [0,0,3.33333],
+        "N1": 2, "N2": 2, "N3": 2,
         "RestartFile": "",
         "AdaptRef": {
-            "Comment":      "adaptive refinement",
-            "Freq":          0,
-            "Width":         0,
+            "Comment": "adaptive refinement",
+            "Freq": 0,
+            "Width": 0,
             "CoarsestLevel": 0,
-            "FinestLevel":   4,
-            "SD":            0.1,
-            "CurvDiff":      -1,
+            "FinestLevel": 4,
+            "SD": 0.1,
+            "CurvDiff": -1,
             "Discontinuous": 0
         }
     },
@@ -44,8 +41,8 @@
         },
         "Torus": {
           "R": 1.0,
-          "r_min": 0.5,
-          "r_max": 0.5
+          "r_min": 0.3,
+          "r_max": 0.6
         }
       }
     },
@@ -53,24 +50,24 @@
     "SurfNSCH": {
       "NumbOfVirtualSubEdges": 2,
       "IC": {
-        "Name": "WanDerVaalsExact",
+        "Name": "RayleighTaylor",
         "Params": {
           "KelvinHelmholtz": {
             "cn": 0.01,
             "aa": 1.0, "ma": 16.0,
             "ab": 0.1, "mb": 20.0
           },
-          "RayleighTaylor": { "GravityScaling": 1.0, "Noise": 1.0 },
+          "RayleighTaylor": { "Axis": 0, "GravityScaling": 1.0, "Noise": 1.0 },
           "WanDerVaalsExact": { "AngularVelocity": 3.14159265359 }
         }
       },
       "NS": {
-        "rho" : { "max" : 1.0, "min" : 1.0 },
-        "nu": 1.0,
-        "gamma": 0.0,
+        "rho" : { "max" : 3.0, "min" : 1.0 },
+        "nu": 1e-3,
+        "gamma": 1.0,
         "LineTension": 0.0,
         "Comment": "Use ConvectionTermType = Stokes (zero convection term), Oseen (convection term is given and equal to velocity), or NavierStokes (convection term will be extrapolated from prev time steps)",
-        "ConvectionTermType": "Stokes",
+        "ConvectionTermType": "NavierStokes",
         "UseTangentialMassMatrix": false,
         "NormalPenalty": {
           "Power": -2.0,
@@ -100,15 +97,13 @@
 
     "Time": {
       "BDF": 2,
-      "Read": 0,
-      "Write": "yes",
       "NumbOfSteps": 100,
-      "FinalTime": 1.0
+      "FinalTime": 10.0
     },
 
     "Solver": {
-        "UsePreviousFrameAsInitialGuess" : false,
-        "RelResTol": 1e-8,
+        "UsePreviousFrameAsInitialGuess" : true,
+        "RelResTol": 1e-6,
         "CH" : {
             "Iteration": "FLEXIBLE GMRES",
             "OutputFrequency": 1,
@@ -140,60 +135,8 @@
         }
     },
 
-    "Levelset": {
-      "Theta":         1,
-      "VolCorrection": 0,
-      "SD":            0.1,
-      "CurvDiff":      -1,
-      "Discontinuous": 0,
-      "BndData": {
-        "Default": ["NoBC"], "0" : ["NoBC"], "1" : ["NoBC"], "2" : ["NoBC"], "3" : ["NoBC"], "4" : ["NoBC"], "5" : ["NoBC"]
-      },
-      "Solver": {
-        "Tol":  1e-10,
-        "Iter": 500
-      },
-      "ShiftNorm": 0.0,
-      "ShiftDir":  [1, 1, 1]
-    },
-
     "General": {
-      "ProgressBar":  1,
       "DynamicLibsPrefix": "../",
       "DynamicLibs": []
-    },
-
-    "Stokes": {
-      "VelocityBndData":       { "Default": ["NoBC"], "0": ["NoBC"], "1": ["NoBC"], "2": ["NoBC"], "3": ["NoBC"], "4": ["NoBC"], "5": ["NoBC"] },
-      "PressureBndData":       { "Default": ["NoBC"], "0": ["NoBC"], "1": ["NoBC"], "2": ["NoBC"], "3": ["NoBC"], "4": ["NoBC"], "5": ["NoBC"] },
-      "VolumeFractionBndData": { "Default": ["NoBC"], "0": ["NoBC"], "1": ["NoBC"], "2": ["NoBC"], "3": ["NoBC"], "4": ["NoBC"], "5": ["NoBC"] },
-      "ChemPotentialBndData":  { "Default": ["NoBC"], "0": ["NoBC"], "1": ["NoBC"], "2": ["NoBC"], "3": ["NoBC"], "4": ["NoBC"], "5": ["NoBC"] }
-    },
-
-    "Reparam": {
-        "Comment": "re-initialization of levelset function",
-        "Freq":		0,
-        "Method":	1
-    },
-
-    "Exp": {
-        "Comment": "experimental conditions",
-        "RadDrop":		[1, 1, 1 ],
-        "PosDrop":		[0, 0, 0 ],
-        "Velocity":		[0, 0, 0.5 ]
-    },
-
-    "SurfTransp": {
-        "Comment":  "surfactant transport",
-        "Theta":     0.5,
-        "OmitBound": -1,
-        "Visc":      0.05,
-        "FEdegree":  2
-    },
-
-    "TestCase":         1,
-    "InitialDivisions": 2,
-    "EnsightCase":      "none",
-    "EnsightDir":       "CNmass-lvl3",
-    "LB":               1
+    }
 }
