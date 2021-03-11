@@ -57,7 +57,7 @@
             "aa": 1.0, "ma": 16.0,
             "ab": 0.1, "mb": 20.0
           },
-          "RayleighTaylor": { "Axis": 0, "GravityScaling": 1.0, "Noise": 1.0 },
+          "RayleighTaylor": { "GravityScaling": 1.0, "Noise": 1.0 },
           "WanDerVaalsExact": { "AngularVelocity": 3.14159265359 }
         }
       },
