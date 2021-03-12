@@ -548,7 +548,7 @@ int main(int argc, char* argv[]) {
                         auto vtkTime = logger.end();
                         tJSON.put("ElapsedTime.VTK", vtkTime);
                     }
-                    if (exportVectors && exportFiles) {
+                    if (exportVectors && exportFiles || i > numSteps - BDF) {
                         logger.beg("export vectors");
                             auto expVec = [&](VecDescCL const & v, std::string const name) {
                                 logger.beg("export " + name + " vec");
