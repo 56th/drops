@@ -311,9 +311,6 @@ int main(int argc, char* argv[]) {
                 C->Multiply(false, x2, y22);
                 y21.Update(1., y22, 1.);
             }));
-
-            // ... add outer solver for CH (can be fixed to FGMRES, no need for json parameter)
-            // ... YP: using same belosParams as in NS
             auto belosParamsCH = parameterList();
             belosParamsCH->set("Num Blocks", inpJSON.get<int>("Solver.CH.KrylovSubspaceSize"));
             belosParamsCH->set("Maximum Iterations", inpJSON.get<int>("Solver.CH.MaxIter"));
@@ -490,23 +487,13 @@ int main(int argc, char* argv[]) {
                 }));
                 auto runFactorizationCH = [&]() {
                     amesosSolverCH = Amesos2::create<MT, MV>("Klu", belosMTXCH);
-                    logger.beg("factorization");
-                        logger.beg("symbolic factorization");
-                            amesosSolverCH->symbolicFactorization();
-                        logger.end();
-                        logger.beg("numeric factorization");
-                            amesosSolverCH->numericFactorization();
-                        logger.end();
-                        auto amesosStatus = amesosSolverCH->getStatus();
-                        logger.buf << "numb of nonzeros in L + U = " << amesosStatus.getNnzLU() << " (" << (100. * amesosStatus.getNnzLU()) / (static_cast<double>(belosMTXCH->NumGlobalRows()) * belosMTXCH->NumGlobalCols()) << "%)";
-                        logger.log();
-                    logger.end();
+                    amesosSolverCH->symbolicFactorization();
+                    amesosSolverCH->numericFactorization();
+                    auto amesosStatus = amesosSolverCH->getStatus();
+                    logger.buf << "numb of nonzeros in L + U = " << amesosStatus.getNnzLU() << " (" << (100. * amesosStatus.getNnzLU()) / (static_cast<double>(belosMTXCH->NumGlobalRows()) * belosMTXCH->NumGlobalCols()) << "%)";
+                    logger.log();
                 };
             logger.end();
-
-            //LinearProblem<ST, MV, OP> belosProblemCH(belosMTXCH, rcpFromRef(belosLHSCH), rcpFromRef(belosRHSCH));
-            //belosProblemCH.setRightPrec(belosPRECH);
-
         logger.end();
         logger.beg("t = t_0 = 0");
             t = 0.;
@@ -731,10 +718,8 @@ int main(int argc, char* argv[]) {
                     }
                     solveWastedTime = 0.;
                     logger.beg("linear solve CH");
-
                         LinearProblem<ST, MV, OP> belosProblemCH(belosMTXCH, rcpFromRef(belosLHSCH), rcpFromRef(belosRHSCH));
                         belosProblemCH.setRightPrec(belosPRECH);
-
                         belosLHSCH.PutScalar(0.);
                         b_norm_CH = r_0_norm_CH = residualNorm(*belosMTXCH, belosLHSCH, belosRHSCH);
                         if (usePrevGuess) {
