@@ -67,11 +67,13 @@ namespace DROPS {
 
     struct Torus : Surface {
         const double R, r_min, r_max;
+        const int axis;
         double r(double x, double y) const { return r_min + .5 * (r_max - r_min) * (1. - x / std::sqrt(x * x + y * y)); }
         std::array<double, 2> r_grad(double x, double y) const { return { .5 * (r_min - r_max) * y * y / pow(x * x + y * y, 1.5), .5 * (r_max - r_min) * x * y / pow(x * x + y * y, 1.5) }; }
-        explicit Torus(double R = 1., double r_min = .5, double r_max = .5) : Surface(true), R(R), r_min(r_min), r_max(r_max) {
+        explicit Torus(double R = 1., double r_min = .5, double r_max = .5, int axis = 0) : Surface(true), R(R), r_min(r_min), r_max(r_max), axis(axis) {
             std::string funcName = __func__;
             if (r_min <= 0. || r_max < r_min || R <= r_max) throw std::invalid_argument(funcName + ": invalid torus params");
+            if (axis != 0 && axis != 1 && axis != 2) throw std::invalid_argument(funcName + ": invalid torus axis");
             description_ +=
                 "torus w/ const distance R from the center of the tube to the origin and\n"
                 "w/ variable tube rad " + std::to_string(r_min) + " =: r_min <= r(xi) <= r_max =: " + std::to_string(r_max) + ", xi in [0, 2 pi]\n"
@@ -80,14 +82,17 @@ namespace DROPS {
         virtual ~Torus() {}
         std::array<radius_, 3> radius(double) const final { return {R - r_max, R + r_max, R - .5 * (r_max + r_min), R + .5 * (r_max + r_min), 0., r_max }; }
         std::array<bool, 3> rotationalInvariance(double) const final { return {false, false, r_min == r_max }; }
-        double dist(Point3DCL const & x, double) const final { return std::sqrt(pow(std::sqrt(x[0] * x[0] + x[1] * x[1]) - R, 2.) + x[2] * x[2]) - r(x[0], x[1]); }
-        double phi(Point3DCL const & x, double) const final { return pow(norm_sq(x) + R * R - r(x[0], x[1]) * r(x[0], x[1]), 2.) - 4. * R * R * (pow(x[0], 2.) + pow(x[1], 2.)); }
+        int x_2 = axis;
+        int x_0 = (axis+1) % 3;
+        int x_1 = (axis+2) % 3;
+        double dist(Point3DCL const & x, double) const final { return std::sqrt(pow(std::sqrt(x[x_0] * x[x_0] + x[x_1] * x[x_1]) - R, 2.) + x[x_2] * x[x_2]) - r(x[x_0], x[x_1]); }
+        double phi(Point3DCL const & x, double) const final { return pow(norm_sq(x) + R * R - r(x[x_0], x[x_1]) * r(x[x_0], x[x_1]), 2.) - 4. * R * R * (pow(x[x_0], 2.) + pow(x[x_1], 2.)); }
         Point3DCL normal(Point3DCL const & x, double) const final {
-            auto [r_x, r_y] = r_grad(x[0], x[1]);
+            auto [r_x, r_y] = r_grad(x[x_0], x[x_1]);
             return Point3DCL(
-                -r_x + (x[0] * (-R + std::sqrt(pow(x[0], 2) + pow(x[1], 2)))) / (std::sqrt(pow(x[0], 2) + pow(x[1], 2)) * std::sqrt(pow(R - std::sqrt(pow(x[0], 2) + pow(x[1], 2)), 2) + pow(x[2], 2))),
-                -r_y + (x[1] * (-R + std::sqrt(pow(x[0], 2) + pow(x[1], 2)))) / (std::sqrt(pow(x[0], 2) + pow(x[1], 2)) * std::sqrt(pow(R - std::sqrt(pow(x[0], 2) + pow(x[1], 2)), 2) + pow(x[2], 2))),
-                x[2] / std::sqrt(pow(R - std::sqrt(pow(x[0], 2) + pow(x[1], 2)), 2) + pow(x[2], 2))
+                -r_x + (x[x_0] * (-R + std::sqrt(pow(x[x_0], 2) + pow(x[x_1], 2)))) / (std::sqrt(pow(x[x_0], 2) + pow(x[x_1], 2)) * std::sqrt(pow(R - std::sqrt(pow(x[x_0], 2) + pow(x[x_1], 2)), 2) + pow(x[x_2], 2))),
+                -r_y + (x[x_1] * (-R + std::sqrt(pow(x[x_0], 2) + pow(x[x_1], 2)))) / (std::sqrt(pow(x[x_0], 2) + pow(x[x_1], 2)) * std::sqrt(pow(R - std::sqrt(pow(x[x_0], 2) + pow(x[x_1], 2)), 2) + pow(x[x_2], 2))),
+                x[x_2] / std::sqrt(pow(R - std::sqrt(pow(x[x_0], 2) + pow(x[x_1], 2)), 2) + pow(x[x_2], 2))
             );
         }
     };
@@ -96,7 +101,7 @@ namespace DROPS {
         std::string funcName = __func__;
         auto name = params.get<std::string>("Surface.Name");
         if (name == "Sphere") return std::make_unique<Sphere>(params.get<double>("Surface.Params." + name + ".r_0"), params.get<double>("Surface.Params." + name + ".A"));
-        if (name == "Torus") return std::make_unique<Torus>(params.get<double>("Surface.Params." + name + ".R"), params.get<double>("Surface.Params." + name + ".r_min"), params.get<double>("Surface.Params." + name + ".r_max"));
+        if (name == "Torus") return std::make_unique<Torus>(params.get<double>("Surface.Params." + name + ".R"), params.get<double>("Surface.Params." + name + ".r_min"), params.get<double>("Surface.Params." + name + ".r_max"), params.get<int>("Surface.Params." + name + ".axis"));
         throw std::invalid_argument(funcName + ": unknown surface '" + name + "'");
     }
 

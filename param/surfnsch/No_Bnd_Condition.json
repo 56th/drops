@@ -42,7 +42,9 @@
         "Torus": {
           "R": 1.0,
           "r_min": 0.3,
-          "r_max": 0.6
+          "r_max": 0.6,
+          "Comment": "Use axis = 0 to set axis of revolution to x-axis, 1 for y-axis, 2 for z-axis",
+          "axis": 0
         }
       }
     },
