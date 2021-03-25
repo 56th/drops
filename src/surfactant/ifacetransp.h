@@ -951,7 +951,7 @@ private:
     double absDet;
     QuadDomain2DCL qDomain;
     QuadDomainCL q3Domain;
-    GridFunctionCL<> qHatP2[10], qHatP1[4], qLsGradNorm, qSurfSpeed, qContinuityF, qConcentrationF, qChi, qOmega, qRho;
+    GridFunctionCL<> qHatP2[10], qHatP1[4], qLsGradNorm, qSurfSpeed, qContinuityF, qConcentrationF, qChi, qOmega, qRho, qMobility2D;
     GridFunctionCL<Point3DCL> qGradP2[10], qSurfGradP2[10], q3DGradP2[10], qGradP1[4], qSurfGradP1[4], q3DGradP1[4], qNormal, q3DNormal, qSurfSpeedSurfGrad, qChiSurfGrad, qOmegaSurfGrad, qMomentumF, qHatP2CrossN[30];
     struct { GridFunctionCL<Point3DCL> NS, CH; } qWind;
     GridFunctionCL<SMatrixCL<3,3>> qP, qH, qE[30];
@@ -1162,12 +1162,27 @@ private:
             qContinuityF += qSurfSpeed * trace(qH);
         }
     }
+    double Mobility_function(double x) {
+        auto val = (1. - x) * x;
+        if (val > 0.) return val;
+        return 0.;
+    }
     void buildConcentration() {
         if (!params.surfNavierStokesParams.chi) throw std::invalid_argument(__func__ + std::string(": chi is nullptr"));
         LocalP1CL<> chiTet;
         chiTet.assign(tet, *params.surfNavierStokesParams.chi, BndDataCL<>());
         resize_and_evaluate_on_vertexes(chiTet, qDomain, qChi);
         qChiSurfGrad = getSurfGradP1(chiTet);
+        if(params.surfCahnHilliardParams.useDegenerateMobility){
+            LocalP1CL<> mobTet;
+            LocalP1CL<> P1Hat[4];
+            P1DiscCL::GetP1Basis(P1Hat);
+            for(int i=0; i<4 ; ++i)
+            {
+                mobTet += Mobility_function(chiTet[i]) * P1Hat[i];
+            }
+            resize_and_evaluate_on_vertexes (mobTet, qDomain, qMobility2D);
+        }
     }
     void buildChemPotential() {
         if (!params.surfNavierStokesParams.omega) throw std::invalid_argument(__func__ + std::string(": omega is nullptr"));
@@ -1432,6 +1447,18 @@ public:
         for (size_t i = 0; i < n.P1; ++i)
             for (size_t j = i; j < n.P1; ++j) {
                 A[i][j] = quad_2D(dot(qSurfGradP1[j], qSurfGradP1[i]), qDomain);
+                A[j][i] = A[i][j];
+            }
+        return A;
+    }
+    mtx LaplaceM_P1P1() {
+        if (qDomain.empty()) return createMtx(n.P1, 0.);
+        require(qSurfGradP1[0], &LocalAssembler::buildSurfGradP1);
+        require(qChi, &LocalAssembler::buildConcentration);
+        auto A = createMtx(n.P1);
+        for (size_t i = 0; i < n.P1; ++i)
+            for (size_t j = i; j < n.P1; ++j) {
+                A[i][j] = quad_2D(qMobility2D * dot(qSurfGradP1[j], qSurfGradP1[i]), qDomain);
                 A[j][i] = A[i][j];
             }
         return A;

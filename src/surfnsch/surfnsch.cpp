@@ -232,6 +232,7 @@ int main(int argc, char* argv[]) {
                     M_p(&preIdx, &preIdx, &LocalAssembler::M_P1P1),
                     C_p(&preIdx, &preIdx, stab == "Normal" ? &LocalAssembler::C_n_P1P1 : &LocalAssembler::C_full_P1P1),
                     A_p(&preIdx, &preIdx, &LocalAssembler::A_P1P1),
+                    LM(&preIdx, &preIdx, &LocalAssembler::LaplaceM_P1P1),
                     N_c(&preIdx, &preIdx, &LocalAssembler::N_P1P1);
                 FEVecDescCL
                     F_u(&velIdx, &LocalAssembler::F_momentum_vecP2),
@@ -689,8 +690,13 @@ int main(int argc, char* argv[]) {
                 logger.beg("Cahn-Hilliard step");
                     logger.beg("assemble");
                         surfNSCHSystem.params.surfCahnHilliardParams.u_T = &u;
+                        surfNSCHSystem.params.surfNavierStokesParams.chi = &chi;
                         surfNSCHSystem.matrices = { &N_c };
                         surfNSCHSystem.vectors = { &F_c };
+                        if(surfNSCHSystem.params.surfCahnHilliardParams.useDegenerateMobility){
+                            surfNSCHSystem.matrices.push_back(&LM);
+                        }
+                        auto& LM_ = surfNSCHSystem.params.surfCahnHilliardParams.useDegenerateMobility ? LM : A_p;
                         alpha = i == 1 || BDF == 1 ? 1. / stepSize : 1.5 / stepSize;
                         logger.buf << "alpha = " << alpha;
                         logger.log();
@@ -704,7 +710,7 @@ int main(int argc, char* argv[]) {
                     assembleTime = logger.end();
                     logger.beg("convert to Epetra");
                         belosMTXCH = static_cast<RCP<MT>>(MatrixCL(
-                            MatrixCL(alpha, M_p.Data, 1., N_c.Data), MatrixCL(mobilityScaling, A_p.Data, rho_p, C_p.Data),
+                            MatrixCL(alpha, M_p.Data, 1., N_c.Data), MatrixCL(mobilityScaling, LM_.Data, rho_p, C_p.Data),
                             MatrixCL(eps * eps, A_p.Data, beta_s, M_p.Data, eps * eps * rho_p, C_p.Data), MatrixCL(-1., M_p.Data)
                         ));
                         logCRS(*belosMTXCH, "{A, B; C, D} block mtx");

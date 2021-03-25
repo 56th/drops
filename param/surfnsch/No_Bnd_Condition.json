@@ -89,11 +89,15 @@
       },
       "CH": {
         "c_0": 0.5,
-        "Epsilon": 0.05,
-        "MobilityScaling": 1.0,
+        "Epsilon": 0.025,
+        "MobilityScaling": 0.1,
         "ChemicalPotentialScaling": 1.0,
         "Beta_s": 1.0,
-        "UseDegenerateMobility": false
+        "UseDegenerateMobility": true,
+        "Random" : {
+          "RaftRatio" : 0.5,
+          "RaftRatioNoiseFraction" : 0.1
+        }
       }
     },
 
