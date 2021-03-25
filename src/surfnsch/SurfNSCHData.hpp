@@ -45,6 +45,14 @@ namespace DROPS {
             dataCH.exact = false;
             dataCH.f = zeroInstatScalarFunction;
         }
+        else if (name == "RandomBernoulli") {
+            dataNS = surfNavierStokesDataFactory(surface, "0", params);
+            auto raftRatio = params.get<double>("SurfNSCH.CH.Random.RaftRatio");
+            params.put("SurfCahnHilliard.IC.Params." + name + ".RaftRatio", raftRatio);
+            dataCH = surfCahnHilliardDataFactory(surface, "RandomBernoulli", params);
+            dataCH.exact = false;
+            dataCH.f = zeroInstatScalarFunction;
+        }
         else throw std::invalid_argument(funcName + ": IC '" + name + "' is not defined");
         return { dataNS, dataCH };
     }
