@@ -181,7 +181,10 @@ int main(int argc, char* argv[]) {
             logger.end();
             logger.beg("refine towards the surface");
                 AdapTriangCL adap(mg);
-                DistMarkingStrategyCL markerLset([&](Point3DCL const & x, double) { return surface->phi(x); }, inpJSON.get<double>("Mesh.AdaptRef.Width"), inpJSON.get<int>("Mesh.AdaptRef.CoarsestLevel"), inpJSON.get<int>("Mesh.AdaptRef.FinestLevel"));
+                auto meshCoarseLevel = std::max(0, inpJSON.get<int>("Mesh.AdaptRef.CoarsestLevel"));
+                auto meshFineLevel = std::max(0, inpJSON.get<int>("Mesh.AdaptRef.FinestLevel"));
+                if (meshFineLevel < meshCoarseLevel) meshFineLevel = meshCoarseLevel;
+                DistMarkingStrategyCL markerLset([&](Point3DCL const & x, double) { return surface->phi(x); }, inpJSON.get<double>("Mesh.AdaptRef.Width"), meshCoarseLevel, meshFineLevel);
                 adap.set_marking_strategy(&markerLset);
                 adap.MakeInitialTriang();
                 adap.set_marking_strategy(nullptr);
@@ -215,6 +218,20 @@ int main(int argc, char* argv[]) {
             size_t n = velIdx.NumUnknowns();
             auto n_i = n / 3;
             size_t m = preIdx.NumUnknowns();
+
+            //..
+            auto prolongationLevel = inpJSON.get<int>("SurfNSCH.CH.ProlongateFromLevelNo");
+            if (prolongationLevel < meshCoarseLevel) prolongationLevel = meshCoarseLevel;
+            if (prolongationLevel > meshFineLevel) prolongationLevel = meshFineLevel;
+            IdxDescCL coarseIdx(P1IF_FE); {
+            auto n = coarseIdx.DistributeDOFs(prolongationLevel, mg, &levelSet);
+            logger.buf << "numb of active tetras for prolongation level of concentration: " << n << " (" << (100. * n) / mg.GetNumTriangTetra() << "%)";
+            logger.log();
+            }
+            //coarseIdx.GetXidx().SetBound(inpJSON.get<double>("SurfTransp.OmitBound"));
+            //coarseIdx.CreateNumbering(prolongationLevel, mg);
+
+
             logger.beg("set up FE system");
                 FEMatDescCL
                     // velocity
@@ -241,7 +258,7 @@ int main(int argc, char* argv[]) {
                 VecDescCL
                     u_star(&velIdx), u(&velIdx), surf_curl_u(&preIdx), w_T(&velIdx),
                     p_star(&preIdx), p(&preIdx),
-                    chi_star(&preIdx), chi(&preIdx), omega(&preIdx),
+                    chi_star(&preIdx), chi(&preIdx), omega(&preIdx), chi_coarse(&coarseIdx),
                     F_omega(&preIdx), chi_extrap(&preIdx), well_potential(&preIdx);
             logger.end();
         logger.end();
@@ -506,6 +523,39 @@ int main(int argc, char* argv[]) {
             auto assembleTime = logger.end();
             auto factorizationTime = 0.;
             logger.beg("interpolate initial data");
+
+                //.. prolongate initial chi
+                {
+                    IdxDescCL P1FEidxFrom(P1IF_FE), P1FEidxTo(P1IF_FE);
+                    //P1FEidxFrom.GetXidx().SetBound(inpJSON.get<double>("SurfTransp.OmitBound"));
+                    //P1FEidxTo.GetXidx().SetBound(inpJSON.get<double>("SurfTransp.OmitBound"));
+                    std::vector<ProlongationCL<double>> P;
+                    for (size_t l = prolongationLevel + 1; l <= meshFineLevel; ++l) {
+                        P.emplace_back(ProlongationCL<double>(mg));
+
+
+                        P1FEidxFrom.DistributeDOFs(l - 1, mg, &levelSet);
+                        P1FEidxTo.DistributeDOFs( l, mg, &levelSet);
+                        //P1FEidxFrom.CreateNumbering(l - 1, mg);
+                        //P1FEidxTo.CreateNumbering(l, mg);
+                        P.back().Create(&P1FEidxFrom, &P1FEidxTo);
+                    }
+                    double raftFraction, raftFractionError;
+                    do {
+                        chi_coarse.Interpolate(mg , [&](Point3DCL const & x) { return surfCahnHilliardData.chi(x, t); });
+                        chi.Data = chi_coarse.Data;
+                        for (auto const &p : P)
+                            chi.Data = p * chi.Data;
+                        //Restrict(mg, chi_ext, chi);
+                        if (surfCahnHilliardData.raftRatio > 0.) {
+                            raftFraction = dot(M_p.Data * chi.Data, I_p) / dot(M_p.Data * I_p, I_p);
+                            raftFractionError = std::fabs(surfCahnHilliardData.raftRatio - raftFraction) / surfCahnHilliardData.raftRatio;
+                            logger.buf << "raft ratio error (%) = " << raftFractionError;
+                            logger.log();
+                        }
+                    } while (surfCahnHilliardData.raftRatio > 0. && raftFractionError > .001);
+                }
+
                 chi.Interpolate(mg , [&](Point3DCL const & x) { return surfCahnHilliardData.chi(x, t); });
                 u.Interpolate(mg, [&](Point3DCL const & x) { return surfNavierStokesData.u_T(x, t); });
                 p.Interpolate(mg, [&](Point3DCL const & x) { return surfNavierStokesData.p(x, t); });

@@ -94,6 +94,7 @@
         "ChemicalPotentialScaling": 1.0,
         "Beta_s": 1.0,
         "UseDegenerateMobility": true,
+        "ProlongateFromLevelNo" : 3,
         "Random" : {
           "RaftRatio" : 0.5,
           "RaftRatioNoiseFraction" : 0.1
