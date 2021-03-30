@@ -928,9 +928,9 @@ public:
             InstatScalarFunction m_g = nullptr; // - continuity eqn rhs
         } surfNavierStokesParams;
         struct {
-            bool useDegenerateMobility = false;
             double mobilityScaling = 1.;
             VecDescCL* u_T = nullptr;
+            VecDescCL* chi = nullptr;
             InstatScalarFunction f = nullptr;
         } surfCahnHilliardParams;
     };
@@ -1162,10 +1162,14 @@ private:
             qContinuityF += qSurfSpeed * trace(qH);
         }
     }
-    double Mobility_function(double x) {
-        auto val = (1. - x) * x;
-        if (val > 0.) return val;
-        return 0.;
+    void buildMobility() {
+        if (!params.surfCahnHilliardParams.chi) throw std::invalid_argument(__func__ + std::string(": chi is nullptr"));
+        LocalP1CL<> chiTet;
+        chiTet.assign(tet, *params.surfCahnHilliardParams.chi, BndDataCL<>());
+        resize_and_evaluate_on_vertexes(chiTet, qDomain, qMobility2D);
+        qMobility2D = qMobility2D * (1. - qMobility2D);
+        for (auto &val : qMobility2D) // cut-off function
+            if (val < 0.) val = 0.;
     }
     void buildConcentration() {
         if (!params.surfNavierStokesParams.chi) throw std::invalid_argument(__func__ + std::string(": chi is nullptr"));
@@ -1173,16 +1177,6 @@ private:
         chiTet.assign(tet, *params.surfNavierStokesParams.chi, BndDataCL<>());
         resize_and_evaluate_on_vertexes(chiTet, qDomain, qChi);
         qChiSurfGrad = getSurfGradP1(chiTet);
-        if(params.surfCahnHilliardParams.useDegenerateMobility){
-            LocalP1CL<> mobTet;
-            LocalP1CL<> P1Hat[4];
-            P1DiscCL::GetP1Basis(P1Hat);
-            for(int i=0; i<4 ; ++i)
-            {
-                mobTet += Mobility_function(chiTet[i]) * P1Hat[i];
-            }
-            resize_and_evaluate_on_vertexes (mobTet, qDomain, qMobility2D);
-        }
     }
     void buildChemPotential() {
         if (!params.surfNavierStokesParams.omega) throw std::invalid_argument(__func__ + std::string(": omega is nullptr"));
@@ -1454,7 +1448,7 @@ public:
     mtx LaplaceM_P1P1() {
         if (qDomain.empty()) return createMtx(n.P1, 0.);
         require(qSurfGradP1[0], &LocalAssembler::buildSurfGradP1);
-        require(qChi, &LocalAssembler::buildConcentration);
+        require(qMobility2D, &LocalAssembler::buildMobility);
         auto A = createMtx(n.P1);
         for (size_t i = 0; i < n.P1; ++i)
             for (size_t j = i; j < n.P1; ++j) {
