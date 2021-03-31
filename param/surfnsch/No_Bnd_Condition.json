@@ -60,13 +60,14 @@
             "ab": 0.1, "mb": 20.0
           },
           "RayleighTaylor": { "GravityScaling": 1.0, "Noise": 1.0 },
-          "WanDerVaalsExact": { "AngularVelocity": 3.14159265359 }
+          "WanDerVaalsExact": { "AngularVelocity": 3.14159265359 },
+          "RandomBernoulli" : {}
         }
       },
       "NS": {
-        "rho" : { "max" : 3.0, "min" : 1.0 },
-        "nu": 1e-3,
-        "gamma": 1.0,
+        "rho" : { "max" : 1.0, "min" : 1.0 },
+        "nu": 1e-2,
+        "gamma": 0.5,
         "LineTension": 0.0,
         "Comment": "Use ConvectionTermType = Stokes (zero convection term), Oseen (convection term is given and equal to velocity), or NavierStokes (convection term will be extrapolated from prev time steps)",
         "ConvectionTermType": "NavierStokes",
@@ -89,11 +90,16 @@
       },
       "CH": {
         "c_0": 0.5,
-        "Epsilon": 0.05,
-        "MobilityScaling": 1.0,
+        "Epsilon": 0.025,
+        "MobilityScaling": 0.1,
         "ChemicalPotentialScaling": 1.0,
         "Beta_s": 1.0,
-        "UseDegenerateMobility": false
+        "UseDegenerateMobility": true,
+        "ProlongateFromLevelNo" : 3,
+        "Random" : {
+          "RaftRatio" : 0.5,
+          "RaftRatioNoiseFraction" : 0.1
+        }
       }
     },
 

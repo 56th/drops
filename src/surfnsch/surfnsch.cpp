@@ -125,7 +125,7 @@ int main(int argc, char* argv[]) {
             auto beta_s = inpJSON.get<double>("SurfNSCH.CH.Beta_s");
             auto& t = surfNSCHSystem.params.t;
             auto& levelSet = surfNSCHSystem.params.levelSet;
-            surfNSCHSystem.params.surfCahnHilliardParams.useDegenerateMobility = inpJSON.get<bool>("SurfNSCH.CH.UseDegenerateMobility");
+            auto useDegenerateMobility = inpJSON.get<bool>("SurfNSCH.CH.UseDegenerateMobility");
             surfNSCHSystem.params.surfNavierStokesParams.lineTension = inpJSON.get<double>("SurfNSCH.NS.LineTension");
             surfNSCHSystem.params.numbOfVirtualSubEdges = inpJSON.get<size_t>("SurfNSCH.NumbOfVirtualSubEdges");
             surfNSCHSystem.params.surfNavierStokesParams.m_g = surfNavierStokesData.m_g;
@@ -138,12 +138,19 @@ int main(int argc, char* argv[]) {
             auto tol = inpJSON.get<double>("Solver.RelResTol");
             if (surfNavierStokesData.exact != surfCahnHilliardData.exact) logger.wrn("exact soln is available only for either NS or CH");
             auto exactSoln = surfNavierStokesData.exact && surfCahnHilliardData.exact;
+            auto meshCoarseLevel = std::max(0, inpJSON.get<int>("Mesh.AdaptRef.CoarsestLevel"));
+            auto meshFineLevel = std::max(0, inpJSON.get<int>("Mesh.AdaptRef.FinestLevel"));
+            if (meshFineLevel < meshCoarseLevel) meshFineLevel = meshCoarseLevel;
+            auto prolongationLevel = inpJSON.get<int>("SurfNSCH.CH.ProlongateFromLevelNo");
+            if (prolongationLevel < meshCoarseLevel) prolongationLevel = meshCoarseLevel;
+            if (prolongationLevel > meshFineLevel) prolongationLevel = meshFineLevel;
             logger.buf
                 << surface->description() << '\n'
                 << surfNavierStokesData.description << '\n'
                 << surfCahnHilliardData.description << '\n'
                 << "exact soln: " << (exactSoln ? "yes" : "no") << '\n'
-                << "delta t = " << stepSize;
+                << "delta t = " << stepSize << '\n'
+                << "prolongate CH IC from lvl " << prolongationLevel;
             logger.log();
         logger.end();
         logger.beg("set up chemical potential");
@@ -181,7 +188,7 @@ int main(int argc, char* argv[]) {
             logger.end();
             logger.beg("refine towards the surface");
                 AdapTriangCL adap(mg);
-                DistMarkingStrategyCL markerLset([&](Point3DCL const & x, double) { return surface->phi(x); }, inpJSON.get<double>("Mesh.AdaptRef.Width"), inpJSON.get<int>("Mesh.AdaptRef.CoarsestLevel"), inpJSON.get<int>("Mesh.AdaptRef.FinestLevel"));
+                DistMarkingStrategyCL markerLset([&](Point3DCL const & x, double) { return surface->phi(x); }, inpJSON.get<double>("Mesh.AdaptRef.Width"), meshCoarseLevel, meshFineLevel);
                 adap.set_marking_strategy(&markerLset);
                 adap.MakeInitialTriang();
                 adap.set_marking_strategy(nullptr);
@@ -232,6 +239,7 @@ int main(int argc, char* argv[]) {
                     M_p(&preIdx, &preIdx, &LocalAssembler::M_P1P1),
                     C_p(&preIdx, &preIdx, stab == "Normal" ? &LocalAssembler::C_n_P1P1 : &LocalAssembler::C_full_P1P1),
                     A_p(&preIdx, &preIdx, &LocalAssembler::A_P1P1),
+                    LM(&preIdx, &preIdx, &LocalAssembler::LaplaceM_P1P1),
                     N_c(&preIdx, &preIdx, &LocalAssembler::N_P1P1);
                 FEVecDescCL
                     F_u(&velIdx, &LocalAssembler::F_momentum_vecP2),
@@ -505,7 +513,34 @@ int main(int argc, char* argv[]) {
             auto assembleTime = logger.end();
             auto factorizationTime = 0.;
             logger.beg("interpolate initial data");
-                chi.Interpolate(mg , [&](Point3DCL const & x) { return surfCahnHilliardData.chi(x, t); });
+                {
+                    IdxDescCL P1FEidxFrom(P1_FE), P1FEidxTo(P1_FE);
+                    std::vector<ProlongationCL<double>> P;
+                    for (size_t l = prolongationLevel + 1; l <= meshFineLevel; ++l) {
+                        P.emplace_back(ProlongationCL<double>(mg));
+                        P1FEidxFrom.CreateNumbering(l - 1, mg);
+                        P1FEidxTo.CreateNumbering( l, mg);
+                        P.back().Create(&P1FEidxFrom, &P1FEidxTo);
+                    }
+                    IdxDescCL coarseIdx(P1_FE);
+                    coarseIdx.CreateNumbering(prolongationLevel, mg);
+                    if (meshFineLevel == prolongationLevel) P1FEidxTo.CreateNumbering(meshFineLevel, mg);
+                    VecDescCL chi_coarse(&coarseIdx), chi_ext(&P1FEidxTo);
+                    double raftFraction, raftFractionError;
+                    do {
+                        chi_coarse.Interpolate(mg , [&](Point3DCL const & x) { return surfCahnHilliardData.chi(x, t); });
+                        chi_ext.Data = chi_coarse.Data;
+                        for (auto const &p : P)
+                            chi_ext.Data = p * chi_ext.Data;
+                        Restrict(mg, chi_ext, chi);
+                        if (surfCahnHilliardData.raftRatio > 0.) {
+                            raftFraction = dot(M_p.Data * chi.Data, I_p) / dot(M_p.Data * I_p, I_p);
+                            raftFractionError = std::fabs(surfCahnHilliardData.raftRatio - raftFraction) / surfCahnHilliardData.raftRatio;
+                            logger.buf << "raft ratio error (%) = " << raftFractionError;
+                            logger.log();
+                        }
+                    } while (surfCahnHilliardData.raftRatio > 0. && raftFractionError > .001);
+                }
                 u.Interpolate(mg, [&](Point3DCL const & x) { return surfNavierStokesData.u_T(x, t); });
                 p.Interpolate(mg, [&](Point3DCL const & x) { return surfNavierStokesData.p(x, t); });
                 p.Data -= dot(M_p.Data * p.Data, I_p) / dot(M_p.Data * I_p, I_p) * I_p;
@@ -689,22 +724,27 @@ int main(int argc, char* argv[]) {
                 logger.beg("Cahn-Hilliard step");
                     logger.beg("assemble");
                         surfNSCHSystem.params.surfCahnHilliardParams.u_T = &u;
+                        surfNSCHSystem.params.surfCahnHilliardParams.chi = &chi_extrap;
                         surfNSCHSystem.matrices = { &N_c };
                         surfNSCHSystem.vectors = { &F_c };
+                        if(useDegenerateMobility){
+                            surfNSCHSystem.matrices.push_back(&LM);
+                        }
+                        auto& LM_ = useDegenerateMobility ? LM : A_p;
                         alpha = i == 1 || BDF == 1 ? 1. / stepSize : 1.5 / stepSize;
                         logger.buf << "alpha = " << alpha;
                         logger.log();
+                        chi_extrap.Data = 2. * chi.Data - chi_prev.Data;
                         setupFESystem(mg, surfNSCHSystem);
                         if (i == 1 || BDF == 1) F_c.Data += (1. / stepSize) * (M_p.Data * chi.Data);
                         else F_c.Data += (2. / stepSize) * (M_p.Data * chi.Data) - (.5 / stepSize) * (M_p.Data * chi_prev.Data);
                         for (size_t i = 0; i < m; ++i) well_potential.Data[i] = 2. * chemicalPotential(chi.Data[i]) - chemicalPotential(chi_prev.Data[i]);
-                        chi_extrap.Data = 2. * chi.Data - chi_prev.Data;
                         F_omega.Data = beta_s * (M_p.Data * chi_extrap.Data) - M_p.Data * well_potential.Data;
                         chi_prev = chi;
                     assembleTime = logger.end();
                     logger.beg("convert to Epetra");
                         belosMTXCH = static_cast<RCP<MT>>(MatrixCL(
-                            MatrixCL(alpha, M_p.Data, 1., N_c.Data), MatrixCL(mobilityScaling, A_p.Data, rho_p, C_p.Data),
+                            MatrixCL(alpha, M_p.Data, 1., N_c.Data), MatrixCL(mobilityScaling, LM_.Data, rho_p, C_p.Data),
                             MatrixCL(eps * eps, A_p.Data, beta_s, M_p.Data, eps * eps * rho_p, C_p.Data), MatrixCL(-1., M_p.Data)
                         ));
                         logCRS(*belosMTXCH, "{A, B; C, D} block mtx");
