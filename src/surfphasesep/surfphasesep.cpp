@@ -21,15 +21,12 @@
 #include "levelset/adaptriang.h"
 #include "levelset/surfacetension.h"
 #include "misc/dynamicload.h"
-// #include "out/vtkOut.h"
 #include "num/bndData.h"
 #include "num/precond.h"
 #include "parallel/exchange.h"
 
 #include "num/oseensolver.h"
 #include <fstream>
-
-#include "surfphasesep/surfphasesep_funcs.h"
 
 // vtk output
 #include "out/VTKWriter.hpp"
@@ -77,28 +74,30 @@ int main (int argc, char* argv[]) {
                 logger.log();
             }
         logger.end();
+        std::cout << std::scientific;
         logger.beg("read input .json");
-              auto& inpJSON = P;
-              read_parameter_file_from_cmdline( inpJSON, argc, argv, "../../param/surfphasesep/No_Bnd_Condition_ch.json");
-              dynamicLoad(inpJSON.get<std::string>("General.DynamicLibsPrefix"), inpJSON.get<std::vector<std::string>>("General.DynamicLibs"));
-              auto dirName = inpJSON.get<std::string>("Output.Directory");
-              system(("mkdir -p " + dirName).c_str());
-              system(("rm -r -f " + dirName + "/*").c_str());
-              system((
-                  "mkdir " + dirName + "/matrices ; "
-                  "mkdir " + dirName + "/vtk ; "
-                  "mkdir " + dirName + "/stats"
-              ).c_str());
-              {
-                  std::ofstream input(dirName + "/input.json");
-                  input << inpJSON;
-                  logger.buf << inpJSON;
-                  logger.log();
-              }
+            ParamCL inpJSON;
+            read_parameter_file_from_cmdline(inpJSON, argc, argv, "../../param/surfphasesep/No_Bnd_Condition.json");
+            dynamicLoad(inpJSON.get<std::string>("General.DynamicLibsPrefix"), inpJSON.get<std::vector<std::string>>("General.DynamicLibs"));
+            auto dirName = inpJSON.get<std::string>("Output.Directory");
+            system((
+                "mkdir -p " + dirName + " ; rm -r -f " + dirName + "/* ; "
+                "mkdir " + dirName + "/stats ; mkdir " + dirName + "/matrices ; mkdir " + dirName + "/vectors ; mkdir " + dirName + "/vtk"
+            ).c_str());
+            {
+                std::ofstream input(dirName + "/input.json");
+                input << inpJSON;
+                logger.buf << inpJSON;
+                logger.log();
+            }
         logger.end();
         logger.beg("set up IC");
-            auto surfCahnHilliardData = SurfCahnHilliardDataFactory(inpJSON);
-            logger.buf << surfCahnHilliardData.description;
+            auto surface = surfaceFactory(inpJSON);
+            auto testName = inpJSON.get<std::string>("SurfCahnHilliard.IC.Name");
+            auto surfCahnHilliardData = surfCahnHilliardDataFactory(*surface, testName, inpJSON);
+            logger.buf
+                << surfCahnHilliardData.description << '\n'
+                << "exact soln: " << (surfCahnHilliardData.exact ? "yes" : "no");
             logger.log();
         logger.end();
         logger.beg("set up chemical potential");
@@ -119,8 +118,8 @@ int main (int argc, char* argv[]) {
         logger.end();
         // build initial mesh
         std::cout << "Setting up interface-PDE:\n";
-        std::auto_ptr<MGBuilderCL> builder( make_MGBuilder( P));
-        MultiGridCL mg( *builder);
+        std::auto_ptr<MGBuilderCL> builder(make_MGBuilder(inpJSON));
+        MultiGridCL mg(*builder);
         const ParamCL::ptree_type* ch= 0;
         try {
             ch= &inpJSON.get_child( "Mesh.Periodicity");
@@ -128,85 +127,47 @@ int main (int argc, char* argv[]) {
         catch (DROPSParamErrCL) {}
         if (ch)
             read_PeriodicBoundaries( mg, *ch);
-
         // adaptive mesh refinement based on level set function
         typedef DistMarkingStrategyCL InitMarkerT;
         auto meshCoarseLevel = std::max(0, inpJSON.get<int>("Mesh.AdaptRef.CoarsestLevel"));
         auto meshFineLevel = std::max(0, inpJSON.get<int>("Mesh.AdaptRef.FinestLevel"));
         if (meshFineLevel < meshCoarseLevel) meshFineLevel = meshCoarseLevel;
-        InitMarkerT initmarker(surfCahnHilliardData.surface.phi, inpJSON.get<double>("Mesh.AdaptRef.Width"), meshCoarseLevel, meshFineLevel);
+        InitMarkerT initmarker([&](Point3DCL const & x, double) { return surface->phi(x); }, inpJSON.get<double>("Mesh.AdaptRef.Width"), meshCoarseLevel, meshFineLevel);
         //adap.set_marking_strategy( &initmarker );
         AdapTriangCL adap( mg, &initmarker );
         adap.MakeInitialTriang();
         adap.set_marking_strategy( 0 );
         // create level set
-        InstatScalarFunction sigma (0);
-        SurfaceTensionCL sf( sigma, 0);
-        BndDataCL<double> lsbnd( 0);
-        read_BndData( lsbnd, mg, inpJSON.get_child( "Levelset.BndData"));
-        std::shared_ptr<LevelsetP2CL> lsetPtr(LevelsetP2CL::Create(mg, lsbnd, sf));
-        auto& lset = *lsetPtr;
-        lset.CreateNumbering( mg.GetLastLevel(), &lset.idx);
-        lset.Phi.SetIdx( &lset.idx);
-        lset.Init(surfCahnHilliardData.surface.phi);
-        // parse FE types and some other parameters from json file
-        std::string FE = inpJSON.get<std::string>("SurfCahnHilliard.FE");
-        std::string velFE, prFE, LgFE;
-        velFE = FE.substr(0,2);
-        prFE = FE.substr(2,2);
-        if( FE.size()>4) {
-            LgFE = FE.substr(4,2);
-        } else {
-            LgFE = FE.substr(2,2);
+        IdxDescCL lstIdx(P2_FE); {
+            auto n = lstIdx.DistributeDOFs(mg.GetLastLevel(), mg);
+            logger.buf << "numb of active tetras for levelset: " << n << " (" << (100. * n) / mg.GetNumTriangTetra() << "%)";
+            logger.log();
         }
-        std::string model = inpJSON.get<std::string>("SurfCahnHilliard.model");
-        std::string testcase = inpJSON.get<std::string>("SurfCahnHilliard.testcase");
+        VecDescCL levelSet(&lstIdx);
+        levelSet.Interpolate(mg, [&](Point3DCL const & x) { return surface->phi(x); });
         double h = inpJSON.get<Point3DCL>("Mesh.E1")[0]/inpJSON.get<double>("Mesh.N1")*std::pow(2., -inpJSON.get<double>("Mesh.AdaptRef.FinestLevel"));
         auto T = inpJSON.get<double>("Time.FinalTime");
         auto dt = inpJSON.get<double>("Time.StepSize");
         auto alpha = inpJSON.get<double>("SurfCahnHilliard.VolumeStab.Factor") * pow(h, inpJSON.get<double>("SurfCahnHilliard.VolumeStab.Power"));
-        std::cout << "h is: " << h << std::endl;
-        std::cout << "dt is: " << dt << std::endl;
-        ParameterNS::h = h;
+        logger.buf << "h is: " << h << '\n' << "dt is: " << dt;
+        logger.log();
         auto S = inpJSON.get<double>("SurfCahnHilliard.Beta_s");
         double sigm = inpJSON.get<double>("SurfCahnHilliard.MobilityScaling");
         double eps = inpJSON.get<double>("SurfCahnHilliard.Epsilon");
-        ParameterNS::sigma = sigm;
-        ParameterNS::eps = eps;
         // construct FE spaces
-        BndDataCL<Point3DCL> vbnd( 0);
-        read_BndData( vbnd, mg, inpJSON.get_child( "Stokes.VelocityBndData"));
-        BndDataCL<double> pbnd( 0);
-        read_BndData( pbnd, mg, inpJSON.get_child( "Stokes.PressureBndData"));
-        BndDataCL<double> chibnd( 0);
-        read_BndData( chibnd, mg, inpJSON.get_child( "Stokes.VolumeFractionBndData"));
-        BndDataCL<double> omegabnd( 0);
-        read_BndData( omegabnd, mg, inpJSON.get_child( "Stokes.ChemPotentialBndData"));
-        IdxDescCL ifaceVecP1idx( vecP1IF_FE, vbnd);
-        IdxDescCL ifaceP1idx( P1IF_FE, pbnd);
-        IdxDescCL vecP1idx( vecP1_FE, vbnd);
-        IdxDescCL P1FEidx( P1_FE, pbnd);
-        ifaceVecP1idx.GetXidx().SetBound( inpJSON.get<double>("SurfTransp.OmitBound"));
-        ifaceVecP1idx.CreateNumbering( mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData());
-        ifaceP1idx.GetXidx().SetBound( inpJSON.get<double>("SurfTransp.OmitBound"));
-        ifaceP1idx.CreateNumbering( mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData());
-        vecP1idx.GetXidx().SetBound( inpJSON.get<double>("SurfTransp.OmitBound"));
-        vecP1idx.CreateNumbering(mg.GetLastLevel(), mg);
-        P1FEidx.GetXidx().SetBound( inpJSON.get<double>("SurfTransp.OmitBound"));
+        IdxDescCL ifaceP1idx(P1IF_FE); {
+            auto n = ifaceP1idx.DistributeDOFs(mg.GetLastLevel(), mg, &levelSet);
+            logger.buf << "numb of active tetras for concentration: " << n << " (" << (100. * n) / mg.GetNumTriangTetra() << "%)";
+            logger.log();
+        }
+        IdxDescCL P1FEidx(P1_FE);
         P1FEidx.CreateNumbering(mg.GetLastLevel(), mg);
-        auto coarseLevel = inpJSON.get<int>("SurfCahnHilliard.IC.ProlongateFromLevelNo");
+        auto coarseLevel = inpJSON.get<int>("SurfCahnHilliard.ProlongateFromLevelNo");
         if (coarseLevel < meshCoarseLevel) coarseLevel = meshCoarseLevel;
         if (coarseLevel > meshFineLevel)   coarseLevel = meshFineLevel;
-        IdxDescCL P1FEidxCoarse(P1_FE, pbnd);
-        P1FEidxCoarse.GetXidx().SetBound(inpJSON.get<double>("SurfTransp.OmitBound"));
-        P1FEidxCoarse.CreateNumbering(coarseLevel, mg);
         // construct FE vectors (initialized with zero)
-        VecDescCL v, omega, omegaSol, chi, chi_ext, chi_coarse_ini_ext, chi_prev, chi_prev_prev, chi_BDF1, chi_BDF2, chi_extrap, chiSol, energy, well_potential, f1, rhs1, rhs2;
-        if( !FE.compare("P1P1")) {
-             v.SetIdx( &ifaceVecP1idx);
+        VecDescCL omega, chi, chi_prev, chi_prev_prev, chi_BDF1, chi_BDF2, chi_extrap, chiSol, energy, well_potential, rhs1, rhs2;
              chi.SetIdx( &ifaceP1idx);
-             chi_coarse_ini_ext.SetIdx(&P1FEidxCoarse);
-             chi_ext.SetIdx(&P1FEidx);
              chi_prev.SetIdx(&ifaceP1idx);
              chi_prev_prev.SetIdx(&ifaceP1idx);
              chi_BDF1.SetIdx( &ifaceP1idx);
@@ -216,16 +177,12 @@ int main (int argc, char* argv[]) {
              energy.SetIdx( &ifaceP1idx);
              chiSol.SetIdx( &ifaceP1idx);
              omega.SetIdx( &ifaceP1idx);
-             omegaSol.SetIdx( &ifaceP1idx);
-             f1.SetIdx(&ifaceP1idx);
              rhs1.SetIdx(&ifaceP1idx);
              rhs2.SetIdx(&ifaceP1idx);
-        }
         // setup matrices
         MatDescCL Laplace, Mass, Normal_stab, Tangent_stab, Volume_stab, LaplaceM, Gprimeprime;
         MatrixCL A, B, C, D;
         size_t n_c, n_omega;
-        if( !FE.compare("P1P1")) {
             n_c = n_omega = ifaceP1idx.NumUnknowns();
             Laplace.SetIdx( &ifaceP1idx, &ifaceP1idx);
             LaplaceM.SetIdx( &ifaceP1idx, &ifaceP1idx);
@@ -234,18 +191,19 @@ int main (int argc, char* argv[]) {
             Normal_stab.SetIdx(&ifaceP1idx, &ifaceP1idx);
             Tangent_stab.SetIdx(&ifaceP1idx, &ifaceP1idx);
             Volume_stab.SetIdx(&ifaceP1idx, &ifaceP1idx);
-            SetupCahnHilliardIF_P1P1(mg,  &Mass,&Normal_stab, &Tangent_stab, &Volume_stab, &Laplace, &LaplaceM, &Gprimeprime, lset.Phi, lset.GetBndData(), v, vbnd, chi, chibnd);
-        }
+            SetupCahnHilliardIF_P1P1(mg,  &Mass,&Normal_stab, &Tangent_stab, &Volume_stab, &Laplace, &LaplaceM, &Gprimeprime, levelSet, chi);
         logger.beg("set up vtk");
-            VTKWriter vtkWriter(dirName + "/vtk/separation", mg, inpJSON.get<bool>("Output.Binary"));
-            vtkWriter
-                .add(VTKWriter::VTKVar({"level-set", &lset.Phi.Data, VTKWriter::VTKVar::Type::P2}))
-                .add(VTKWriter::VTKVar({"c_h", &chi_ext.Data, VTKWriter::VTKVar::Type::P1}));
+            VTKWriter::VTKParams vtkParams; {
+                vtkParams.path = dirName + "/vtk/" + testName + inpJSON.get<std::string>("Surface.Name");
+                vtkParams.mg = &mg;
+                vtkParams.binary = inpJSON.get<bool>("Output.Binary");
+                vtkParams.staticGrid = surface->isStationary();
+                vtkParams.builder = inpJSON.get<bool>("Output.VTK.ExportFullGrid") ? &VTKWriter::buildFullGrid : &VTKWriter::buildInterfaceGrid;
+            }
+            VTKWriter vtkWriter(vtkParams);
+            vtkWriter.add({ "level-set", levelSet });
+            vtkWriter.add({ "c_h", chi });
             auto everyStep = inpJSON.get<int>("Output.EveryStep");
-            auto writeVTK = [&](double t) {
-                Extend(mg, chi, chi_ext);
-                vtkWriter.write(t);
-            };
         logger.end();
         logger.beg("set up outer solver");
             using MV = Epetra_MultiVector;
@@ -259,7 +217,7 @@ int main (int argc, char* argv[]) {
             belosParams->set("Maximum Iterations", inpJSON.get<int>("Solver.Outer.MaxIter"));
             belosParams->set("Convergence Tolerance", inpJSON.get<double>("Solver.Outer.RelResTol"));
             belosParams->set( "Output Frequency", inpJSON.get<int>("Solver.Outer.OutputFrequency"));
-            belosParams->set("Verbosity", Belos::Errors + Belos::Warnings + Belos::StatusTestDetails + Belos::TimingDetails + Belos::FinalSummary + Belos::IterationDetails);
+            belosParams->set("Verbosity", Belos::Errors + Belos::Warnings + Belos::FinalSummary);
             belosParams->set<int>("Output Style", Belos::Brief);
             SolverFactory<ST, MV, OP> belosFactory;
             logger.buf << "available iterations: " << belosFactory.supportedSolverNames();
@@ -277,9 +235,7 @@ int main (int argc, char* argv[]) {
         	auto e = 0.;
             VectorCL unityVector(1., n_c);
             {
-                IdxDescCL P1FEidxFrom(P1_FE, pbnd), P1FEidxTo(P1_FE, pbnd);
-                P1FEidxFrom.GetXidx().SetBound(inpJSON.get<double>("SurfTransp.OmitBound"));
-                P1FEidxTo.GetXidx().SetBound(inpJSON.get<double>("SurfTransp.OmitBound"));
+                IdxDescCL P1FEidxFrom(P1_FE), P1FEidxTo(P1_FE);
                 std::vector<ProlongationCL<double>> P;
                 for (size_t l = coarseLevel + 1; l <= meshFineLevel; ++l) {
                     P.emplace_back(ProlongationCL<double>(mg));
@@ -288,9 +244,14 @@ int main (int argc, char* argv[]) {
                     P.back().Create(&P1FEidxFrom, &P1FEidxTo);
                 }
                 double raftFraction, raftFractionError;
+                IdxDescCL P1FEidxCoarse(P1_FE);
+                P1FEidxCoarse.CreateNumbering(coarseLevel, mg);
+                VecDescCL chi_ext_coarse, chi_ext;
+                chi_ext_coarse.SetIdx(&P1FEidxCoarse);
+                chi_ext.SetIdx(&P1FEidx);
                 do {
-                    chi_coarse_ini_ext.Interpolate(mg, surfCahnHilliardData.chi, 0.);
-                    chi_ext.Data = chi_coarse_ini_ext.Data;
+                    chi_ext_coarse.Interpolate(mg, [&](Point3DCL const & x) { return surfCahnHilliardData.chi(x, t); });
+                    chi_ext.Data = chi_ext_coarse.Data;
                     for (auto const &p : P)
                         chi_ext.Data = p * chi_ext.Data;
                     Restrict(mg, chi_ext, chi);
@@ -340,7 +301,7 @@ int main (int argc, char* argv[]) {
                 if (everyStep > 0 && i % everyStep == 0) {
                     vtkExported = true;
                     logger.beg("write vtk");
-                        writeVTK(t);
+                        vtkWriter.write(t);
                     auto vtkTime = logger.end();
                     tJSON.put("ElapsedTime.VTK", vtkTime);
                 }
@@ -355,7 +316,7 @@ int main (int argc, char* argv[]) {
             logger.beg("do timestep i = 1 w/ BDF1");
                 logger.beg("assemble");
                     chi_prev = chi;
-                    SetupCahnHilliardIF_P1P1(mg, &Mass, &Normal_stab, &Tangent_stab, &Volume_stab, &Laplace, &LaplaceM, &Gprimeprime, lset.Phi, lset.GetBndData(), v, vbnd, chi_prev, chibnd);
+                    SetupCahnHilliardIF_P1P1(mg, &Mass, &Normal_stab, &Tangent_stab, &Volume_stab, &Laplace, &LaplaceM, &Gprimeprime, levelSet, chi_prev);
                 logger.end();
                 logger.beg("update time");
                     t = dt;
@@ -363,36 +324,24 @@ int main (int argc, char* argv[]) {
                         << "t  = " << t << '\n'
                         << "dt = " << dt;
                     logger.log();
-                    chiSol.Interpolate(mg, surfCahnHilliardData.chi, t);
-                    omegaSol.Interpolate(mg, surfCahnHilliardData.omega, t);
-                    SetupInterfaceRhsP1(mg, &f1, lset.Phi, lset.GetBndData(), surfCahnHilliardData.f, t);
+                    chiSol.Interpolate(mg, [&](Point3DCL const & x) { return surfCahnHilliardData.chi(x, t); });
                 logger.end();
                 logger.beg("BDF1 step");
                     logger.beg("set up blocks");
                         for (int i = 0; i < well_potential.Data.size(); i++)
                             well_potential.Data[i] = chemicalPotential(chi_prev.Data[i]);
-                        rhs1 = f1;
-                        rhs1.Data += (1. / dt) * (Mass.Data * chi_prev.Data);
+                        rhs1.Interpolate(mg , [&](Point3DCL const & x) { return surfCahnHilliardData.f(x, t); });
+                        rhs1.Data = Mass.Data * rhs1.Data + (1. / dt) * (Mass.Data * chi_prev.Data);
                         rhs2.Data = S * (Mass.Data * chi_prev.Data) - Mass.Data * well_potential.Data;
                         A.LinComb(0., Laplace.Data, 1. / dt, Mass.Data);
                         B.LinComb(sigm, LaplaceM.Data, alpha, Volume_stab.Data);
                         C.LinComb(eps * eps, Laplace.Data, S, Mass.Data, alpha * eps * eps, Volume_stab.Data);
                         D.LinComb(0., Laplace.Data, -1., Mass.Data);
-                        MatrixCL ABCD(A, B, C, D);
-                        /* A.exportMAT(dirName + "/matrices/A.mat");
-                        B.exportMAT(dirName + "/matrices/B.mat");
-                        C.exportMAT(dirName + "/matrices/C.mat");
-                        D.exportMAT(dirName + "/matrices/D.mat");
-                        ABCD.exportMAT(dirName + "/matrices/ABCD.mat"); */
                     logger.end();
                     logger.beg("convert to Epetra");
-                        auto ABCD_Epetra = static_cast<Epetra_CrsMatrix>(ABCD);
-                        auto printStat = [&](std::string const & name, Epetra_CrsMatrix const & A) {
-                            logger.buf << name << ": " << A.NumGlobalRows() << 'x' << A.NumGlobalCols() << ", " << A.NumGlobalNonzeros() << " nonzeros (" << (100. * A.NumGlobalNonzeros()) / (static_cast<double>(A.NumGlobalRows()) * A.NumGlobalCols()) << "%)";
-                            logger.log();
-                        };
-                        printStat("{A, B; C, D} block mtx", ABCD_Epetra);
-                        belosMTX = rcpFromRef(ABCD_Epetra);
+                        auto ABCD_Epetra = static_cast<RCP<Epetra_CrsMatrix>>(MatrixCL(A, B, C, D));
+                        logCRS(*ABCD_Epetra, "{A, B; C, D} block mtx");
+                        belosMTX = ABCD_Epetra;
                         for (size_t i = 0; i < n_c; ++i) belosRHS[i] = rhs1.Data[i];
                         for (size_t i = 0; i < n_omega; ++i) belosRHS[i + n_c] = rhs2.Data[i];
                     logger.end();
@@ -401,7 +350,7 @@ int main (int argc, char* argv[]) {
                     std::function<void()> runFactorization = [](){};
                     if (inpJSON.get<bool>("Solver.Inner.Use")) {
                         logger.beg("set up preconditioner");
-                            amesosSolver = Amesos2::create<MT, MV>("Klu", rcpFromRef(ABCD_Epetra));
+                            amesosSolver = Amesos2::create<MT, MV>("Klu", ABCD_Epetra);
                             belosPRE = rcp(new Epetra_OperatorApply([&](MV const &X, MV &Y) {
                                 amesosSolver->setB(rcpFromRef(X));
                                 amesosSolver->setX(rcpFromRef(Y));
@@ -415,7 +364,7 @@ int main (int argc, char* argv[]) {
                                     logger.beg("numeric factorization");
                                         amesosSolver->numericFactorization();
                                         auto amesosStatus = amesosSolver->getStatus();
-                                        logger.buf << "numb of nonzeros in L + U = " << amesosStatus.getNnzLU() << " (" << (100. * amesosStatus.getNnzLU()) / (static_cast<double>(ABCD_Epetra.NumGlobalRows()) * ABCD_Epetra.NumGlobalCols()) << "%)";
+                                        logger.buf << "numb of nonzeros in L + U = " << amesosStatus.getNnzLU() << " (" << (100. * amesosStatus.getNnzLU()) / (static_cast<double>(ABCD_Epetra->NumGlobalRows()) * ABCD_Epetra->NumGlobalCols()) << "%)";
                                         logger.log();
                                     logger.end();
                                 factorizationTime = logger.end();
@@ -429,7 +378,6 @@ int main (int argc, char* argv[]) {
                         if (inpJSON.get<bool>("Solver.Inner.Use")) belosProblem.setRightPrec(belosPRE);
                         belosProblem.setProblem();
                         belosSolver->setProblem(rcpFromRef(belosProblem));
-                        std::cout << std::scientific;
                         belosSolverResult = belosSolver->solve();
                         if (myRank == 0) {
                             if (belosSolverResult == Belos::Converged) logger.log("belos converged");
@@ -456,7 +404,7 @@ int main (int argc, char* argv[]) {
                         chi_prev_prev = chi_prev;
                         chi_prev = chi;
                         chi_extrap.Data = 2. * chi_prev.Data - chi_prev_prev.Data; // TODO: eqn (2) in https://www.researchgate.net/publication/30046083_Adaptive_Time-Stepping_for_Incompressible_Flow_Part_II_Navier-Stokes_Equations
-                        SetupCahnHilliardIF_P1P1(mg, &Mass, &Normal_stab, &Tangent_stab, &Volume_stab, &Laplace, &LaplaceM, &Gprimeprime, lset.Phi, lset.GetBndData(), v, vbnd, chi_extrap, chibnd);
+                        SetupCahnHilliardIF_P1P1(mg, &Mass, &Normal_stab, &Tangent_stab, &Volume_stab, &Laplace, &LaplaceM, &Gprimeprime, levelSet, chi_extrap);
                     logger.end();
                     auto t_old = t;
                     do {
@@ -468,27 +416,24 @@ int main (int argc, char* argv[]) {
                                     << "t  = " << t << '\n'
                                     << "dt = " << dt;
                                 logger.log();
-                                chiSol.Interpolate(mg, surfCahnHilliardData.chi, t);
-                                omegaSol.Interpolate(mg, surfCahnHilliardData.omega, t);
-                                SetupInterfaceRhsP1(mg, &f1, lset.Phi, lset.GetBndData(), surfCahnHilliardData.f, t);
+                                chiSol.Interpolate(mg, [&](Point3DCL const & x) { return surfCahnHilliardData.chi(x, t); });
                             logger.end();
                             logger.beg("BDF1 step");
                                 logger.beg("set up blocks");
                                     for (int i = 0; i < well_potential.Data.size(); i++)
                                         well_potential.Data[i] = chemicalPotential(chi_prev.Data[i]);
-                                    rhs1 = f1;
-                                    rhs1.Data += (1. / dt) * (Mass.Data * chi_prev.Data);
+                                    rhs1.Interpolate(mg , [&](Point3DCL const & x) { return surfCahnHilliardData.f(x, t); });
+                                    rhs1.Data = Mass.Data * rhs1.Data + (1. / dt) * (Mass.Data * chi_prev.Data);
                                     rhs2.Data = S * (Mass.Data * chi_prev.Data) - Mass.Data * well_potential.Data;
                                     A.LinComb(0., Laplace.Data, 1. / dt, Mass.Data);
                                     B.LinComb(sigm, LaplaceM.Data, alpha, Volume_stab.Data);
                                     C.LinComb(eps * eps, Laplace.Data, S, Mass.Data, alpha * eps * eps, Volume_stab.Data);
                                     D.LinComb(0., Laplace.Data, -1., Mass.Data);
-                                    ABCD = MatrixCL(A, B, C, D);
                                 logger.end();
                                 logger.beg("convert to Epetra");
-                                    ABCD_Epetra = static_cast<Epetra_CrsMatrix>(ABCD);
-                                    printStat("{A, B; C, D} block mtx", ABCD_Epetra);
-                                    belosMTX = rcpFromRef(ABCD_Epetra);
+                                    ABCD_Epetra = static_cast<RCP<Epetra_CrsMatrix>>(MatrixCL(A, B, C, D));
+                                    logCRS(*ABCD_Epetra, "{A, B; C, D} block mtx");
+                                    belosMTX = ABCD_Epetra;
                                     for (size_t i = 0; i < n_c; ++i) belosRHS[i] = rhs1.Data[i];
                                     for (size_t i = 0; i < n_omega; ++i) belosRHS[i + n_c] = rhs2.Data[i];
                                 logger.end();
@@ -498,7 +443,6 @@ int main (int argc, char* argv[]) {
                                     if (inpJSON.get<bool>("Solver.Inner.Use")) belosProblemBDF1.setRightPrec(belosPRE);
                                     belosProblemBDF1.setProblem();
                                     belosSolver->setProblem(rcpFromRef(belosProblemBDF1));
-                                    std::cout << std::scientific;
                                     belosSolverResult = belosSolver->solve();
                                     if (myRank == 0) {
                                         if (belosSolverResult == Belos::Converged) logger.log("belos converged");
@@ -522,16 +466,15 @@ int main (int argc, char* argv[]) {
                                 logger.beg("set up blocks");
                                     for (int i = 0; i < well_potential.Data.size(); i++)
                                         well_potential.Data[i] = 2. * chemicalPotential(chi_prev.Data[i]) - chemicalPotential(chi_prev_prev.Data[i]);
-                                    rhs1 = f1;
-                                    rhs1.Data += (2. / dt) * (Mass.Data * chi_prev.Data) - (.5 / dt) * (Mass.Data * chi_prev_prev.Data);
+                                    rhs1.Interpolate(mg , [&](Point3DCL const & x) { return surfCahnHilliardData.f(x, t); });
+                                    rhs1.Data = Mass.Data * rhs1.Data + (2. / dt) * (Mass.Data * chi_prev.Data) - (.5 / dt) * (Mass.Data * chi_prev_prev.Data);
                                     rhs2.Data = S * (Mass.Data * chi_extrap.Data) - Mass.Data * well_potential.Data;
                                     A.LinComb(0., Laplace.Data, 1.5 / dt, Mass.Data);
-                                    ABCD = MatrixCL(A, B, C, D);
                                 logger.end();
                                 logger.beg("convert to Epetra");
-                                    ABCD_Epetra = static_cast<Epetra_CrsMatrix>(ABCD);
-                                    printStat("{A, B; C, D} block mtx", ABCD_Epetra);
-                                    belosMTX = rcpFromRef(ABCD_Epetra);
+                                    ABCD_Epetra = static_cast<RCP<Epetra_CrsMatrix>>(MatrixCL(A, B, C, D));
+                                    logCRS(*ABCD_Epetra, "{A, B; C, D} block mtx");
+                                    belosMTX = ABCD_Epetra;
                                     for (size_t i = 0; i < n_c; ++i) belosRHS[i] = rhs1.Data[i];
                                     for (size_t i = 0; i < n_omega; ++i) belosRHS[i + n_c] = rhs2.Data[i];
                                 logger.end();
@@ -541,7 +484,6 @@ int main (int argc, char* argv[]) {
                                     if (inpJSON.get<bool>("Solver.Inner.Use")) belosProblemBDF2.setRightPrec(belosPRE);
                                     belosProblemBDF2.setProblem();
                                     belosSolver->setProblem(rcpFromRef(belosProblemBDF2));
-                                    std::cout << std::scientific;
                                     belosSolverResult = belosSolver->solve();
                                     if (myRank == 0) {
                                         if (belosSolverResult == Belos::Converged) logger.log("belos converged");
@@ -581,7 +523,7 @@ int main (int argc, char* argv[]) {
             }
             if (everyStep > 0 && !vtkExported) { // make sure to export final time
                 logger.beg("write vtk (last time frame)");
-                writeVTK(t);
+                vtkWriter.write(t);
                 auto vtkTime = logger.end();
                 // TODOLATER: update JSON
             }

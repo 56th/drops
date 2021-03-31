@@ -3287,7 +3287,7 @@ class LocalCahnHilliardCL
         P2DiscCL::GetGradientsOnRef(P2GradRef);
      }
 
-    void calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, const LocalP1CL<Point3DCL>& v,const LocalP1CL<>& chi , const TetraCL& tet); ///< has to be called before any setup method!
+    void calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, const LocalP1CL<>& chi , const TetraCL& tet); ///< has to be called before any setup method!
     void calc3DIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, const TetraCL& tet); ///< has to be called after calcIntegrands!
 
     void setupM_P1 (double M_P1[4][4]);
@@ -3379,7 +3379,7 @@ double Potential_prime_function(const double x)
         //return (-(0.)*3.*x+(1.)*1./2. + (0.)*3.*x*x);
     }
 
-void LocalCahnHilliardCL::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, const LocalP1CL<Point3DCL>& v ,const LocalP1CL<>& chi , const TetraCL& tet)
+void LocalCahnHilliardCL::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, const LocalP1CL<>& chi, const TetraCL& tet)
 {
 
     P2DiscCL::GetGradients(P2Grad, P2GradRef, T);
@@ -3423,13 +3423,6 @@ void LocalCahnHilliardCL::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2C
         q3DsurfP1grad[j].resize(q3Ddomain.vertex_size());
         q3DsurfP1grad[j]= P1Grad[j];
         q3DsurfP1grad[j]-= dot(q3DsurfP1grad[j], q3Dnormal)*q3Dnormal;
-    }
-
-    //physical velocity, tetra P1 function
-    LocalP1CL<Point3DCL> velocity;
-    for(int i=0; i<4 ; ++i)
-    {
-    	velocity += v[i]*P1Hat[i];
     }
 
     //volume fraction , tetra P1 function
@@ -3539,11 +3532,7 @@ class CahnHilliardIFAccumulator_P1P1CL : public TetraAccumulatorCL
 {
   protected:
     const VecDescCL& lset;
-    const VecDescCL& velocity;
     const VecDescCL& volume_fraction;
-    const LsetBndDataCL& lset_bnd;
-    const BndDataCL<Point3DCL>& velocity_bnd;
-    const BndDataCL<>& volume_fraction_bnd;
     IdxDescCL &P1Idx_, &ScalarP1Idx_;
 
 
@@ -3557,7 +3546,6 @@ class CahnHilliardIFAccumulator_P1P1CL : public TetraAccumulatorCL
     SMatrixCL<3,3> T;
     double det, absdet;
     LocalP2CL<> ls_loc;
-    LocalP1CL<Point3DCL> v_loc;
     LocalP1CL<> chi_loc;
     LocalNumbP1CL n, nScalar;
 
@@ -3567,7 +3555,7 @@ class CahnHilliardIFAccumulator_P1P1CL : public TetraAccumulatorCL
     void update_global_system ();
 
   public:
-    CahnHilliardIFAccumulator_P1P1CL (const VecDescCL& ls, const VecDescCL& v,const VecDescCL& chi, const LsetBndDataCL& ls_bnd, const BndDataCL<Point3DCL>& v_bnd,const BndDataCL<>& chi_bnd, IdxDescCL& P1FE, IdxDescCL& ScalarP1FE,  MatrixCL& M_P1, MatrixCL& NormalStab_P1,MatrixCL& TangentStab_P1, MatrixCL& VolumeStab_P1,  MatrixCL& L_P1P1,  MatrixCL& LM_P1P1 ,  MatrixCL& Gprimeprime_P1P1);
+    CahnHilliardIFAccumulator_P1P1CL (const VecDescCL& ls, const VecDescCL& chi, IdxDescCL& P1FE, IdxDescCL& ScalarP1FE,  MatrixCL& M_P1, MatrixCL& NormalStab_P1,MatrixCL& TangentStab_P1, MatrixCL& VolumeStab_P1,  MatrixCL& L_P1P1,  MatrixCL& LM_P1P1 ,  MatrixCL& Gprimeprime_P1P1);
 
     ///\brief Initializes matrix-builders and load-vectors
     void begin_accumulation ();
@@ -3580,8 +3568,8 @@ class CahnHilliardIFAccumulator_P1P1CL : public TetraAccumulatorCL
 
 };
 
-CahnHilliardIFAccumulator_P1P1CL::CahnHilliardIFAccumulator_P1P1CL(const VecDescCL& ls, const VecDescCL& v, const VecDescCL& chi, const LsetBndDataCL& ls_bnd, const BndDataCL<Point3DCL>& v_bnd,const BndDataCL<>& chi_bnd, IdxDescCL& P1FE, IdxDescCL& ScalarP1FE, MatrixCL& M_P1, MatrixCL& NormalStab_P1, MatrixCL& TangentStab_P1,  MatrixCL& VolumeStab_P1,  MatrixCL& L_P1P1, MatrixCL& LM_P1P1, MatrixCL& Gprimeprime_P1P1)
- : lset(ls), velocity(v), volume_fraction(chi), lset_bnd(ls_bnd), velocity_bnd(v_bnd),volume_fraction_bnd(chi_bnd), P1Idx_(P1FE), ScalarP1Idx_(ScalarP1FE), M_P1_(M_P1), NormalStab_P1_(NormalStab_P1), TangentStab_P1_(TangentStab_P1), VolumeStab_P1_(VolumeStab_P1), L_P1P1_(L_P1P1), LM_P1P1_(LM_P1P1), Gprimeprime_P1P1_(Gprimeprime_P1P1), localCahnHilliard_()
+CahnHilliardIFAccumulator_P1P1CL::CahnHilliardIFAccumulator_P1P1CL(const VecDescCL& ls, const VecDescCL& chi, IdxDescCL& P1FE, IdxDescCL& ScalarP1FE, MatrixCL& M_P1, MatrixCL& NormalStab_P1, MatrixCL& TangentStab_P1,  MatrixCL& VolumeStab_P1,  MatrixCL& L_P1P1, MatrixCL& LM_P1P1, MatrixCL& Gprimeprime_P1P1)
+ : lset(ls), volume_fraction(chi), P1Idx_(P1FE), ScalarP1Idx_(ScalarP1FE), M_P1_(M_P1), NormalStab_P1_(NormalStab_P1), TangentStab_P1_(TangentStab_P1), VolumeStab_P1_(VolumeStab_P1), L_P1P1_(L_P1P1), LM_P1P1_(LM_P1P1), Gprimeprime_P1P1_(Gprimeprime_P1P1), localCahnHilliard_()
 {}
 
 void CahnHilliardIFAccumulator_P1P1CL::begin_accumulation ()
@@ -3642,9 +3630,8 @@ void CahnHilliardIFAccumulator_P1P1CL::finalize_accumulation ()
 
 void CahnHilliardIFAccumulator_P1P1CL::visit (const TetraCL& tet)
 {
-    ls_loc.assign(tet, lset, lset_bnd);
-    v_loc.assign(tet, velocity, velocity_bnd);
-    chi_loc.assign(tet, volume_fraction, volume_fraction_bnd);
+    ls_loc.assign(tet, lset, BndDataCL<double>());
+    chi_loc.assign(tet, volume_fraction, BndDataCL<double>());
     if (distance(ls_loc) == 0.) {
         local_setup(tet);
         update_global_system();
@@ -3660,7 +3647,7 @@ void CahnHilliardIFAccumulator_P1P1CL::local_setup (const TetraCL& tet)
     nScalar.assign(tet, ScalarP1Idx_, ScalarP1Idx_.GetBndInfo());
 
 
-    localCahnHilliard_.calcIntegrands(T, ls_loc, v_loc, chi_loc, tet);
+    localCahnHilliard_.calcIntegrands(T, ls_loc, chi_loc, tet);
     localCahnHilliard_.calc3DIntegrands(T, ls_loc, tet);
 
     localCahnHilliard_.setupM_P1(locM_P1);
@@ -3709,10 +3696,10 @@ void CahnHilliardIFAccumulator_P1P1CL::update_global_system ()
     }
 }
 
-void SetupCahnHilliardIF_P1P1(const MultiGridCL& MG_,  MatDescCL* M_P1, MatDescCL* NormalStab_P1, MatDescCL* TangentStab_P1,MatDescCL* VolumeStab_P1, MatDescCL* L_P1P1 , MatDescCL* LM_P1P1,  MatDescCL* Gprimeprime_P1P1, const VecDescCL& lset, const LsetBndDataCL& lset_bnd, const VecDescCL& velocity,  const BndDataCL<Point3DCL>& velocity_bnd, const VecDescCL& chi,const BndDataCL<>& chi_bnd)
+void SetupCahnHilliardIF_P1P1(const MultiGridCL& MG_,  MatDescCL* M_P1, MatDescCL* NormalStab_P1, MatDescCL* TangentStab_P1,MatDescCL* VolumeStab_P1, MatDescCL* L_P1P1 , MatDescCL* LM_P1P1,  MatDescCL* Gprimeprime_P1P1, const VecDescCL& lset, const VecDescCL& chi)
 {
   ScopeTimerCL scope("SetupCahnHilliardIF_P1P1");
-  CahnHilliardIFAccumulator_P1P1CL accu(lset, velocity, chi, lset_bnd, velocity_bnd, chi_bnd, *(M_P1->RowIdx), *(L_P1P1->RowIdx),  M_P1->Data, NormalStab_P1->Data, TangentStab_P1->Data, VolumeStab_P1->Data,  L_P1P1->Data,  LM_P1P1->Data,  Gprimeprime_P1P1->Data);
+  CahnHilliardIFAccumulator_P1P1CL accu(lset, chi, *(M_P1->RowIdx), *(L_P1P1->RowIdx),  M_P1->Data, NormalStab_P1->Data, TangentStab_P1->Data, VolumeStab_P1->Data,  L_P1P1->Data,  LM_P1P1->Data,  Gprimeprime_P1P1->Data);
   TetraAccumulatorTupleCL accus;
   //    MaybeAddProgressBar(MG_, "LapBeltr(P2) Setup", accus, RowIdx.TriangLevel());
   accus.push_back(&accu);

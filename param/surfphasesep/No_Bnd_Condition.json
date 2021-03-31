@@ -1,0 +1,97 @@
+{
+    "Output": {
+      "Directory": "../../output/tmp",
+      "EveryStep": 1,
+      "Binary": true,
+      "VTK": {
+        "ExportFullGrid": false,
+        "Concentration": true
+      }
+    },
+
+    "Mesh": {
+      "Type": "BrickBuilder",
+      "Origin": [-1.66666,-1.66666,-1.66666],
+      "E1": [3.33333, 0,0], "E2": [0,3.33333,0], "E3": [0,0,3.33333],
+      "N1": 2, "N2": 2, "N3": 2,
+      "RestartFile": "",
+      "AdaptRef": {
+        "Comment": "adaptive refinement",
+        "Freq": 0,
+        "Width": 0,
+        "CoarsestLevel": 0,
+        "FinestLevel": 4,
+        "SD": 0.1,
+        "CurvDiff": -1,
+        "Discontinuous": 0
+      }
+    },
+
+    "Surface": {
+      "Name": "Sphere",
+      "Params": {
+        "Sphere": {
+          "r_0": 1.0,
+          "A": 0.0
+        },
+        "Torus": {
+          "R": 1.0,
+          "r_min": 0.6,
+          "r_max": 0.6,
+          "Comment": "Use axis = 0 to set axis of revolution to x-axis, 1 for y-axis, 2 for z-axis",
+          "axis": 2
+        }
+      }
+    },
+
+    "SurfCahnHilliard" : {
+      "NumbOfVirtualSubEdges": 2,
+      "IC": {
+        "Name": "RandomBernoulli",
+        "Params": {
+          "RandomBernoulli": { "RaftRatio" : 0.5 },
+          "RandomUniform": { "RaftRatio" : 0.5, "RaftRatioNoiseFraction" : 0.1 },
+          "WanDerVaals": { "AngularVelocity": 3.14159265359, "Noise": 0.0 }
+        }
+      },
+      "ProlongateFromLevelNo" : 100,
+      "c_0" : 0.5,
+      "VolumeStab" : {
+        "Factor" : 1.0,
+        "Power"  : 1.0
+      },
+      "Beta_s" : 1.0,
+      "ChemicalPotentialScaling": 1.0,
+      "MobilityScaling": 1.0,
+      "UseDegenerateMobility": true,
+      "Epsilon": 0.05
+    },
+
+    "Time": {
+      "StepSize" : 0.01,
+      "FinalTime": 1e3,
+      "Adaptive" : {
+        "Tol" : 0.001,
+        "rho" : 0.9,
+        "MinStepSize" : 0.01
+      }
+    },
+
+  "Solver" : {
+    "Outer" : {
+      "Iteration" : "FLEXIBLE GMRES",
+      "OutputFrequency" : 1,
+      "KrylovSubspaceSize" : 100,
+      "MaxIter" : 50,
+      "RelResTol" : 1e-8
+    },
+    "Inner" : {
+      "Use" : true
+    }
+  },
+
+  "General" : {
+    "DynamicLibsPrefix": "../",
+    "DynamicLibs": []
+  }
+}
