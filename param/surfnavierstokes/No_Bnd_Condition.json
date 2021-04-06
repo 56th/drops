@@ -115,10 +115,5 @@
               "RelResTol" : 1e-2
             }
         }
-    },
-
-    "General": {
-      "DynamicLibsPrefix": "../",
-      "DynamicLibs": []
     }
 }

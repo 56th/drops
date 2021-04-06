@@ -1,5 +1,6 @@
 {
-    "Levelset": {
-        "CurvDiff": -1
+    "General": {
+        "DynamicLibsPrefix": "../",
+        "DynamicLibs": []
     }
 }
