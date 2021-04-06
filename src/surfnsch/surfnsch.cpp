@@ -92,8 +92,8 @@ int main(int argc, char* argv[]) {
             auto h = inpJSON.get<Point3DCL>("Mesh.E1")[0] / inpJSON.get<double>("Mesh.N1") * std::pow(2., -inpJSON.get<double>("Mesh.AdaptRef.FinestLevel"));
             auto eps = inpJSON.get<double>("SurfNSCH.CH.Epsilon");
             auto tau_u = inpJSON.get<double>("SurfNSCH.NS.NormalPenalty.Scaling") * pow(h, inpJSON.get<double>("SurfNSCH.NS.NormalPenalty.Power")); // constant for normal penalty
-            auto rho_u = inpJSON.get<double>("SurfNSCH.NS.VelocityStab.Scaling") * pow(h, inpJSON.get<double>("SurfNSCH.NS.VelocityStab.Power")); // constant for velocity stabilisation
-            auto rho_p = inpJSON.get<double>("SurfNSCH.NS.PressureStab.Scaling") * pow(h, inpJSON.get<double>("SurfNSCH.NS.PressureStab.Power")); // constant for pressure stabilisation
+            auto rho_u = inpJSON.get<double>("SurfNSCH.NS.VelocityStab.Scaling") * pow(h, inpJSON.get<double>("SurfNSCH.NS.VelocityStab.Power")); // constant for velocity stabilization
+            auto rho_p = inpJSON.get<double>("SurfNSCH.NS.PressureStab.Scaling") * pow(h, inpJSON.get<double>("SurfNSCH.NS.PressureStab.Power")); // constant for pressure stabilization
             auto BDF = inpJSON.get<size_t>("Time.BDF");
             if (BDF != 1 && BDF != 2) throw std::invalid_argument("use BDF = 1 or 2");
             auto numSteps = inpJSON.get<size_t>("Time.NumbOfSteps");
@@ -120,8 +120,7 @@ int main(int argc, char* argv[]) {
             rho_max = inpJSON.get<double>("SurfNSCH.NS.rho.max");
             if (rho_max < rho_min) throw std::invalid_argument("rho_max < rho_min");
             auto rho_delta = rho_max - rho_min;
-            auto& mobilityScaling = surfNSCHSystem.params.surfCahnHilliardParams.mobilityScaling;
-            mobilityScaling = inpJSON.get<double>("SurfNSCH.CH.MobilityScaling");
+            auto mobilityScaling = inpJSON.get<double>("SurfNSCH.CH.MobilityScaling");
             auto beta_s = inpJSON.get<double>("SurfNSCH.CH.Beta_s");
             auto& t = surfNSCHSystem.params.t;
             auto& levelSet = surfNSCHSystem.params.levelSet;
@@ -154,20 +153,20 @@ int main(int argc, char* argv[]) {
             logger.log();
         logger.end();
         logger.beg("set up chemical potential");
-        auto xi = inpJSON.get<double>("SurfNSCH.CH.ChemicalPotentialScaling");
-        auto c0 = inpJSON.get<double>("SurfNSCH.CH.c_0");
-        auto c0_l = std::min(c0, 1. - c0) / sqrt(3.);
-        auto chemicalPotential = [&](double c) {
-            if (c < 0.) return xi * (1. - c0) * c;
-            if (c > 1.) return xi * c0 * (c - 1.);
-            double x[1], f[1], d[1], s[1], t[1];
-            x[0] = c;
-            if      (c < c0 - c0_l) hermite_cubic_value(0., 0., 1. - c0, c0 - c0_l, 1. / (12. * sqrt(3.)), 0., 1, x, f, d, s, t);
-            else if (c < c0)        hermite_cubic_value(c0 - c0_l, 1. / (12. * sqrt(3.)), 0., c0, 0., -std::max(c0 * c0, (1. - c0) * (1. - c0)), 1, x, f, d, s, t);
-            else if (c < c0 + c0_l) hermite_cubic_value(c0, 0., -std::max(c0 * c0, (1. - c0) * (1. - c0)), c0 + c0_l, -1. / (12. * sqrt(3.)), 0., 1, x, f, d, s, t);
-            else                    hermite_cubic_value(c0 + c0_l, -1. / (12. * sqrt(3.)), 0., 1., 0., c0, 1, x, f, d, s, t);
-            return xi * f[0];
-        };
+            auto xi = inpJSON.get<double>("SurfNSCH.CH.ChemicalPotentialScaling");
+            auto c0 = inpJSON.get<double>("SurfNSCH.CH.c_0");
+            auto c0_l = std::min(c0, 1. - c0) / sqrt(3.);
+            auto chemicalPotential = [&](double c) {
+                if (c < 0.) return xi * (1. - c0) * c;
+                if (c > 1.) return xi * c0 * (c - 1.);
+                double x[1], f[1], d[1], s[1], t[1];
+                x[0] = c;
+                if      (c < c0 - c0_l) hermite_cubic_value(0., 0., 1. - c0, c0 - c0_l, 1. / (12. * sqrt(3.)), 0., 1, x, f, d, s, t);
+                else if (c < c0)        hermite_cubic_value(c0 - c0_l, 1. / (12. * sqrt(3.)), 0., c0, 0., -std::max(c0 * c0, (1. - c0) * (1. - c0)), 1, x, f, d, s, t);
+                else if (c < c0 + c0_l) hermite_cubic_value(c0, 0., -std::max(c0 * c0, (1. - c0) * (1. - c0)), c0 + c0_l, -1. / (12. * sqrt(3.)), 0., 1, x, f, d, s, t);
+                else                    hermite_cubic_value(c0 + c0_l, -1. / (12. * sqrt(3.)), 0., 1., 0., c0, 1, x, f, d, s, t);
+                return xi * f[0];
+            };
         logger.end();
         logger.beg("build mesh");
             logger.beg("build initial bulk mesh");
