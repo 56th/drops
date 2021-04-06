@@ -15,12 +15,14 @@ namespace DROPS {
         bool exact;
         double raftRatio;
         InstatScalarFunction chi, f;
+        InstatVectorFunction wind;
         std::string description;
     };
 
     SurfCahnHilliardData surfCahnHilliardDataFactory(Surface const & surface, std::string const & name, ParamCL const & params) {
         std::string funcName = __func__;
         InstatScalarFunction chi = zeroInstatScalarFunction, f = zeroInstatScalarFunction;
+        InstatVectorFunction wind = zeroInstatVectorFunction;
         SurfCahnHilliardData data;
         data.exact = false;
         data.raftRatio = -1;
@@ -37,6 +39,7 @@ namespace DROPS {
                 std::uniform_real_distribution<> dis(-a, a);
                 return .5 * (1. + tanh((x[2] * cos(omega * t) - x[1] * sin(omega * t) + dis(gen))/(2. * std::sqrt(2.) * eps)));
             };
+            wind = [=](Point3DCL const & x, double) { return omega * Point3DCL(0., -x[2], x[1]); };
             auto sphere = dynamic_cast<Sphere const *>(&surface);
             if (!noise && sphere) {
                 data.exact = true;
@@ -58,7 +61,7 @@ namespace DROPS {
         }
         else if (name == "RandomUniform") {
             data.raftRatio = params.get<double>("SurfCahnHilliard.IC.Params." + name + ".RaftRatio");
-            auto raftRatioNoisePercent = params.get<double>("SurfCahnHilliard.IC." + name + ".RaftRatioNoiseFraction");
+            auto raftRatioNoisePercent = params.get<double>("SurfCahnHilliard.IC.Params." + name + ".RaftRatioNoiseFraction");
             auto a = data.raftRatio - raftRatioNoisePercent * data.raftRatio;
             auto b = data.raftRatio + raftRatioNoisePercent * data.raftRatio;
             data.description = "chi_0 ~ Uniform(" + std::to_string(a) + ", " + std::to_string(b) + ")";
@@ -81,6 +84,7 @@ namespace DROPS {
         }
         else throw std::invalid_argument(funcName + ": IC '" + name + "' is not defined");
         data.chi = [=, &surface](Point3DCL const & x, double t) { return chi(surface.ext(x, t), t); };
+        data.wind = [=, &surface](Point3DCL const & x, double t) { return wind(surface.ext(x, t), t); };
         data.f = [=, &surface](Point3DCL const & x, double t) { return f(surface.ext(x, t), t); };
         return data;
     }
