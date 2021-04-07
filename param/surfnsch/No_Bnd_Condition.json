@@ -141,10 +141,5 @@
             }
           }
         }
-    },
-
-    "General": {
-      "DynamicLibsPrefix": "../",
-      "DynamicLibs": []
     }
 }

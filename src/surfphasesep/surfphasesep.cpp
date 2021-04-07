@@ -1,4 +1,10 @@
+/// \file SurfCahnHilliard.cpp
+/// \brief Trace FEM discretization of a surface Cahn-Hilliard problem
+/// \author Alexander Zhiliakov alex@math.uh.edu
+
 /*
+ * This file is part of DROPS.
+ *
  * DROPS is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -7,35 +13,28 @@
  * DROPS is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
+ * GNU Lesser General Public License for more dtau_uils.
  *
  * You should have received a copy of the GNU Lesser General Public License
  * along with DROPS. If not, see <http://www.gnu.org/licenses/>.
  *
+ *
+ * Copyright 2009 LNM/SC RWTH Aachen, Germany
 */
 
-#include "surfactant/ifacetransp.h"
+#include <fstream>
+#include <surfactant/ifacetransp.h>
 #include "misc/params.h"
 #include "geom/builder.h"
 #include "levelset/levelset.h"
 #include "levelset/adaptriang.h"
 #include "levelset/surfacetension.h"
 #include "misc/dynamicload.h"
-#include "num/bndData.h"
-#include "num/precond.h"
-#include "parallel/exchange.h"
-
-#include "num/oseensolver.h"
-#include <fstream>
-
-// vtk output
+#include "surfactant/ifacetransp.h"
 #include "out/VTKWriter.hpp"
-// logger
-#include "SingletonLogger.hpp"
-// initial data
-#include "SurfCahnHilliardData.hpp"
-// for chemical potential
 #include "hermite_cubic/hermite_cubic.hpp"
+#include "SurfCahnHilliardData.hpp"
+#include "SingletonLogger.hpp"
 // belos (iterative solvers)
 #include "BelosSolverFactory.hpp"
 #include "BelosLinearProblem.hpp"
@@ -55,18 +54,17 @@
 
 using namespace DROPS;
 
-int main (int argc, char* argv[]) {
-    srand(time(NULL));
+int main(int argc, char* argv[]) {
     auto& logger = SingletonLogger::instance();
     try {
         logger.beg("mpi init");
             #ifdef HAVE_MPI
-                    MPI_Init(&argc, &argv);
-                    Epetra_MpiComm comm(MPI_COMM_WORLD);
-                    logger.log("using Epetra_MpiComm");
+                MPI_Init(&argc, &argv);
+                Epetra_MpiComm comm(MPI_COMM_WORLD);
+                logger.log("using Epetra_MpiComm");
             #else
-                    Epetra_SerialComm comm;
-                    logger.log("using Epetra_SerialComm");
+                Epetra_SerialComm comm;
+                logger.log("using Epetra_SerialComm");
             #endif
             auto myRank = comm.MyPID();
             if (myRank == 0) {
@@ -82,7 +80,7 @@ int main (int argc, char* argv[]) {
             auto dirName = inpJSON.get<std::string>("Output.Directory");
             system((
                 "mkdir -p " + dirName + " ; rm -r -f " + dirName + "/* ; "
-                "mkdir " + dirName + "/stats ; mkdir " + dirName + "/matrices ; mkdir " + dirName + "/vectors ; mkdir " + dirName + "/vtk"
+                "mkdir " + dirName + "/stats ; mkdir " + dirName + "/vectors ; mkdir " + dirName + "/vtk"
             ).c_str());
             {
                 std::ofstream input(dirName + "/input.json");
@@ -90,14 +88,37 @@ int main (int argc, char* argv[]) {
                 logger.buf << inpJSON;
                 logger.log();
             }
-        logger.end();
-        logger.beg("set up IC");
+            auto h = inpJSON.get<Point3DCL>("Mesh.E1")[0] / inpJSON.get<double>("Mesh.N1") * std::pow(2., -inpJSON.get<double>("Mesh.AdaptRef.FinestLevel"));
+            auto eps = inpJSON.get<double>("SurfCahnHilliard.Epsilon");
+            auto rho_vol = inpJSON.get<double>("SurfCahnHilliard.VolumeStab.Scaling") * pow(h, inpJSON.get<double>("SurfCahnHilliard.VolumeStab.Power")); // constant for volume stabilization
+            auto finalTime = inpJSON.get<double>("Time.FinalTime");
+            auto everyStep = inpJSON.get<int>("Output.EveryStep");
+            auto binary = inpJSON.get<bool>("Output.Binary");
+            auto exportVectors = inpJSON.get<bool>("Output.Vectors");
             auto surface = surfaceFactory(inpJSON);
             auto testName = inpJSON.get<std::string>("SurfCahnHilliard.IC.Name");
             auto surfCahnHilliardData = surfCahnHilliardDataFactory(*surface, testName, inpJSON);
+            auto mobilityScaling = inpJSON.get<double>("SurfCahnHilliard.MobilityScaling");
+            auto beta_s = inpJSON.get<double>("SurfCahnHilliard.Beta_s");
+            auto useDegenerateMobility = inpJSON.get<bool>("SurfCahnHilliard.UseDegenerateMobility");
+            FESystem surfCHSystem;
+            auto& t = surfCHSystem.params.t;
+            auto& levelSet = surfCHSystem.params.levelSet;
+            surfCHSystem.params.numbOfVirtualSubEdges = inpJSON.get<size_t>("SurfCahnHilliard.NumbOfVirtualSubEdges");
+            surfCHSystem.params.surfCahnHilliardParams.f = surfCahnHilliardData.f;
+            auto usePrevGuess = inpJSON.get<bool>("Solver.UsePreviousFrameAsInitialGuess");
+            auto tol = inpJSON.get<double>("Solver.Outer.RelResTol");
+            auto meshCoarseLevel = std::max(0, inpJSON.get<int>("Mesh.AdaptRef.CoarsestLevel"));
+            auto meshFineLevel = std::max(0, inpJSON.get<int>("Mesh.AdaptRef.FinestLevel"));
+            if (meshFineLevel < meshCoarseLevel) meshFineLevel = meshCoarseLevel;
+            auto prolongationLevel = inpJSON.get<int>("SurfCahnHilliard.ProlongateFromLevelNo");
+            if (prolongationLevel < meshCoarseLevel) prolongationLevel = meshCoarseLevel;
+            if (prolongationLevel > meshFineLevel) prolongationLevel = meshFineLevel;
             logger.buf
+                << surface->description() << '\n'
                 << surfCahnHilliardData.description << '\n'
-                << "exact soln: " << (surfCahnHilliardData.exact ? "yes" : "no");
+                << "exact soln: " << (surfCahnHilliardData.exact ? "yes" : "no") << '\n'
+                << "prolongate CH IC from lvl " << prolongationLevel;
             logger.log();
         logger.end();
         logger.beg("set up chemical potential");
@@ -116,420 +137,392 @@ int main (int argc, char* argv[]) {
                 return xi * f[0];
             };
         logger.end();
-        // build initial mesh
-        std::cout << "Setting up interface-PDE:\n";
-        std::auto_ptr<MGBuilderCL> builder(make_MGBuilder(inpJSON));
-        MultiGridCL mg(*builder);
-        const ParamCL::ptree_type* ch= 0;
-        try {
-            ch= &inpJSON.get_child( "Mesh.Periodicity");
-        }
-        catch (DROPSParamErrCL) {}
-        if (ch)
-            read_PeriodicBoundaries( mg, *ch);
-        // adaptive mesh refinement based on level set function
-        typedef DistMarkingStrategyCL InitMarkerT;
-        auto meshCoarseLevel = std::max(0, inpJSON.get<int>("Mesh.AdaptRef.CoarsestLevel"));
-        auto meshFineLevel = std::max(0, inpJSON.get<int>("Mesh.AdaptRef.FinestLevel"));
-        if (meshFineLevel < meshCoarseLevel) meshFineLevel = meshCoarseLevel;
-        InitMarkerT initmarker([&](Point3DCL const & x, double) { return surface->phi(x); }, inpJSON.get<double>("Mesh.AdaptRef.Width"), meshCoarseLevel, meshFineLevel);
-        //adap.set_marking_strategy( &initmarker );
-        AdapTriangCL adap( mg, &initmarker );
-        adap.MakeInitialTriang();
-        adap.set_marking_strategy( 0 );
-        // create level set
-        IdxDescCL lstIdx(P2_FE); {
-            auto n = lstIdx.DistributeDOFs(mg.GetLastLevel(), mg);
-            logger.buf << "numb of active tetras for levelset: " << n << " (" << (100. * n) / mg.GetNumTriangTetra() << "%)";
-            logger.log();
-        }
-        VecDescCL levelSet(&lstIdx);
-        levelSet.Interpolate(mg, [&](Point3DCL const & x) { return surface->phi(x); });
-        double h = inpJSON.get<Point3DCL>("Mesh.E1")[0]/inpJSON.get<double>("Mesh.N1")*std::pow(2., -inpJSON.get<double>("Mesh.AdaptRef.FinestLevel"));
-        auto T = inpJSON.get<double>("Time.FinalTime");
-        auto dt = inpJSON.get<double>("Time.StepSize");
-        auto alpha = inpJSON.get<double>("SurfCahnHilliard.VolumeStab.Factor") * pow(h, inpJSON.get<double>("SurfCahnHilliard.VolumeStab.Power"));
-        logger.buf << "h is: " << h << '\n' << "dt is: " << dt;
-        logger.log();
-        auto S = inpJSON.get<double>("SurfCahnHilliard.Beta_s");
-        double sigm = inpJSON.get<double>("SurfCahnHilliard.MobilityScaling");
-        double eps = inpJSON.get<double>("SurfCahnHilliard.Epsilon");
-        // construct FE spaces
-        IdxDescCL ifaceP1idx(P1IF_FE); {
-            auto n = ifaceP1idx.DistributeDOFs(mg.GetLastLevel(), mg, &levelSet);
-            logger.buf << "numb of active tetras for concentration: " << n << " (" << (100. * n) / mg.GetNumTriangTetra() << "%)";
-            logger.log();
-        }
-        IdxDescCL P1FEidx(P1_FE);
-        P1FEidx.CreateNumbering(mg.GetLastLevel(), mg);
-        auto coarseLevel = inpJSON.get<int>("SurfCahnHilliard.ProlongateFromLevelNo");
-        if (coarseLevel < meshCoarseLevel) coarseLevel = meshCoarseLevel;
-        if (coarseLevel > meshFineLevel)   coarseLevel = meshFineLevel;
-        // construct FE vectors (initialized with zero)
-        VecDescCL omega, chi, chi_prev, chi_prev_prev, chi_BDF1, chi_BDF2, chi_extrap, chiSol, energy, well_potential, rhs1, rhs2;
-             chi.SetIdx( &ifaceP1idx);
-             chi_prev.SetIdx(&ifaceP1idx);
-             chi_prev_prev.SetIdx(&ifaceP1idx);
-             chi_BDF1.SetIdx( &ifaceP1idx);
-             chi_BDF2.SetIdx( &ifaceP1idx);
-             chi_extrap.SetIdx(&ifaceP1idx);
-             well_potential.SetIdx( &ifaceP1idx);
-             energy.SetIdx( &ifaceP1idx);
-             chiSol.SetIdx( &ifaceP1idx);
-             omega.SetIdx( &ifaceP1idx);
-             rhs1.SetIdx(&ifaceP1idx);
-             rhs2.SetIdx(&ifaceP1idx);
-        // setup matrices
-        MatDescCL Laplace, Mass, Normal_stab, Tangent_stab, Volume_stab, LaplaceM, Gprimeprime;
-        MatrixCL A, B, C, D;
-        size_t n_c, n_omega;
-            n_c = n_omega = ifaceP1idx.NumUnknowns();
-            Laplace.SetIdx( &ifaceP1idx, &ifaceP1idx);
-            LaplaceM.SetIdx( &ifaceP1idx, &ifaceP1idx);
-            Gprimeprime.SetIdx( &ifaceP1idx, &ifaceP1idx);
-            Mass.SetIdx(&ifaceP1idx, &ifaceP1idx);
-            Normal_stab.SetIdx(&ifaceP1idx, &ifaceP1idx);
-            Tangent_stab.SetIdx(&ifaceP1idx, &ifaceP1idx);
-            Volume_stab.SetIdx(&ifaceP1idx, &ifaceP1idx);
-            SetupCahnHilliardIF_P1P1(mg,  &Mass,&Normal_stab, &Tangent_stab, &Volume_stab, &Laplace, &LaplaceM, &Gprimeprime, levelSet, chi);
+        logger.beg("build mesh");
+            logger.beg("build initial bulk mesh");
+                std::auto_ptr<MGBuilderCL> builder(make_MGBuilder(inpJSON));
+                MultiGridCL mg(*builder);
+                const ParamCL::ptree_type* ch= 0;
+                try {
+                    ch = &inpJSON.get_child("Mesh.Periodicity");
+                } catch (DROPSParamErrCL) {}
+                if (ch) read_PeriodicBoundaries(mg, *ch);
+                auto shift = inpJSON.get<Point3DCL>("Surface.Shift.Dir", Point3DCL(0., 0., 0.)); {
+                    if (shift.norm()) shift /= shift.norm();
+                    shift *= std::abs(inpJSON.get<double>("Surface.Shift.Norm", 0.));
+                }
+                mg.Transform([&](Point3DCL const & p) { return p - shift; });
+                logger.buf << "surface shift: " << shift;
+                logger.log();
+            logger.end();
+            logger.beg("refine towards the surface");
+                AdapTriangCL adap(mg);
+                DistMarkingStrategyCL markerLset([&](Point3DCL const & x, double) { return surface->phi(x); }, inpJSON.get<double>("Mesh.AdaptRef.Width"), meshCoarseLevel, meshFineLevel);
+                adap.set_marking_strategy(&markerLset);
+                adap.MakeInitialTriang();
+                adap.set_marking_strategy(nullptr);
+                auto numbOfTetras = mg.GetNumTriangTetra();
+                logger.buf
+                    << "h = " << h << '\n'
+                    << "numb of tetras = " << numbOfTetras;
+                logger.log();
+            logger.end();
+        logger.end();
+        logger.beg("interpolate level-set");
+            IdxDescCL lstIdx(P2_FE); {
+                auto n = lstIdx.DistributeDOFs(mg.GetLastLevel(), mg);
+                logger.buf << "numb of active tetras for levelset: " << n << " (" << (100. * n) / mg.GetNumTriangTetra() << "%)";
+                logger.log();
+            }
+            levelSet.SetIdx(&lstIdx);
+            levelSet.Interpolate(mg, [&](Point3DCL const & x) { return surface->phi(x); });
+        logger.end();
+        logger.beg("set up FE spaces");
+            IdxDescCL chiIdx(P1IF_FE); {
+                auto n = chiIdx.DistributeDOFs(mg.GetLastLevel(), mg, &levelSet);
+                logger.buf << "numb of active tetras for concentration: " << n << " (" << (100. * n) / mg.GetNumTriangTetra() << "%)";
+                logger.log();
+            }
+            IdxDescCL velIdx(vecP2IF_FE); {
+                auto n = velIdx.DistributeDOFs(mg.GetLastLevel(), mg, &levelSet);
+                logger.buf << "numb of active tetras for velocity: " << n << " (" << (100. * n) / mg.GetNumTriangTetra() << "%)";
+                logger.log();
+            }
+            size_t m = chiIdx.NumUnknowns();
+            logger.beg("set up FE system");
+                FEMatDescCL
+                    M(&chiIdx, &chiIdx, &LocalAssembler::M_P1P1),
+                    C(&chiIdx, &chiIdx, &LocalAssembler::C_n_P1P1),
+                    N(&chiIdx, &chiIdx, &LocalAssembler::N_P1P1),
+                    A_one(&chiIdx, &chiIdx, &LocalAssembler::A_P1P1),
+                    A_deg(&chiIdx, &chiIdx, &LocalAssembler::LaplaceM_P1P1);
+                FEVecDescCL f(&chiIdx, &LocalAssembler::F_concentration_P1);
+                VecDescCL
+                    chi_star(&chiIdx), chi(&chiIdx), chi_BDF1(&chiIdx), chi_BDF2(&chiIdx), chi_extrap(&chiIdx), omega(&chiIdx), wind(&velIdx),
+                    F_chi(&chiIdx), F_omega(&chiIdx);
+            logger.end();
+        logger.end();
         logger.beg("set up vtk");
             VTKWriter::VTKParams vtkParams; {
                 vtkParams.path = dirName + "/vtk/" + testName + inpJSON.get<std::string>("Surface.Name");
                 vtkParams.mg = &mg;
-                vtkParams.binary = inpJSON.get<bool>("Output.Binary");
+                vtkParams.binary = binary;
                 vtkParams.staticGrid = surface->isStationary();
                 vtkParams.builder = inpJSON.get<bool>("Output.VTK.ExportFullGrid") ? &VTKWriter::buildFullGrid : &VTKWriter::buildInterfaceGrid;
             }
             VTKWriter vtkWriter(vtkParams);
             vtkWriter.add({ "level-set", levelSet });
-            vtkWriter.add({ "c_h", chi });
-            auto everyStep = inpJSON.get<int>("Output.EveryStep");
+            if (everyStep > 0) {
+                if (inpJSON.get<bool>("Output.VTK.Concentration")) {
+                    vtkWriter.add({"c_h", chi});
+                    if (surfCahnHilliardData.exact) vtkWriter.add({"c_*", chi_star});
+                }
+                if (inpJSON.get<bool>("Output.VTK.Wind")) vtkWriter.add({"wind", wind});
+            }
+            auto exportVTK = vtkWriter.numVars() > 0;
         logger.end();
-        logger.beg("set up outer solver");
+        logger.beg("set up linear solver");
+            using SV = Epetra_Vector;
             using MV = Epetra_MultiVector;
             using OP = Epetra_Operator;
             using MT = Epetra_CrsMatrix;
             using ST = double;
             using namespace Teuchos;
             using namespace Belos;
-            RCP<ParameterList> belosParams = parameterList();
+            auto belosParams = parameterList();
             belosParams->set("Num Blocks", inpJSON.get<int>("Solver.Outer.KrylovSubspaceSize"));
             belosParams->set("Maximum Iterations", inpJSON.get<int>("Solver.Outer.MaxIter"));
-            belosParams->set("Convergence Tolerance", inpJSON.get<double>("Solver.Outer.RelResTol"));
-            belosParams->set( "Output Frequency", inpJSON.get<int>("Solver.Outer.OutputFrequency"));
-            belosParams->set("Verbosity", Belos::Errors + Belos::Warnings + Belos::FinalSummary);
-            belosParams->set<int>("Output Style", Belos::Brief);
+            belosParams->set("Output Frequency", inpJSON.get<int>("Solver.Outer.OutputFrequency"));
+            belosParams->set("Verbosity", Errors + Warnings + StatusTestDetails);
+            belosParams->set<int>("Output Style", Brief);
             SolverFactory<ST, MV, OP> belosFactory;
             logger.buf << "available iterations: " << belosFactory.supportedSolverNames();
             logger.log();
             auto belosSolver = belosFactory.create(inpJSON.get<std::string>("Solver.Outer.Iteration"), belosParams);
             logger.buf << "outer solver: " << belosSolver->description();
             logger.log();
-            // matrix, lhs, and rhs
-            RCP<OP> belosMTX;
-            Epetra_Map belosMap(static_cast<int>(n_c + n_omega), 0, comm);
-            Epetra_Vector belosLHS(belosMap), belosRHS(belosMap);
-        logger.end();
-        logger.beg("do timestep i = 0");
-        	auto t = 0.;
-        	auto e = 0.;
-            VectorCL unityVector(1., n_c);
-            {
-                IdxDescCL P1FEidxFrom(P1_FE), P1FEidxTo(P1_FE);
-                std::vector<ProlongationCL<double>> P;
-                for (size_t l = coarseLevel + 1; l <= meshFineLevel; ++l) {
-                    P.emplace_back(ProlongationCL<double>(mg));
-                    P1FEidxFrom.CreateNumbering(l - 1, mg);
-                    P1FEidxTo.CreateNumbering(l, mg);
-                    P.back().Create(&P1FEidxFrom, &P1FEidxTo);
-                }
-                double raftFraction, raftFractionError;
-                IdxDescCL P1FEidxCoarse(P1_FE);
-                P1FEidxCoarse.CreateNumbering(coarseLevel, mg);
-                VecDescCL chi_ext_coarse, chi_ext;
-                chi_ext_coarse.SetIdx(&P1FEidxCoarse);
-                chi_ext.SetIdx(&P1FEidx);
-                do {
-                    chi_ext_coarse.Interpolate(mg, [&](Point3DCL const & x) { return surfCahnHilliardData.chi(x, t); });
-                    chi_ext.Data = chi_ext_coarse.Data;
-                    for (auto const &p : P)
-                        chi_ext.Data = p * chi_ext.Data;
-                    Restrict(mg, chi_ext, chi);
-                    if (surfCahnHilliardData.raftRatio > 0.) {
-                        raftFraction = dot(Mass.Data * chi.Data, unityVector) / dot(Mass.Data * unityVector, unityVector);
-                        raftFractionError = std::fabs(surfCahnHilliardData.raftRatio - raftFraction) / surfCahnHilliardData.raftRatio;
-                        logger.buf << "raft ratio error (%) = " << raftFractionError;
-                        logger.log();
-                    }
-                } while (surfCahnHilliardData.raftRatio > 0. && raftFractionError > .001);
-            }
-            chiSol = chi;
-            size_t numbOfTries = 0;
-            auto vtkExported = false;
-            auto solveTime = 0.;
-            auto factorizationTime = 0.;
-            auto belosSolverResult = Belos::Converged;
-            auto exportStats = [&](size_t i) {
-                std::ofstream stats(dirName + "/stats/t_" + std::to_string(i) + ".json");
-                ParamCL tJSON;
-                tJSON.put("DOF.c", n_c);
-                tJSON.put("DOF.mu", n_omega);
-                tJSON.put("h", h);
-                tJSON.put("rho", alpha);
-                tJSON.put("t", t);
-                tJSON.put("c_h.Max", chi.Data.max());
-                tJSON.put("c_h.Min", chi.Data.min());
-                tJSON.put("Integral.PerimeterEstimate", eps * dot(Laplace.Data * chi.Data, chi.Data));
-                // for (int i = 0; i < energy.Data.size(); i++) energy.Data[i] = potential(chi.Data[i]);
-                // tJSON.put("Integral.LyapunovEnergy", (eps / 2.) * dot(Laplace.Data * chi.Data, chi.Data) + (1. / eps) * dot(Mass.Data * energy.Data, unityVector));
-                auto surfaceArea = dot(Mass.Data * unityVector, unityVector);
-                tJSON.put("Integral.SurfaceArea", surfaceArea);
-                tJSON.put("Integral.RaftFraction", dot(Mass.Data * chi.Data, unityVector) / surfaceArea);
-                if (i > 0) {
-                    tJSON.put("dt", dt);
-                    tJSON.put("Integral.Solver.Outer.TotalIters", belosSolver->getNumIters());
-                    tJSON.put("Integral.Solver.Outer.ResidualNorm.SolverRelative", belosSolver->achievedTol());
-                    tJSON.put("Integral.Solver.Outer.Converged", belosSolverResult == Belos::Converged);
-                    tJSON.put("ElapsedTime.Factorization", factorizationTime);
-                    factorizationTime = 0.;
-                    tJSON.put("ElapsedTime.LinearSolve", solveTime);
-                }
-                if (i > 1) {
-                    tJSON.put("ApaptiveTimeStep.NumbOfTries", numbOfTries);
-                    tJSON.put("ApaptiveTimeStep.RelativeError", e);
-                }
-                if (everyStep > 0 && i % everyStep == 0) {
-                    vtkExported = true;
-                    logger.beg("write vtk");
-                        vtkWriter.write(t);
-                    auto vtkTime = logger.end();
-                    tJSON.put("ElapsedTime.VTK", vtkTime);
-                }
-                else vtkExported = false;
-                stats << tJSON;
-                logger.buf << tJSON;
-                logger.log();
-            };
-            exportStats(0);
-        logger.end();
-        if (T > 0.) {
-            logger.beg("do timestep i = 1 w/ BDF1");
-                logger.beg("assemble");
-                    chi_prev = chi;
-                    SetupCahnHilliardIF_P1P1(mg, &Mass, &Normal_stab, &Tangent_stab, &Volume_stab, &Laplace, &LaplaceM, &Gprimeprime, levelSet, chi_prev);
-                logger.end();
-                logger.beg("update time");
-                    t = dt;
-                    logger.buf
-                        << "t  = " << t << '\n'
-                        << "dt = " << dt;
+            Epetra_Map mapChi(static_cast<int>(m), 0, comm), mapChiOmega(static_cast<int>(m + m), 0, comm);
+            SV belosLHS(mapChiOmega), belosRHS(mapChiOmega);
+            RCP<MT> belosMTX;
+            logger.beg("set up preconditioner");
+                RCP<Amesos2::Solver<MT, MV>> amesosSolver;
+                auto belosPRE = rcp(new Epetra_OperatorApply([&](MV const &X, MV &Y) {
+                    amesosSolver->setB(rcpFromRef(X));
+                    amesosSolver->setX(rcpFromRef(Y));
+                    amesosSolver->solve();
+                }));
+                auto runFactorization = [&]() {
+                    amesosSolver = Amesos2::create<MT, MV>(inpJSON.get<std::string>("Solver.Inner.Iteration"), belosMTX);
+                    amesosSolver->symbolicFactorization();
+                    amesosSolver->numericFactorization();
+                    auto amesosStatus = amesosSolver->getStatus();
+                    logger.buf << "numb of nonzeros in L + U = " << amesosStatus.getNnzLU() << " (" << (100. * amesosStatus.getNnzLU()) / (static_cast<double>(belosMTX->NumGlobalRows()) * belosMTX->NumGlobalCols()) << "%)";
                     logger.log();
-                    chiSol.Interpolate(mg, [&](Point3DCL const & x) { return surfCahnHilliardData.chi(x, t); });
-                logger.end();
-                logger.beg("BDF1 step");
-                    logger.beg("set up blocks");
-                        for (int i = 0; i < well_potential.Data.size(); i++)
-                            well_potential.Data[i] = chemicalPotential(chi_prev.Data[i]);
-                        rhs1.Interpolate(mg , [&](Point3DCL const & x) { return surfCahnHilliardData.f(x, t); });
-                        rhs1.Data = Mass.Data * rhs1.Data + (1. / dt) * (Mass.Data * chi_prev.Data);
-                        rhs2.Data = S * (Mass.Data * chi_prev.Data) - Mass.Data * well_potential.Data;
-                        A.LinComb(0., Laplace.Data, 1. / dt, Mass.Data);
-                        B.LinComb(sigm, LaplaceM.Data, alpha, Volume_stab.Data);
-                        C.LinComb(eps * eps, Laplace.Data, S, Mass.Data, alpha * eps * eps, Volume_stab.Data);
-                        D.LinComb(0., Laplace.Data, -1., Mass.Data);
-                    logger.end();
-                    logger.beg("convert to Epetra");
-                        auto ABCD_Epetra = static_cast<RCP<Epetra_CrsMatrix>>(MatrixCL(A, B, C, D));
-                        logCRS(*ABCD_Epetra, "{A, B; C, D} block mtx");
-                        belosMTX = ABCD_Epetra;
-                        for (size_t i = 0; i < n_c; ++i) belosRHS[i] = rhs1.Data[i];
-                        for (size_t i = 0; i < n_omega; ++i) belosRHS[i + n_c] = rhs2.Data[i];
-                    logger.end();
-                    RCP<OP> belosPRE;
-                    RCP<Amesos2::Solver<MT, MV>> amesosSolver;
-                    std::function<void()> runFactorization = [](){};
-                    if (inpJSON.get<bool>("Solver.Inner.Use")) {
-                        logger.beg("set up preconditioner");
-                            amesosSolver = Amesos2::create<MT, MV>("Klu", ABCD_Epetra);
-                            belosPRE = rcp(new Epetra_OperatorApply([&](MV const &X, MV &Y) {
-                                amesosSolver->setB(rcpFromRef(X));
-                                amesosSolver->setX(rcpFromRef(Y));
-                                amesosSolver->solve();
-                            }));
-                            runFactorization = [&]() {
-                                logger.beg("factorization");
-                                    logger.beg("symbolic factorization");
-                                        amesosSolver->symbolicFactorization();
-                                    logger.end();
-                                    logger.beg("numeric factorization");
-                                        amesosSolver->numericFactorization();
-                                        auto amesosStatus = amesosSolver->getStatus();
-                                        logger.buf << "numb of nonzeros in L + U = " << amesosStatus.getNnzLU() << " (" << (100. * amesosStatus.getNnzLU()) / (static_cast<double>(ABCD_Epetra->NumGlobalRows()) * ABCD_Epetra->NumGlobalCols()) << "%)";
-                                        logger.log();
-                                    logger.end();
-                                factorizationTime = logger.end();
-                            };
-                        logger.end();
-                    }
-                    runFactorization();
-                    logger.beg("linear solve");
-                        belosLHS.PutScalar(0.);
-                        LinearProblem<ST, MV, OP> belosProblem(belosMTX, rcpFromRef(belosLHS), rcpFromRef(belosRHS));
-                        if (inpJSON.get<bool>("Solver.Inner.Use")) belosProblem.setRightPrec(belosPRE);
-                        belosProblem.setProblem();
-                        belosSolver->setProblem(rcpFromRef(belosProblem));
-                        belosSolverResult = belosSolver->solve();
-                        if (myRank == 0) {
-                            if (belosSolverResult == Belos::Converged) logger.log("belos converged");
-                            else logger.wrn("belos did not converge");
+                };
+            logger.end();
+        logger.end();
+        logger.beg("t = t_0 = 0");
+            size_t i = 0;
+            t = 0.;
+            logger.beg("assemble");
+                surfCHSystem.matrices = { &M, &C, &A_one };
+                setupFESystem(mg, surfCHSystem);
+                VectorCL I_p(1., m);
+            auto assembleTime = logger.end();
+            logger.beg("interpolate initial data");
+                {
+                    IdxDescCL chiIdxExtCoarse(P1_FE), chiIdxExt(P1_FE);
+                    chiIdxExtCoarse.CreateNumbering(prolongationLevel, mg);
+                    chiIdxExt.CreateNumbering(meshFineLevel, mg);
+                    VecDescCL chiExtCoarse(&chiIdxExtCoarse), chiExt(&chiIdxExt);
+                    std::vector<ProlongationCL<double>> P; {
+                        for (size_t l = prolongationLevel + 1; l <= meshFineLevel; ++l) {
+                            P.emplace_back(ProlongationCL<double>(mg));
+                            IdxDescCL chiIdxExtFrom(P1_FE), chiIdxExtTo(P1_FE);
+                            chiIdxExtFrom.CreateNumbering(l - 1, mg);
+                            chiIdxExtTo.CreateNumbering(l, mg);
+                            P.back().Create(&chiIdxExtFrom, &chiIdxExtTo);
                         }
-                    solveTime = logger.end();
-                    logger.beg("convert from Epetra");
-                        for (size_t i = 0; i < n_c; ++i) chi.Data[i] = belosLHS[i];
-                        for (size_t i = 0; i < n_omega; ++i) omega.Data[i] = belosLHS[i + n_c];
+                    }
+                    double raftFraction, raftFractionError;
+                    do {
+                        chiExtCoarse.Interpolate(mg , [&](Point3DCL const & x) { return surfCahnHilliardData.chi(x, t); });
+                        chiExt.Data = chiExtCoarse.Data;
+                        for (auto const & p : P)
+                            chiExt.Data = p * chiExt.Data;
+                        Restrict(mg, chiExt, chi);
+                        if (surfCahnHilliardData.raftRatio > 0.) {
+                            raftFraction = dot(M.Data * chi.Data, I_p) / dot(M.Data * I_p, I_p);
+                            raftFractionError = std::fabs(surfCahnHilliardData.raftRatio - raftFraction) / surfCahnHilliardData.raftRatio;
+                            logger.buf << "raft ratio error (%) = " << raftFractionError;
+                            logger.log();
+                        }
+                    } while (surfCahnHilliardData.raftRatio > 0. && raftFractionError > .001);
+                }
+                auto chi_prev = chi;
+                wind.Interpolate(mg, [&](Point3DCL const & x) { return surfCahnHilliardData.wind(x, t); });
+            auto solveTime = logger.end();
+            logger.beg("output");
+                size_t numTries;
+                double e = 0., dt, alpha, b_norm, r_0_norm;
+                ReturnType belosSolverResult;
+                auto exportStats = [&](size_t i) {
+                    std::ofstream stats(dirName + "/stats/t_" + std::to_string(i) + ".json");
+                    ParamCL tJSON;
+                    tJSON.put("t", t);
+                    tJSON.put("h", h);
+                    tJSON.put("c_h.Max", chi.Data.max());
+                    tJSON.put("c_h.Min", chi.Data.min());
+                    tJSON.put("DOF.c_h", m);
+                    tJSON.put("DOF.mu_h", m);
+                    tJSON.put("MeshDepParams.rho_vol", rho_vol);
+                    tJSON.put("ElapsedTime.Assemble", assembleTime);
+                    tJSON.put("ElapsedTime.LinearSolve", solveTime);
+                    auto surfArea = dot(I_p, M.Data * I_p);
+                    tJSON.put("Integral.SurfacaAreaP1", surfArea);
+                    tJSON.put("Integral.FESolution.RaftFraction", dot(M.Data * chi.Data, I_p) / surfArea);
+                    tJSON.put("Integral.FESolution.PerimeterEstimate", eps * dot(A_one.Data * chi.Data, chi.Data));
+                    if (surfCahnHilliardData.exact) {
+                        chi_star.Interpolate(mg, [&](Point3DCL const & x) { return surfCahnHilliardData.chi(x, t); });
+                        tJSON.put("Integral.ExactSolution.RaftFraction", dot(M.Data * chi_star.Data, I_p) / surfArea);
+                        tJSON.put("Integral.ExactSolution.PerimeterEstimate", eps * dot(A_one.Data * chi_star.Data, chi_star.Data));
+                        auto chi_diff = chi_star.Data - chi.Data;
+                        tJSON.put("Integral.Error.ConcentrationL2", sqrt(dot(chi_diff, M.Data * chi_diff)));
+                        tJSON.put("Integral.Error.ConcentrationH1", sqrt(dot(chi_diff, A_one.Data * chi_diff)));
+                    }
+                    if (i > 0) {
+                        tJSON.put("dt", dt);
+                        auto r_i_norm = residualNorm(*belosMTX, belosLHS, belosRHS);
+                        tJSON.put("Solver.ResidualNorm.r_i", r_i_norm);
+                        tJSON.put("Solver.ResidualNorm.b", b_norm);
+                        tJSON.put("Solver.ResidualNorm.r_0", r_0_norm);
+                        tJSON.put("Solver.ResidualNorm.r_i/b", r_i_norm / b_norm);
+                        tJSON.put("Solver.ResidualNorm.r_i/r_0", r_i_norm / r_0_norm);
+                        tJSON.put("Solver.ResidualNorm.BelosRelative", belosSolver->achievedTol());
+                        tJSON.put("Solver.TotalIters", belosSolver->getNumIters());
+                        tJSON.put("Solver.Converged", belosSolverResult == Converged);
+                        tJSON.put("MassMatrixCoef", alpha);
+                    }
+                    if (i > 1) {
+                        tJSON.put("ApaptiveTimeStep.NumbOfTries", numTries);
+                        tJSON.put("ApaptiveTimeStep.RelativeError", e);
+                    }
+                    auto exportFiles = everyStep > 0 && (i % everyStep == 0 || t >= finalTime);
+                    if (exportVTK && exportFiles) {
+                        logger.beg("write vtk");
+                            vtkWriter.write(t);
+                        auto vtkTime = logger.end();
+                        tJSON.put("ElapsedTime.VTK", vtkTime);
+                    }
+                    if (exportVectors && exportFiles || t >= finalTime) {
+                        logger.beg("export vectors");
+                            auto expVec = [&](VecDescCL const & v, std::string const name) {
+                                logger.beg("export " + name + " vec");
+                                    logger.buf << "size: " << v.Data.size();
+                                    logger.log();
+                                    auto path = dirName + "/vectors/" + name + '_' + std::to_string(i) + ".dat";
+                                    std::ofstream file(path);
+                                    v.Write(file, binary);
+                                    tJSON.put("Vectors." + name, path);
+                                logger.end();
+                            };
+                            expVec(chi, "chi");
+                        auto vecTime = logger.end();
+                        tJSON.put("ElapsedTime.VectorExport", vecTime);
+                    }
+                    stats << tJSON;
+                    logger.buf << tJSON;
+                    logger.log();;
+                };
+                exportStats(i);
+            logger.end();
+        logger.end();
+        auto F_rho = inpJSON.get<double>("Time.Adaptive.rho");
+        auto F_tol = inpJSON.get<double>("Time.Adaptive.Tol");
+        auto F_min = inpJSON.get<double>("Time.Adaptive.MinStepSize");
+        auto F = [=](double e, double dt) {
+            if (e) return std::max(F_min, F_rho * std::sqrt(F_tol / e) * dt);
+            return inpJSON.get<double>("Time.StepSize");
+        };
+        while (t <= finalTime) {
+            logger.beg("t = t_" + std::to_string(++i));
+                auto t_prev = t;
+                auto dt_prev = dt;
+                numTries = 0;
+                do {
+                    logger.beg("attempt #" + std::to_string(++numTries));
+                        logger.beg("update time");
+                            dt = F(e, dt);
+                            t = t_prev + dt;
+                            logger.buf
+                                << "t  = " << t << '\n'
+                                << "dt = " << dt;
+                            logger.log();
+                        logger.end();
+                        logger.beg("BDF1 step");
+                            logger.beg("assemble");
+                                surfCHSystem.matrices = {};
+                                surfCHSystem.params.surfCahnHilliardParams.chi = &chi;
+                                if (useDegenerateMobility) surfCHSystem.matrices.push_back(&A_deg);
+                                surfCHSystem.params.surfCahnHilliardParams.u_T = &wind;
+                                wind.Interpolate(mg, [&](Point3DCL const & x) { return surfCahnHilliardData.wind(x, t); });
+                                auto wind_max = supnorm(wind.Data);
+                                if (wind_max) surfCHSystem.matrices.push_back(&N);
+                                surfCHSystem.vectors = { &f };
+                                setupFESystem(mg, surfCHSystem);
+                                F_chi.Data = f.Data + (1. / dt) * (M.Data * chi.Data);
+                                for (size_t i = 0; i < m; ++i) F_omega.Data[i] = chemicalPotential(chi.Data[i]);
+                                F_omega.Data = beta_s * (M.Data * chi.Data) - M.Data * F_omega.Data;
+                            assembleTime = logger.end();
+                            logger.beg("convert to Epetra");
+                                alpha = 1. / dt;
+                                logger.buf << "alpha = " << alpha;
+                                logger.log();
+                                belosMTX = static_cast<RCP<MT>>(MatrixCL(
+                                    wind_max ? MatrixCL(alpha, M.Data, 1., N.Data) : MatrixCL(alpha, M.Data), MatrixCL(mobilityScaling, useDegenerateMobility ? A_deg.Data : A_one.Data, rho_vol, C.Data),
+                                    MatrixCL(eps * eps, A_one.Data, beta_s, M.Data, eps * eps * rho_vol, C.Data), MatrixCL(-1., M.Data)
+                                ));
+                                logCRS(*belosMTX, "{A, B; C, D} block mtx");
+                                belosRHS = static_cast<SV>(F_chi.Data.append(F_omega.Data));
+                            logger.end();
+                            logger.beg("linear solve");
+                                auto belosSolve = [&]() {
+                                    if (i == 1) {
+                                        logger.beg("build initial factorization");
+                                            runFactorization();
+                                        logger.end();
+                                    }
+                                    belosLHS.PutScalar(0.);
+                                    b_norm = r_0_norm = residualNorm(*belosMTX, belosLHS, belosRHS);
+                                    if (usePrevGuess) {
+                                        belosLHS = static_cast<SV>(chi.Data.append(omega.Data));
+                                        r_0_norm = residualNorm(*belosMTX, belosLHS, belosRHS);
+                                    }
+                                    belosSolver->setParameters(rcpFromRef(belosParams->set("Convergence Tolerance", r_0_norm ? tol * b_norm / r_0_norm : 0.)));
+                                    LinearProblem<ST, MV, OP> belosProblem(belosMTX, rcpFromRef(belosLHS), rcpFromRef(belosRHS));
+                                    belosProblem.setRightPrec(belosPRE);
+                                    belosProblem.setProblem();
+                                    belosSolver->setProblem(rcpFromRef(belosProblem));
+                                    belosSolverResult = belosSolver->solve();
+                                    if (belosSolverResult != Converged) {
+                                        logger.wrn("belos did not converge");
+                                        logger.beg("build new factorization");
+                                            runFactorization();
+                                        logger.end();
+                                        logger.beg("linear solve w/ new factorization");
+                                            if (usePrevGuess) belosLHS = static_cast<SV>(chi.Data.append(omega.Data));
+                                            else belosLHS.PutScalar(0.);
+                                            LinearProblem<ST, MV, OP> belosProblem(belosMTX, rcpFromRef(belosLHS), rcpFromRef(belosRHS));
+                                            belosProblem.setRightPrec(belosPRE);
+                                            belosProblem.setProblem();
+                                            belosSolver->setProblem(rcpFromRef(belosProblem));
+                                            belosSolverResult = belosSolver->solve();
+                                        logger.end();
+                                    }
+                                };
+                                belosSolve();
+                                if (belosSolverResult != Converged) logger.wrn("belos did not converge");
+                            solveTime = logger.end();
+                            logger.beg("convert from Epetra");
+                                for (size_t i = 0; i < m; ++i) chi_BDF1.Data[i] = belosLHS[i];
+                            logger.end();
+                        logger.end();
+                        logger.beg("BDF2 step");
+                            if (i == 1) {
+                                chi_BDF2 = chi_BDF1;
+                                logger.log("i = 1: BDF2 soln = BDF1 soln");
+                                logger.end();
+                                break;
+                            }
+                            logger.beg("assemble");
+                                auto r = dt / dt_prev;
+                                chi_extrap.Data = (1. + r) * chi.Data - r * chi_prev.Data;
+                                surfCHSystem.params.surfCahnHilliardParams.chi = &chi_extrap;
+                                surfCHSystem.matrices = {};
+                                if (useDegenerateMobility) surfCHSystem.matrices.push_back(&A_deg);
+                                surfCHSystem.vectors = {};
+                                setupFESystem(mg, surfCHSystem);
+                                F_chi.Data = f.Data + ((1. + r) / dt) * (M.Data * chi.Data) - (r * r / (1. + r) / dt) * (M.Data * chi_prev.Data);
+                                for (size_t i = 0; i < m; ++i) F_omega.Data[i] = chemicalPotential(chi_extrap.Data[i]);
+                                F_omega.Data = beta_s * (M.Data * chi_extrap.Data) - M.Data * F_omega.Data;
+                            assembleTime += logger.end();
+                            logger.beg("convert to Epetra");
+                                alpha = (1. + 2. * r) / (1. + r) / dt; // https://dc.uwm.edu/cgi/viewcontent.cgi?article=1405&context=etd, eqn. (2.12)
+                                logger.buf << "alpha = " << alpha;
+                                logger.log();
+                                belosMTX = static_cast<RCP<MT>>(MatrixCL(
+                                    wind_max ? MatrixCL(alpha, M.Data, 1., N.Data) : MatrixCL(alpha, M.Data), MatrixCL(mobilityScaling, useDegenerateMobility ? A_deg.Data : A_one.Data, rho_vol, C.Data),
+                                    MatrixCL(eps * eps, A_one.Data, beta_s, M.Data, eps * eps * rho_vol, C.Data), MatrixCL(-1., M.Data)
+                                ));
+                                logCRS(*belosMTX, "{A, B; C, D} block mtx");
+                                belosRHS = static_cast<SV>(F_chi.Data.append(F_omega.Data));
+                            logger.end();
+                            logger.beg("linear solve");
+                                belosSolve();
+                                if (belosSolverResult != Converged) logger.wrn("belos did not converge");
+                            solveTime += logger.end();
+                            logger.beg("convert from Epetra");
+                                for (size_t i = 0; i < m; ++i) chi_BDF2.Data[i] = belosLHS[i];
+                            logger.end();
+                        logger.end();
+                        auto chi_diff = chi_BDF2.Data - chi_BDF1.Data;
+                        e = sqrt(dot(chi_diff, M.Data * chi_diff) / dot(chi_BDF2.Data, M.Data * chi_BDF2.Data));
+                        // e = std::sqrt(norm_sq(chi_BDF2.Data - chi_BDF1.Data) / norm_sq(chi_BDF2.Data));
+                        logger.buf << "e = " << e;
+                        logger.log();
                     logger.end();
-                    exportStats(1);
+                } while (e > F_tol && dt > F_min);
+                logger.beg("save BDF2 soln");
+                    for (size_t i = 0; i < m; ++i) omega.Data[i] = belosLHS[i + m];
+                    chi_prev = chi;
+                    chi = chi_BDF2;
+                logger.end();
+                logger.beg("output");
+                    exportStats(i);
                 logger.end();
             logger.end();
-            auto F_rho = inpJSON.get<double>("Time.Adaptive.rho");
-            auto F_tol = inpJSON.get<double>("Time.Adaptive.Tol");
-            auto F_min = inpJSON.get<double>("Time.Adaptive.MinStepSize");
-            auto F = [=](double e, double dt) {
-                return std::max(F_min, F_rho * std::sqrt(F_tol / e) * dt);
-            };
-            size_t i = 2; // second time step, apply BDF1/BDF2 apaptive scheme
-            while (t < T) {
-                logger.beg("do timestep i = " + std::to_string(i) + " w/ BDF1/BDF2 adaptive scheme");
-                    logger.beg("assemble");
-                        chi_prev_prev = chi_prev;
-                        chi_prev = chi;
-                        chi_extrap.Data = 2. * chi_prev.Data - chi_prev_prev.Data; // TODO: eqn (2) in https://www.researchgate.net/publication/30046083_Adaptive_Time-Stepping_for_Incompressible_Flow_Part_II_Navier-Stokes_Equations
-                        SetupCahnHilliardIF_P1P1(mg, &Mass, &Normal_stab, &Tangent_stab, &Volume_stab, &Laplace, &LaplaceM, &Gprimeprime, levelSet, chi_extrap);
-                    logger.end();
-                    auto t_old = t;
-                    do {
-                        logger.beg("attempt #" + std::to_string(numbOfTries + 1));
-                            logger.beg("update time");
-                                if (numbOfTries > 0) dt = F(e, dt);
-                                t = t_old + dt;
-                                logger.buf
-                                    << "t  = " << t << '\n'
-                                    << "dt = " << dt;
-                                logger.log();
-                                chiSol.Interpolate(mg, [&](Point3DCL const & x) { return surfCahnHilliardData.chi(x, t); });
-                            logger.end();
-                            logger.beg("BDF1 step");
-                                logger.beg("set up blocks");
-                                    for (int i = 0; i < well_potential.Data.size(); i++)
-                                        well_potential.Data[i] = chemicalPotential(chi_prev.Data[i]);
-                                    rhs1.Interpolate(mg , [&](Point3DCL const & x) { return surfCahnHilliardData.f(x, t); });
-                                    rhs1.Data = Mass.Data * rhs1.Data + (1. / dt) * (Mass.Data * chi_prev.Data);
-                                    rhs2.Data = S * (Mass.Data * chi_prev.Data) - Mass.Data * well_potential.Data;
-                                    A.LinComb(0., Laplace.Data, 1. / dt, Mass.Data);
-                                    B.LinComb(sigm, LaplaceM.Data, alpha, Volume_stab.Data);
-                                    C.LinComb(eps * eps, Laplace.Data, S, Mass.Data, alpha * eps * eps, Volume_stab.Data);
-                                    D.LinComb(0., Laplace.Data, -1., Mass.Data);
-                                logger.end();
-                                logger.beg("convert to Epetra");
-                                    ABCD_Epetra = static_cast<RCP<Epetra_CrsMatrix>>(MatrixCL(A, B, C, D));
-                                    logCRS(*ABCD_Epetra, "{A, B; C, D} block mtx");
-                                    belosMTX = ABCD_Epetra;
-                                    for (size_t i = 0; i < n_c; ++i) belosRHS[i] = rhs1.Data[i];
-                                    for (size_t i = 0; i < n_omega; ++i) belosRHS[i + n_c] = rhs2.Data[i];
-                                logger.end();
-                                logger.beg("linear solve");
-                                    belosLHS.PutScalar(0.);
-                                    LinearProblem<ST, MV, OP> belosProblemBDF1(belosMTX, rcpFromRef(belosLHS), rcpFromRef(belosRHS));
-                                    if (inpJSON.get<bool>("Solver.Inner.Use")) belosProblemBDF1.setRightPrec(belosPRE);
-                                    belosProblemBDF1.setProblem();
-                                    belosSolver->setProblem(rcpFromRef(belosProblemBDF1));
-                                    belosSolverResult = belosSolver->solve();
-                                    if (myRank == 0) {
-                                        if (belosSolverResult == Belos::Converged) logger.log("belos converged");
-                                        else logger.wrn("belos did not converge");
-                                    }
-                                solveTime = logger.end();
-                                if (belosSolverResult != Belos::Converged) {
-                                    runFactorization();
-                                    logger.beg("linear solve w/ new factorization");
-                                        belosLHS.PutScalar(0.);
-                                        belosSolverResult = belosSolver->solve();
-                                        if (belosSolverResult == Belos::Converged) logger.log("belos converged");
-                                        else logger.wrn("belos did not converge");
-                                    solveTime += logger.end();
-                                }
-                                logger.beg("convert from Epetra");
-                                    for (size_t i = 0; i < n_c; ++i) chi_BDF1.Data[i] = belosLHS[i];
-                                logger.end();
-                            logger.end();
-                            logger.beg("BDF2 step");
-                                logger.beg("set up blocks");
-                                    for (int i = 0; i < well_potential.Data.size(); i++)
-                                        well_potential.Data[i] = 2. * chemicalPotential(chi_prev.Data[i]) - chemicalPotential(chi_prev_prev.Data[i]);
-                                    rhs1.Interpolate(mg , [&](Point3DCL const & x) { return surfCahnHilliardData.f(x, t); });
-                                    rhs1.Data = Mass.Data * rhs1.Data + (2. / dt) * (Mass.Data * chi_prev.Data) - (.5 / dt) * (Mass.Data * chi_prev_prev.Data);
-                                    rhs2.Data = S * (Mass.Data * chi_extrap.Data) - Mass.Data * well_potential.Data;
-                                    A.LinComb(0., Laplace.Data, 1.5 / dt, Mass.Data);
-                                logger.end();
-                                logger.beg("convert to Epetra");
-                                    ABCD_Epetra = static_cast<RCP<Epetra_CrsMatrix>>(MatrixCL(A, B, C, D));
-                                    logCRS(*ABCD_Epetra, "{A, B; C, D} block mtx");
-                                    belosMTX = ABCD_Epetra;
-                                    for (size_t i = 0; i < n_c; ++i) belosRHS[i] = rhs1.Data[i];
-                                    for (size_t i = 0; i < n_omega; ++i) belosRHS[i + n_c] = rhs2.Data[i];
-                                logger.end();
-                                logger.beg("linear solve");
-                                    belosLHS.PutScalar(0.);
-                                    LinearProblem<ST, MV, OP> belosProblemBDF2(belosMTX, rcpFromRef(belosLHS), rcpFromRef(belosRHS));
-                                    if (inpJSON.get<bool>("Solver.Inner.Use")) belosProblemBDF2.setRightPrec(belosPRE);
-                                    belosProblemBDF2.setProblem();
-                                    belosSolver->setProblem(rcpFromRef(belosProblemBDF2));
-                                    belosSolverResult = belosSolver->solve();
-                                    if (myRank == 0) {
-                                        if (belosSolverResult == Belos::Converged) logger.log("belos converged");
-                                        else logger.wrn("belos did not converge");
-                                    }
-                                solveTime += logger.end();
-                                if (belosSolverResult != Belos::Converged) {
-                                    runFactorization();
-                                    logger.beg("linear solve w/ new factorization");
-                                        belosLHS.PutScalar(0.);
-                                        belosSolverResult = belosSolver->solve();
-                                        if (belosSolverResult == Belos::Converged) logger.log("belos converged");
-                                        else logger.wrn("belos did not converge");
-                                    solveTime += logger.end();
-                                }
-                                logger.beg("convert from Epetra");
-                                    for (size_t i = 0; i < n_c; ++i) chi_BDF2.Data[i] = belosLHS[i];
-                                logger.end();
-                            logger.end();
-                            e = std::sqrt(norm_sq(chi_BDF2.Data - chi_BDF1.Data) / norm_sq(chi_BDF2.Data));
-                            logger.buf << "e = " << e;
-                            logger.log();
-                            ++numbOfTries;
-                        logger.end();
-                    } while (e > F_tol && dt != F_min);
-                    logger.beg("convert $\\omega$ from Epetra");
-                        for (size_t i = 0; i < n_omega; ++i) omega.Data[i] = belosLHS[i + n_c];
-                    logger.end();
-                    chi = chi_BDF2; // save soln as BDF2
-                    // export
-                    exportStats(i);
-                    // prepare for the next step
-                    dt = F(e, dt);
-                    ++i;
-                    numbOfTries = 0;
-                logger.end();
-            }
-            if (everyStep > 0 && !vtkExported) { // make sure to export final time
-                logger.beg("write vtk (last time frame)");
-                vtkWriter.write(t);
-                auto vtkTime = logger.end();
-                // TODOLATER: update JSON
-            }
         }
         #ifdef HAVE_MPI
-                MPI_Finalize() ;
+            MPI_Finalize() ;
         #endif
         return 0;
     } catch (std::exception const & e) {

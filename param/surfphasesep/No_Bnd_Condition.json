@@ -5,8 +5,10 @@
       "Binary": true,
       "VTK": {
         "ExportFullGrid": false,
-        "Concentration": true
-      }
+        "Concentration": true,
+        "Wind": false
+      },
+      "Vectors": false
     },
 
     "Mesh": {
@@ -51,13 +53,13 @@
         "Params": {
           "RandomBernoulli": { "RaftRatio" : 0.5 },
           "RandomUniform": { "RaftRatio" : 0.5, "RaftRatioNoiseFraction" : 0.1 },
-          "WanDerVaals": { "AngularVelocity": 3.14159265359, "Noise": 0.0 }
+          "WanDerVaals": { "AngularVelocity": 0.0, "Noise": 0.0 }
         }
       },
       "ProlongateFromLevelNo" : 100,
       "c_0" : 0.5,
       "VolumeStab" : {
-        "Factor" : 1.0,
+        "Scaling" : 1.0,
         "Power"  : 1.0
       },
       "Beta_s" : 1.0,
@@ -68,30 +70,27 @@
     },
 
     "Time": {
-      "StepSize" : 0.01,
-      "FinalTime": 1e3,
+      "StepSize" : 0.001,
+      "FinalTime": 1e10,
       "Adaptive" : {
-        "Tol" : 0.001,
+        "Tol" : 0.005,
         "rho" : 0.9,
-        "MinStepSize" : 0.01
+        "MinStepSize" : 0.001
       }
     },
 
   "Solver" : {
+    "UsePreviousFrameAsInitialGuess": false,
     "Outer" : {
       "Iteration" : "FLEXIBLE GMRES",
       "OutputFrequency" : 1,
       "KrylovSubspaceSize" : 100,
       "MaxIter" : 50,
-      "RelResTol" : 1e-8
+      "RelResTol" : 1e-6
     },
     "Inner" : {
-      "Use" : true
+      "Comment" : "use Iteration = Amesos2_* (e.g. Amesos2_Klu, Amesos2_SuperLU etc.)",
+      "Iteration" : "Amesos2_KLU"
     }
-  },
-
-  "General" : {
-    "DynamicLibsPrefix": "../",
-    "DynamicLibs": []
   }
 }

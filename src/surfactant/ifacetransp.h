@@ -928,7 +928,6 @@ public:
             InstatScalarFunction m_g = nullptr; // - continuity eqn rhs
         } surfNavierStokesParams;
         struct {
-            double mobilityScaling = 1.;
             VecDescCL* u_T = nullptr;
             VecDescCL* chi = nullptr;
             InstatScalarFunction f = nullptr;
