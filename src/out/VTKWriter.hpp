@@ -156,20 +156,26 @@ namespace DROPS {
                             logger.log();
                             auto* value = new double[size];
                             for (size_t i = 0; i < size; ++i) value[i] = 0.;
-                            for (auto it = params.mg->GetTriangVertexBegin(); it != params.mg->GetTriangVertexEnd(); ++it)
-                                if (it->Unknowns.Exist(idx))
+                            for (auto it = params.mg->GetTriangVertexBegin(); it != params.mg->GetTriangVertexEnd(); ++it) {
+                                auto i = &*it;
+                                if (vertexIndex.count(i) && it->Unknowns.Exist(idx))
                                     for (size_t d = 0; d < dim; ++d)
-                                        value[dim * vertexIndex[&*it] + d] = var.vec.Data[it->Unknowns(idx) + d * blockSize];
-                            for (auto it = params.mg->GetTriangEdgeBegin(); it != params.mg->GetTriangEdgeEnd(); ++it)
-                                if (it->Unknowns.Exist(idx))
-                                    for (size_t d = 0; d < dim; ++d)
-                                        value[dim * edgeIndex[&*it] + d] = var.vec.Data[it->Unknowns(idx) + d * blockSize];
-                                else { // P1
-                                    auto i0 = dim * vertexIndex[it->GetVertex(0)];
-                                    auto i1 = dim * vertexIndex[it->GetVertex(1)];
-                                    for (size_t d = 0; d < dim; ++d)
-                                        value[dim * edgeIndex[&*it] + d] = .5 * (value[i0 + d] + value[i1 + d]);
+                                        value[dim * vertexIndex[i] + d] = var.vec.Data[it->Unknowns(idx) + d * blockSize];
+                            }
+                            for (auto it = params.mg->GetTriangEdgeBegin(); it != params.mg->GetTriangEdgeEnd(); ++it) {
+                                auto i = &*it;
+                                if (edgeIndex.count(i)) {
+                                    if (it->Unknowns.Exist(idx))
+                                        for (size_t d = 0; d < dim; ++d)
+                                            value[dim * edgeIndex[i] + d] = var.vec.Data[it->Unknowns(idx) + d * blockSize];
+                                    else { // P1
+                                        auto i0 = dim * vertexIndex[it->GetVertex(0)];
+                                        auto i1 = dim * vertexIndex[it->GetVertex(1)];
+                                        for (size_t d = 0; d < dim; ++d)
+                                            value[dim * edgeIndex[i] + d] = .5 * (value[i0 + d] + value[i1 + d]);
+                                    }
                                 }
+                            }
                             array->SetNumberOfComponents(dim); // cf. https://vtk.org/Wiki/VTK/Examples/Cxx/PolyData/PolyDataCellNormals
                             array->SetArray(value, size, 0 /* this will free the memory for ptr, cf. https://vtk.org/doc/release/5.6/html/a00505.html#d35ae5bee4aa873d543f1ab3eaf94454 */);
                             array->SetName(var.name.c_str());
