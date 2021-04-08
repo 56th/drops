@@ -52,7 +52,7 @@
     "SurfNSCH": {
       "NumbOfVirtualSubEdges": 2,
       "IC": {
-        "Name": "RayleighTaylor",
+        "Name": "RandomBernoulli",
         "Params": {
           "KelvinHelmholtz": {
             "cn": 0.01,
@@ -90,14 +90,14 @@
       },
       "CH": {
         "c_0": 0.5,
-        "Epsilon": 0.025,
-        "MobilityScaling": 0.1,
+        "Epsilon": 0.02,
+        "MobilityScaling": 50,
         "ChemicalPotentialScaling": 1.0,
         "Beta_s": 1.0,
         "UseDegenerateMobility": true,
-        "ProlongateFromLevelNo" : 3,
+        "ProlongateFromLevelNo" : 200,
         "Random" : {
-          "RaftRatio" : 0.5,
+          "RaftRatio" : 0.3,
           "RaftRatioNoiseFraction" : 0.1
         }
       }
@@ -106,7 +106,14 @@
     "Time": {
       "BDF": 2,
       "NumbOfSteps": 100,
-      "FinalTime": 10.0
+      "StepSize": 0.01,
+      "FinalTime": 10.0,
+      "Adaptive": {
+        "rho": 0.9,
+        "Tol": 0.005,
+        "MinStepSize": 0.01,
+        "MaxStepSize": 1
+      }
     },
 
     "Solver": {
@@ -131,7 +138,7 @@
             "A": {
               "Comment": "use Iteration = Amesos2_* (e.g. Amesos2_Klu, Amesos2_SuperLU etc.) for the sparse-direct; Type = Full for full factorization, BlockTriangular for block Gauss-Seidel, BlockDiagonal for block Jacobi",
               "Iteration": "Amesos2_KLU",
-              "Type": "Full"
+              "Type": "BlockTriangular"
             },
             "S": {
               "S_L": true,
