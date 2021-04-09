@@ -7,6 +7,7 @@
 
 #include <functional>
 #include <string>
+#include <Epetra_FECrsMatrix.h>
 #include "Epetra_Operator.h"
 #include "SingletonLogger.hpp"
 
@@ -61,20 +62,12 @@ namespace DROPS {
         }
     };
 
-    void logCRS(Epetra_CrsMatrix const & A, std::string const & name) {
+    void logCRS(Teuchos::RCP<const Epetra_Operator> B, std::string const & name) {
+        auto A = Teuchos::rcp_dynamic_cast<const Epetra_CrsMatrix>(B);
         auto& logger = SingletonLogger::instance();
-        logger.buf << name << ": " << A.NumGlobalRows() << 'x' << A.NumGlobalCols() << ", " << A.NumGlobalNonzeros() << " nonzeros";
-        if (A.NumGlobalNonzeros()) logger.buf << " (" << (100. * A.NumGlobalNonzeros()) / (static_cast<double>(A.NumGlobalRows()) * A.NumGlobalCols()) << "%)";
+        logger.buf << name << ": " << A->NumGlobalRows() << 'x' << A->NumGlobalCols() << ", " << A->NumGlobalNonzeros() << " nonzeros";
+        if (A->NumGlobalNonzeros()) logger.buf << " (" << (100. * A->NumGlobalNonzeros()) / (static_cast<double>(A->NumGlobalRows()) * A->NumGlobalCols()) << "%)";
         logger.log();
-    }
-
-    double residualNorm(Epetra_Operator const & A, Epetra_Vector const & x, Epetra_Vector const & b) {
-        Epetra_Vector residual(b.Map(), true);
-        A.Apply(x, residual);
-        residual.Update(-1., b, 1.);
-        double nrm;
-        residual.Norm2(&nrm);
-        return nrm;
     }
 
 }

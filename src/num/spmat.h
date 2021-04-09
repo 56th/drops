@@ -58,7 +58,7 @@
     #include "MatlabEngine.hpp"
 #endif
 
-// for casting to epetra
+// for casting to trilinos
 #ifdef _TRILINOS
     #include "Teuchos_RCPDecl.hpp"
     #include "Epetra_CrsMatrix.h"
@@ -89,7 +89,7 @@ class VectorBaseCL: public std::valarray<T>
     // ctors
     VectorBaseCL()                      : base_type()       {}
     #ifdef _TRILINOS
-        explicit operator Epetra_Vector() const {
+        explicit operator Teuchos::RCP<Epetra_Vector>() const {
             #ifdef HAVE_MPI
                 Epetra_MpiComm comm(MPI_COMM_WORLD);
             #else
@@ -97,8 +97,7 @@ class VectorBaseCL: public std::valarray<T>
             #endif
             Epetra_Map map(static_cast<int>(this->size()), 0, comm);
             double* view = const_cast<double*>(&(*this)[0]);
-            Epetra_Vector result(Copy, map, view);
-            return result;
+            return Teuchos::rcp(new Epetra_Vector(Copy, map, view));
         }
     #endif
     #ifdef VALARRAY_BUG
