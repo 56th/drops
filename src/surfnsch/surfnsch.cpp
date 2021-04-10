@@ -124,6 +124,7 @@ int main(int argc, char* argv[]) {
             auto formulation = inpJSON.get<std::string>("SurfNavierStokes.Formulation");
             auto stab = inpJSON.get<std::string>("SurfNavierStokes.PressureStab.Type");
             auto useTangMassMat = inpJSON.get<bool>("SurfNSCH.NS.UseTangentialMassMatrix");
+            auto thermoConsistentTerm = inpJSON.get<bool>("SurfNSCH.NS.ThermoConsistentTerm");
             auto usePrevGuess = inpJSON.get<bool>("Solver.UsePreviousFrameAsInitialGuess");
             auto tol = inpJSON.get<double>("Solver.RelResTol");
             if (surfNavierStokesData.exact != surfCahnHilliardData.exact) logger.wrn("exact soln is available only for either NS or CH");
@@ -229,6 +230,7 @@ int main(int argc, char* argv[]) {
                     rho_N_u(&velIdx, &velIdx, &LocalAssembler::rho_N_vecP2vecP2),
                     AL_u(&velIdx, &velIdx, &LocalAssembler::AL_vecP2vecP2),
                     A_u(&velIdx, &velIdx, formulation == "Consistent" ? &LocalAssembler::A_consistent_vecP2vecP2 : &LocalAssembler::A_vecP2vecP2),
+                    T_u(&velIdx, &velIdx, &LocalAssembler::T_vecP2vecP2),
                     S_u(&velIdx, &velIdx, &LocalAssembler::S_vecP2vecP2),
                     C_u(&velIdx, &velIdx, &LocalAssembler::C_n_vecP2vecP2),
                     // pressure-velocity
@@ -824,6 +826,10 @@ int main(int argc, char* argv[]) {
                         if (rho_delta) {
                             logger.log("assembling mass mtx scaled w/ cut-off function");
                             surfNSCHSystem.matrices.push_back(&rho_M_u);
+                            if (thermoConsistentTerm) {
+                                logger.log("assembling thermo-consistent term");
+                                surfNSCHSystem.matrices.push_back(&T_u);
+                            }
                         }
                         if (Pe) {
                             logger.log("assembling convection mtx");
@@ -835,6 +841,7 @@ int main(int argc, char* argv[]) {
                         // system mtx
                         A_sum.LinComb(alpha, rho_M_u.Data, gamma, AL_u.Data, nu, A_u.Data, tau_u, S_u.Data, rho_u, C_u.Data);
                         if (Pe) A_sum.LinComb(1., MatrixCL(A_sum), 1., rho_N_u.Data);
+                        if (rho_delta && thermoConsistentTerm) A_sum.LinComb(1., MatrixCL(A_sum), -1., T_u.Data);
                         // system rhs
                         if (i == 1) F_u.Data += (1. / dt) * (rho_M_u.Data * u.Data);
                         else F_u.Data += ((1. + r) / dt) * (rho_M_u.Data * u.Data) - (r * r / (1. + r) / dt) * (rho_M_u.Data * u_prev.Data);

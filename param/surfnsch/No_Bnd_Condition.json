@@ -66,13 +66,14 @@
         }
       },
       "NS": {
-        "rho" : { "max" : 3.0, "min" : 1.0 },
+        "rho": { "max" : 3.0, "min" : 1.0 },
         "nu": 1e-2,
         "gamma": 1.0,
         "LineTension": 1.0,
         "Comment": "Use ConvectionTermType = Stokes (zero convection term), Oseen (convection term is given and equal to velocity), or NavierStokes (convection term will be extrapolated from prev time steps)",
         "ConvectionTermType": "NavierStokes",
         "UseTangentialMassMatrix": false,
+        "ThermoConsistentTerm": true,
         "NormalPenalty": {
           "Power": -2.0,
           "Scaling": 1.0

@@ -919,7 +919,7 @@ public:
         VecDescCL levelSet;
         struct {
             double nu = 1., gamma = 0., lineTension = 0.;
-            struct { double min = 1., max = 1.; } rho;
+            struct { double min = 1., max = 1., alpha = .1; } rho;
             VecDescCL* w_T = nullptr;
             VecDescCL* u_N = nullptr;
             VecDescCL* chi = nullptr;
@@ -950,10 +950,10 @@ private:
     double absDet;
     QuadDomain2DCL qDomain;
     QuadDomainCL q3Domain;
-    GridFunctionCL<> qHatP2[10], qHatP1[4], qLsGradNorm, qSurfSpeed, qContinuityF, qConcentrationF, qChi, qOmega, qRho, qMobility2D;
+    GridFunctionCL<> qHatP2[10], qHatP1[4], qLsGradNorm, qSurfSpeed, qContinuityF, qConcentrationF, qChi, qOmega, qRho, qRhoPrime, qMobility;
     GridFunctionCL<Point3DCL> qGradP2[10], qSurfGradP2[10], q3DGradP2[10], qGradP1[4], qSurfGradP1[4], q3DGradP1[4], qNormal, q3DNormal, qSurfSpeedSurfGrad, qChiSurfGrad, qOmegaSurfGrad, qMomentumF, qHatP2CrossN[30];
     struct { GridFunctionCL<Point3DCL> NS, CH; } qWind;
-    GridFunctionCL<SMatrixCL<3,3>> qP, qH, qE[30];
+    GridFunctionCL<SMatrixCL<3,3>> qP, qH, qVectorGradP2[30], qE[30];
     mtx createMtx(size_t n, size_t m, double v) { return mtx(n, vec(m, v)); }
     mtx createMtx(size_t n, double v) { return createMtx(n, n, v); }
     mtx createMtx(size_t n, size_t m) { return mtx(n, vec(m)); }
@@ -1049,6 +1049,18 @@ private:
         require(qGradP2[0], &LocalAssembler::buildGradP2);
         for (size_t i = 0; i < 10; ++i) qSurfGradP2[i] = qGradP2[i] - dot(qGradP2[i], qNormal) * qNormal;
     }
+    void buildVectorGradP2() {
+        require(qGradP2[0], &LocalAssembler::buildGradP2);
+        for (size_t vecShapeIndex = 0; vecShapeIndex < n.vecP2; ++vecShapeIndex) {
+            qVectorGradP2[vecShapeIndex].resize(qDomain.vertex_size());
+            auto && [ scaShapeIndex, row ] = ind(n.P2, vecShapeIndex);
+            for (size_t i = 0; i < qVectorGradP2[vecShapeIndex].size(); ++i) {
+                SMatrixCL<3, 3> mtx(0.);
+                mtx.col(row, qGradP2[scaShapeIndex][i]);
+                assign_transpose(qVectorGradP2[vecShapeIndex][i], mtx);
+            }
+        }
+    }
     void buildNormal() {
         qNormal = getGradP2(levelSetTet);
         qLsGradNorm = sqrt(dot(qNormal, qNormal));
@@ -1069,20 +1081,10 @@ private:
         qH = qP * (qH / qLsGradNorm) * qP;
     }
     void buildRateOfStrainTensor() {
-        require(qGradP2[0], &LocalAssembler::buildGradP2);
+        require(qVectorGradP2[0], &LocalAssembler::buildVectorGradP2);
         require(qP, &LocalAssembler::buildProjector);
-        auto qVectGrad = [&](size_t vecShapeIndex, GridFunctionCL<Point3DCL>* qGrad) {
-            GridFunctionCL<SMatrixCL<3,3>> res(SMatrixCL<3,3>(), qDomain.vertex_size());
-            auto && [ scaShapeIndex, row ] = ind(n.P2, vecShapeIndex);
-            for (size_t i = 0; i < res.size(); ++i) {
-                SMatrixCL<3, 3> mtx(0.);
-                mtx.col(row, qGrad[scaShapeIndex][i]);
-                assign_transpose(res[i], mtx);
-            }
-            return res;
-        };
         for (size_t i = 0; i < n.vecP2; ++i)
-            qE[i] = qP * sym_part(qVectGrad(i, qGradP2)) * qP;
+            qE[i] = qP * sym_part(qVectorGradP2[i]) * qP;
     }
     void buildHatP2CrossN() { // compute velocity shape func cross normal vector
         require(qHatP2[0], &LocalAssembler::buildHatP2);
@@ -1165,9 +1167,9 @@ private:
         if (!params.surfCahnHilliardParams.chi) throw std::invalid_argument(__func__ + std::string(": chi is nullptr"));
         LocalP1CL<> chiTet;
         chiTet.assign(tet, *params.surfCahnHilliardParams.chi, BndDataCL<>());
-        resize_and_evaluate_on_vertexes(chiTet, qDomain, qMobility2D);
-        qMobility2D = qMobility2D * (1. - qMobility2D);
-        for (auto &val : qMobility2D) // cut-off function
+        resize_and_evaluate_on_vertexes(chiTet, qDomain, qMobility);
+        qMobility = qMobility * (1. - qMobility);
+        for (auto &val : qMobility) // cut-off function
             if (val < 0.) val = 0.;
     }
     void buildConcentration() {
@@ -1196,6 +1198,16 @@ private:
                 if (val < params.surfNavierStokesParams.rho.min)
                     val = params.surfNavierStokesParams.rho.min;
         }
+    }
+    void buildRhoPrime() {
+        require(qChi, &LocalAssembler::buildConcentration);
+        if (params.surfNavierStokesParams.rho.alpha <= 0.) throw std::invalid_argument(__func__ + std::string(": alpha <= 0"));
+        qRhoPrime = qChi / params.surfNavierStokesParams.rho.alpha;
+        qRhoPrime.apply(atan);
+        qRhoPrime += M_PI / 2.;
+        auto rho_delta = params.surfNavierStokesParams.rho.max - params.surfNavierStokesParams.rho.min;
+        if (rho_delta < 0.) throw std::invalid_argument(__func__ + std::string(": rho_max < rho_min"));
+        qRhoPrime *= rho_delta / M_PI;
     }
 public:
     LocalAssembler(TetraCL const & tet, LocalAssemblerParams const & params) : tet(tet), params(params) {
@@ -1370,6 +1382,23 @@ public:
         }
         return A;
     }
+    mtx T_vecP2vecP2() {
+        if (qDomain.empty()) return createMtx(n.vecP2, 0.);
+        require(qMobility, &LocalAssembler::buildMobility);
+        require(qRhoPrime, &LocalAssembler::buildRhoPrime);
+        require(qP, &LocalAssembler::buildProjector);
+        require(qVectorGradP2[0], &LocalAssembler::buildVectorGradP2);
+        require(qOmegaSurfGrad, &LocalAssembler::buildChemPotential);
+        require(qHatP2[0], &LocalAssembler::buildHatP2);
+        auto A = createMtx(n.vecP2);
+        for (size_t i = 0; i < n.vecP2; ++i) {
+            auto && [ is, in ] = ind(n.P2, i);
+            auto e_in = std_basis<3>(in + 1);
+            for (size_t j = 0; j < n.vecP2; ++j)
+                A[i][j] = quad_2D(qMobility * qRhoPrime * dot(e_in, qP * (qVectorGradP2[j] * (qP * qOmegaSurfGrad))) * qHatP2[is], qDomain);
+        }
+        return A;
+    }
     mtx C_n_vecP2vecP2() {
         if (q3Domain.empty()) return createMtx(n.vecP2, 0.);
         require(q3DGradP2[0], &LocalAssembler::buildGradP2);
@@ -1447,11 +1476,11 @@ public:
     mtx LaplaceM_P1P1() {
         if (qDomain.empty()) return createMtx(n.P1, 0.);
         require(qSurfGradP1[0], &LocalAssembler::buildSurfGradP1);
-        require(qMobility2D, &LocalAssembler::buildMobility);
+        require(qMobility, &LocalAssembler::buildMobility);
         auto A = createMtx(n.P1);
         for (size_t i = 0; i < n.P1; ++i)
             for (size_t j = i; j < n.P1; ++j) {
-                A[i][j] = quad_2D(qMobility2D * dot(qSurfGradP1[j], qSurfGradP1[i]), qDomain);
+                A[i][j] = quad_2D(qMobility * dot(qSurfGradP1[j], qSurfGradP1[i]), qDomain);
                 A[j][i] = A[i][j];
             }
         return A;
