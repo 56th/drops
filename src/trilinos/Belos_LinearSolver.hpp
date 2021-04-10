@@ -91,6 +91,7 @@ namespace DROPS {
                         problem.setProblem();
                         solver->setProblem(rcpFromRef(problem));
                         s.result = solver->solve();
+                        if (s.result != Converged) logger.wrn("belos did not converge");
                     s.time.solve += logger.end();
                 }
             }
