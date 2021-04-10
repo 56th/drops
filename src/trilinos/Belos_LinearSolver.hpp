@@ -23,7 +23,8 @@ namespace DROPS {
         } system;
         Teuchos::RCP<Belos::SolverManager<ST, MV, OP>> solver;
         std::function<void()> updatePreconditioner;
-        bool zeroIniGuess = true;
+        bool zeroIniGuess = false;
+        bool mute = false;
         struct Stats {
             size_t counter = 0;
             Belos::ReturnType result = Belos::Converged;
@@ -36,8 +37,9 @@ namespace DROPS {
             using namespace Belos;
             std::string funcName = __func__;
             if (!system.mtx || !system.lhs || !system.rhs) throw std::invalid_argument(funcName + ": setup system mtx, lhs, and rhs");
-            auto& s = const_cast<Stats&>(stats);
             auto& logger = SingletonLogger::instance();
+            std::swap(logger.mute, mute);
+            auto& s = const_cast<Stats&>(stats);
             if (updatePreconditioner && !s.counter++) {
                 logger.beg("build initial preconditioner");
                     updatePreconditioner();
@@ -95,6 +97,7 @@ namespace DROPS {
             s.norm.r_i = residualNorm();
             params->set("Convergence Tolerance", tol);
             solver->setParameters(params);
+            std::swap(logger.mute, mute);
         }
     };
 
