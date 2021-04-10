@@ -52,7 +52,7 @@
     "SurfNSCH": {
       "NumbOfVirtualSubEdges": 2,
       "IC": {
-        "Name": "RandomBernoulli",
+        "Name": "RayleighTaylor",
         "Params": {
           "KelvinHelmholtz": {
             "cn": 0.01,
@@ -61,14 +61,15 @@
           },
           "RayleighTaylor": { "GravityScaling": 1.0, "Noise": 1.0 },
           "WanDerVaalsExact": { "AngularVelocity": 3.14159265359 },
-          "RandomBernoulli" : {}
+          "RandomBernoulli": { "RaftRatio" : 0.5 },
+          "RandomUniform": { "RaftRatio" : 0.5, "RaftRatioNoiseFraction" : 0.1 }
         }
       },
       "NS": {
-        "rho" : { "max" : 1.0, "min" : 1.0 },
+        "rho" : { "max" : 3.0, "min" : 1.0 },
         "nu": 1e-2,
-        "gamma": 0.5,
-        "LineTension": 0.0,
+        "gamma": 1.0,
+        "LineTension": 1.0,
         "Comment": "Use ConvectionTermType = Stokes (zero convection term), Oseen (convection term is given and equal to velocity), or NavierStokes (convection term will be extrapolated from prev time steps)",
         "ConvectionTermType": "NavierStokes",
         "UseTangentialMassMatrix": false,
@@ -77,7 +78,7 @@
           "Scaling": 1.0
         },
         "VelocityStab":  {
-          "Power": -1.0,
+          "Power": 0.0,
           "Scaling": 1.0
         },
         "PressureStab":  {
@@ -90,40 +91,39 @@
       },
       "CH": {
         "c_0": 0.5,
-        "Epsilon": 0.02,
-        "MobilityScaling": 50,
+        "Epsilon": 0.05,
+        "MobilityScaling": 0.1,
         "ChemicalPotentialScaling": 1.0,
         "Beta_s": 1.0,
-        "UseDegenerateMobility": true,
-        "ProlongateFromLevelNo" : 200,
-        "Random" : {
-          "RaftRatio" : 0.3,
-          "RaftRatioNoiseFraction" : 0.1
-        }
+        "UseDegenerateMobility": false,
+        "ProlongateFromLevelNo" : 100
       }
     },
 
     "Time": {
-      "BDF": 2,
-      "NumbOfSteps": 100,
-      "StepSize": 0.01,
-      "FinalTime": 10.0,
+      "StepSize": 0.1,
+      "FinalTime": 200.0,
       "Adaptive": {
         "rho": 0.9,
         "Tol": 0.005,
-        "MinStepSize": 0.01,
-        "MaxStepSize": 1
+        "MinStepSize": 0.1
       }
     },
 
     "Solver": {
-        "UsePreviousFrameAsInitialGuess" : true,
+        "UsePreviousFrameAsInitialGuess": true,
         "RelResTol": 1e-6,
-        "CH" : {
+        "CH": {
+          "Outer": {
             "Iteration": "FLEXIBLE GMRES",
             "OutputFrequency": 1,
             "KrylovSubspaceSize": 50,
             "MaxIter": 50
+          },
+          "Inner": {
+            "Comment": "use Iteration = Amesos2_* (e.g. Amesos2_Klu, Amesos2_SuperLU etc.)",
+            "Iteration": "Amesos2_KLU"
+          }
         },
         "NS" : {
           "Outer": {
@@ -133,12 +133,11 @@
             "MaxIter": 50
           },
           "Inner": {
-            "Use": true,
             "Type": "BlockTriangular",
             "A": {
               "Comment": "use Iteration = Amesos2_* (e.g. Amesos2_Klu, Amesos2_SuperLU etc.) for the sparse-direct; Type = Full for full factorization, BlockTriangular for block Gauss-Seidel, BlockDiagonal for block Jacobi",
               "Iteration": "Amesos2_KLU",
-              "Type": "BlockTriangular"
+              "Type": "Full"
             },
             "S": {
               "S_L": true,
