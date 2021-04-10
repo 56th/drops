@@ -628,7 +628,7 @@ int main(int argc, char* argv[]) {
                     linearSolverS_M.system.mtx = static_cast<RCP<MT>>(MatrixCL(1. / (gamma + nu), M_p.Data, rho_p, C_p.Data));
                     logCRS(linearSolverS_M.system.mtx, "S_M := (nu + gamma)^{-1} M_p - C");
                     linearSolverS_L.system.mtx = static_cast<RCP<MT>>(MatrixCL(1. / alpha, A_p.Data, rho_p, C_p.Data));
-                    logCRS(linearSolverS_L.system.mtx, "S_L := \\alpha^{-1} L_p - C");
+                    logCRS(linearSolverS_L.system.mtx, "S_L := alpha^{-1} L_p - C");
                     linearSolver.system.rhs = static_cast<RCP<SV>>(F_u.Data.append(G_p.Data));
                 logger.end();
                 linearSolver.solve();

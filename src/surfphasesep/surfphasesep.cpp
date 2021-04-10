@@ -233,21 +233,22 @@ int main(int argc, char* argv[]) {
             using ST = double;
             using namespace Teuchos;
             using namespace Belos;
-            auto belosParams = parameterList();
-            belosParams->set("Convergence Tolerance", inpJSON.get<double>("Solver.Outer.RelResTol"));
-            belosParams->set("Num Blocks", inpJSON.get<int>("Solver.Outer.KrylovSubspaceSize"));
-            belosParams->set("Maximum Iterations", inpJSON.get<int>("Solver.Outer.MaxIter"));
-            belosParams->set("Output Frequency", inpJSON.get<int>("Solver.Outer.OutputFrequency"));
-            belosParams->set("Verbosity", Errors + Warnings + StatusTestDetails);
-            belosParams->set<int>("Output Style", Brief);
             SolverFactory<ST, MV, OP> belosFactory;
             logger.buf << "available iterations: " << belosFactory.supportedSolverNames();
             logger.log();
-            Belos_LinearSolver linearSolver;
+            Belos_LinearSolver linearSolver; {
+                auto belosParams = parameterList();
+                belosParams->set("Convergence Tolerance", inpJSON.get<double>("Solver.Outer.RelResTol"));
+                belosParams->set("Num Blocks", inpJSON.get<int>("Solver.Outer.KrylovSubspaceSize"));
+                belosParams->set("Maximum Iterations", inpJSON.get<int>("Solver.Outer.MaxIter"));
+                belosParams->set("Output Frequency", inpJSON.get<int>("Solver.Outer.OutputFrequency"));
+                belosParams->set("Verbosity", Errors + Warnings + StatusTestDetails);
+                belosParams->set<int>("Output Style", Brief);
+                linearSolver.solver = belosFactory.create(inpJSON.get<std::string>("Solver.Outer.Iteration"), belosParams);
+                logger.buf << "outer solver: " << linearSolver.solver->description();
+                logger.log();
+            }
             linearSolver.zeroIniGuess = !inpJSON.get<bool>("Solver.UsePreviousFrameAsInitialGuess");
-            linearSolver.solver = belosFactory.create(inpJSON.get<std::string>("Solver.Outer.Iteration"), belosParams);
-            logger.buf << "outer solver: " << linearSolver.solver->description();
-            logger.log();
             logger.beg("set up preconditioner");
                 RCP<Amesos2::Solver<MT, MV>> amesosSolver;
                 linearSolver.system.pre = rcp(new Epetra_OperatorApply([&](MV const &X, MV &Y) {
