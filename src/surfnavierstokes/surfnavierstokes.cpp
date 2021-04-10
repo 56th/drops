@@ -25,25 +25,20 @@
 #include <fstream>
 #include "misc/params.h"
 #include "geom/builder.h"
-#include "levelset/levelset.h"
 #include "levelset/adaptriang.h"
-#include "levelset/surfacetension.h"
 #include "misc/dynamicload.h"
-#include "num/bndData.h"
 #include "surfactant/ifacetransp.h"
 #include "out/VTKWriter.hpp"
 #include "SurfNavierStokesData.hpp"
 #include "SingletonLogger.hpp"
 // belos (iterative solvers)
 #include "BelosSolverFactory.hpp"
-#include "BelosLinearProblem.hpp"
-#include "BelosEpetraAdapter.hpp"
-// #include "BelosStatusTestImpResNorm.hpp"
+#include "trilinos/Belos_LinearSolver.hpp"
 // amesos2 (sparse-direct solvers)
 #include "Amesos2.hpp"
 #include "Amesos2_Version.hpp"
-// epetra (vectors and operators / matrices)
-#include "epetra/Epetra_OperatorApply.hpp"
+// trilinos (vectors and operators / matrices)
+#include "trilinos/Epetra_OperatorApply.hpp"
 #include "Epetra_CrsMatrix.h"
 #include "Epetra_Vector.h"
 #ifdef HAVE_MPI
@@ -120,9 +115,6 @@ int main(int argc, char* argv[]) {
             auto formulation = inpJSON.get<std::string>("SurfNavierStokes.Formulation");
             auto stab = inpJSON.get<std::string>("SurfNavierStokes.PressureStab.Type");
             auto useTangMassMat = inpJSON.get<bool>("SurfNavierStokes.UseTangentialMassMatrix");
-            auto useInnerIters = inpJSON.get<bool>("Solver.Inner.Use");
-            auto usePrevGuess = inpJSON.get<bool>("Solver.UsePreviousFrameAsInitialGuess");
-            auto tol = inpJSON.get<double>("Solver.Outer.RelResTol");
             logger.buf
                 << surface->description() << '\n'
                 << surfNavierStokesData.description << '\n'
@@ -238,22 +230,25 @@ int main(int argc, char* argv[]) {
             using ST = double;
             using namespace Teuchos;
             using namespace Belos;
-            auto belosParams = parameterList();
-            belosParams->set("Num Blocks", inpJSON.get<int>("Solver.Outer.KrylovSubspaceSize"));
-            belosParams->set("Maximum Iterations", inpJSON.get<int>("Solver.Outer.MaxIter"));
-            belosParams->set("Output Frequency", inpJSON.get<int>("Solver.Outer.OutputFrequency"));
-            belosParams->set("Verbosity", Errors + Warnings + StatusTestDetails/* + TimingDetails + FinalSummary + IterationDetails*/);
-            belosParams->set<int>("Output Style", Brief);
             SolverFactory<ST, MV, OP> belosFactory;
             logger.buf << "available iterations: " << belosFactory.supportedSolverNames();
             logger.log();
-            auto belosSolver = belosFactory.create(inpJSON.get<std::string>("Solver.Outer.Iteration"), belosParams);
-            logger.buf << "outer solver: " << belosSolver->description();
-            logger.log();
+            Belos_LinearSolver linearSolver; {
+                auto belosParams = parameterList();
+                belosParams->set("Convergence Tolerance", inpJSON.get<double>("Solver.Outer.RelResTol"));
+                belosParams->set("Num Blocks", inpJSON.get<int>("Solver.Outer.KrylovSubspaceSize"));
+                belosParams->set("Maximum Iterations", inpJSON.get<int>("Solver.Outer.MaxIter"));
+                belosParams->set("Output Frequency", inpJSON.get<int>("Solver.Outer.OutputFrequency"));
+                belosParams->set("Verbosity", Errors + Warnings + StatusTestDetails/* + TimingDetails + FinalSummary + IterationDetails*/);
+                belosParams->set<int>("Output Style", Brief);
+                linearSolver.solver = belosFactory.create(inpJSON.get<std::string>("Solver.Outer.Iteration"), belosParams);
+                logger.buf << "outer solver: " << linearSolver.solver->description();
+                logger.log();
+            }
+            linearSolver.zeroIniGuess = !inpJSON.get<bool>("Solver.UsePreviousFrameAsInitialGuess");
             Epetra_Map mapVelocity(static_cast<int>(n), 0, comm), mapVelocityComp(static_cast<int>(n_i), 0, comm), mapVelocityPressure(static_cast<int>(n + m), 0, comm), mapPressure(static_cast<int>(m), 0, comm);
-            SV belosLHS(mapVelocityPressure), belosRHS(mapVelocityPressure);
             RCP<MT> A, B, C;
-            RCP<OP> belosMTX = rcp(new Epetra_OperatorApply([&](MV const & X, MV& Y) {
+            linearSolver.system.mtx = rcp(new Epetra_OperatorApply([&](MV const & X, MV& Y) {
                 double* view;
                 X(0)->ExtractView(&view);
                 SV x1(Epetra_DataAccess::View, mapVelocity, view);
@@ -283,7 +278,7 @@ int main(int argc, char* argv[]) {
                     else logger.log("factorizing diagonal blocks A_{ii} of velocity matrix");
                     std::vector<std::vector<RCP<MT>>> A_block(numBlocksA, std::vector<RCP<MT>>(numBlocksA));
                     std::vector<RCP<Amesos2::Solver<MT, MV>>> amesosSolver(numBlocksA);
-                    auto runFactorization = [&]() {
+                    linearSolver.updatePreconditioner = [&]() {
                         for (size_t i = 0; i < numBlocksA; ++i)
                             amesosSolver[i] = Amesos2::create<MT, MV>(iterationA, A_block[i][i]);
                         logger.buf
@@ -300,7 +295,6 @@ int main(int argc, char* argv[]) {
                                    << (100. * amesosStatus.getNnzLU()) / (static_cast<double>(A_block[0][0]->NumGlobalRows()) * A_block[0][0]->NumGlobalCols()) << "%)";
                         logger.log();
                     };
-                    size_t numItersA = 0;
                     Epetra_OperatorApply::ApplyType invA = [&](MV const &X, MV &Y) {
                         double *viewX, *viewY;
                         X(0)->ExtractView(&viewX);
@@ -318,7 +312,6 @@ int main(int argc, char* argv[]) {
                             amesosSolver[i]->setX(rcpFromRef(y[i]));
                             amesosSolver[i]->solve();
                         }
-                        numItersA++;
                     };
                     if (precTypeA == "BlockTriangular")
                         invA = [&](MV const &X, MV &Y) {
@@ -343,19 +336,19 @@ int main(int argc, char* argv[]) {
                                 amesosSolver[i]->setX(rcpFromRef(y[i]));
                                 amesosSolver[i]->solve();
                             }
-                            numItersA++;
                         };
                 logger.end();
                 logger.beg("schur complement block");
-                    auto belosParamsS = parameterList();
-                    belosParamsS->set("Maximum Iterations", inpJSON.get<int>("Solver.Inner.S.MaxIter"));
-                    belosParamsS->set("Convergence Tolerance", inpJSON.get<double>("Solver.Inner.S.RelResTol"));
-                    auto belosSolverS_M = belosFactory.create(inpJSON.get<std::string>("Solver.Inner.S.Iteration"), belosParamsS);
-                    auto belosSolverS_L = belosFactory.create(inpJSON.get<std::string>("Solver.Inner.S.Iteration"), belosParamsS);
-                    logger.buf << "inner solver: " << belosSolverS_M->description();
-                    logger.log();
-                    RCP<MT> S_L, S_M;
-                    size_t numItersS_M = 0, numItersS_L = 0;
+                    Belos_LinearSolver linearSolverS_M, linearSolverS_L; {
+                        auto belosParams = parameterList();
+                        belosParams->set("Maximum Iterations", inpJSON.get<int>("Solver.Inner.S.MaxIter"));
+                        belosParams->set("Convergence Tolerance", inpJSON.get<double>("Solver.Inner.S.RelResTol"));
+                        linearSolverS_M.solver = belosFactory.create(inpJSON.get<std::string>("Solver.Inner.S.Iteration"), belosParams);
+                        linearSolverS_L.solver = belosFactory.create(inpJSON.get<std::string>("Solver.Inner.S.Iteration"), belosParams);
+                        logger.buf << "inner solver: " << linearSolverS_M.solver->description();
+                        logger.log();
+                    }
+                    linearSolverS_M.mute = linearSolverS_L.mute = true;
                     auto invS = [&](MV const & X, MV& Y) {
                         Y.PutScalar(0.); // ini guess
                         auto& Y_M = Y;
@@ -366,18 +359,14 @@ int main(int argc, char* argv[]) {
                             for (size_t i = 0; i < m; ++i) (*X_nrm(0))[i] -= mean;
                         }
                         // Y_M
-                        LinearProblem<ST, MV, OP> belosProblemS_M(S_M, rcpFromRef(Y_M), rcpFromRef(X_nrm));
-                        belosProblemS_M.setProblem();
-                        belosSolverS_M->setProblem(rcpFromRef(belosProblemS_M));
-                        belosSolverS_M->solve();
-                        numItersS_M += belosSolverS_M->getNumIters();
-                        // Y_L (TODO: make parallel)
+                        linearSolverS_M.system.lhs = rcpFromRef(*Y_M(0));
+                        linearSolverS_M.system.rhs = rcpFromRef(*X_nrm(0));
+                        linearSolverS_M.solve();
+                        // Y_L
                         if (inpJSON.get<bool>("Solver.Inner.S.S_L")) {
-                            LinearProblem<ST, MV, OP> belosProblemS_L(S_L, rcpFromRef(Y_L), rcpFromRef(X_nrm));
-                            belosProblemS_L.setProblem();
-                            belosSolverS_L->setProblem(rcpFromRef(belosProblemS_L));
-                            belosSolverS_L->solve();
-                            numItersS_L += belosSolverS_L->getNumIters();
+                            linearSolverS_L.system.lhs = rcpFromRef(*Y_L(0));
+                            linearSolverS_L.system.rhs = rcpFromRef(*X_nrm(0));
+                            linearSolverS_L.solve();
                         }
                         // result
                         Y_M.Update(1., Y_L, 1.);
@@ -385,27 +374,27 @@ int main(int argc, char* argv[]) {
                 logger.end();
                 auto precType = inpJSON.get<std::string>("Solver.Inner.Type");
                 logger.log("preconditioner type: " + precType);
-                auto belosPRE = rcp(new Epetra_OperatorApply([&](MV const & X, MV& Y) {
-                    double* view;
-                    X(0)->ExtractView(&view);
-                    SV x1(Epetra_DataAccess::View, mapVelocity, view);
-                    SV x2(Epetra_DataAccess::View, mapPressure, view + n);
-                    Y(0)->ExtractView(&view);
-                    SV y1(Epetra_DataAccess::View, mapVelocity, view);
-                    SV y2(Epetra_DataAccess::View, mapPressure, view + n);
-                    #pragma omp parallel
-                    {
-                        #pragma omp single
+                linearSolver.system.pre = precType == "BlockDiagonal"
+                    ? rcp(new Epetra_OperatorApply([&](MV const & X, MV& Y) {
+                        double* view;
+                        X(0)->ExtractView(&view);
+                        SV x1(Epetra_DataAccess::View, mapVelocity, view);
+                        SV x2(Epetra_DataAccess::View, mapPressure, view + n);
+                        Y(0)->ExtractView(&view);
+                        SV y1(Epetra_DataAccess::View, mapVelocity, view);
+                        SV y2(Epetra_DataAccess::View, mapPressure, view + n);
+                        #pragma omp parallel
                         {
-                            #pragma omp task
-                            invA(x1, y1); // y1
-                            #pragma omp task
-                            invS(x2, y2); // y2
+                            #pragma omp single
+                            {
+                                #pragma omp task
+                                invA(x1, y1); // y1
+                                #pragma omp task
+                                invS(x2, y2); // y2
+                            }
                         }
-                    }
-                }));
-                if (precType == "BlockTriangular")
-                    belosPRE = rcp(new Epetra_OperatorApply([&](MV const & X, MV& Y) {
+                    }))
+                    : rcp(new Epetra_OperatorApply([&](MV const & X, MV& Y) {
                         double* view;
                         X(0)->ExtractView(&view);
                         SV x1(Epetra_DataAccess::View, mapVelocity, view);
@@ -422,8 +411,6 @@ int main(int argc, char* argv[]) {
                         invA(rhs, y1);
                     }));
             logger.end();
-            LinearProblem<ST, MV, OP> belosProblem(belosMTX, rcpFromRef(belosLHS), rcpFromRef(belosRHS));
-            if (useInnerIters) belosProblem.setRightPrec(belosPRE);
         logger.end();
         logger.beg("t = t_0 = 0");
             t = 0.;
@@ -433,42 +420,35 @@ int main(int argc, char* argv[]) {
                 MatrixCL A_sum;
                 VectorCL I_p(1., m);
             auto assembleTime = logger.end();
-            auto factorizationTime = 0.;
             logger.beg("interpolate initial data");
                 u_N.Interpolate(mg, [&](Point3DCL const & x) { return surface->u_N(x, t); });
                 u.Interpolate(mg, [&](Point3DCL const & x) { return surfNavierStokesData.u_T(x, t); });
                 p.Interpolate(mg, [&](Point3DCL const & x) { return surfNavierStokesData.p(x, t); });
                 p.Data -= dot(M_p.Data * p.Data, I_p) / dot(M_p.Data * I_p, I_p) * I_p;
                 u_prev = u;
-            auto solveTime = logger.end();
-            auto solveWastedTime = 0.;
+                linearSolver.system.lhs = static_cast<RCP<SV>>(u.Data.append(p.Data));
+            logger.end();
             logger.beg("project surface vorticity");
-                auto belosParamsW = parameterList();
-                belosParamsW->set("Maximum Iterations", 1000);
-                belosParamsW->set("Convergence Tolerance", 1e-8);
-                belosParamsW->set("Output Frequency", 10);
-                belosParamsW->set("Verbosity", Errors + Warnings + StatusTestDetails);
-                belosParamsW->set<int>("Output Style", Brief);
-                auto belosSolverW = belosFactory.create("CG", belosParamsW);
-                ReturnType belosSolverResultW;
+                Belos_LinearSolver linearSolverVorticity; {
+                    auto belosParams = parameterList();
+                    belosParams->set("Maximum Iterations", 1000);
+                    belosParams->set("Convergence Tolerance", 1e-8);
+                    belosParams->set("Output Frequency", 10);
+                    belosParams->set("Verbosity", Errors + Warnings + StatusTestDetails);
+                    belosParams->set<int>("Output Style", Brief);
+                    linearSolverVorticity.solver = belosFactory.create("CG", belosParams);
+                }
                 auto projectVorticity = [&]() {
-                    auto mtx = static_cast<RCP<MT>>(MatrixCL(1., M_p.Data, rho_p, C_p.Data));
-                    auto rhs = static_cast<SV>(Q_pu.Data * u.Data);
-                    auto sln = static_cast<SV>(surf_curl_u.Data);
-                    sln.PutScalar(0.);
-                    LinearProblem<ST, MV, OP> belosProblemW(mtx, rcpFromRef(sln), rcpFromRef(rhs));
-                    belosProblemW.setProblem();
-                    belosSolverW->setProblem(rcpFromRef(belosProblemW));
-                    belosSolverResultW = belosSolverW->solve();
-                    if (belosSolverResultW == Converged) logger.log("belos converged");
-                    else logger.wrn("belos did not converge");
-                    for (size_t i = 0; i < m; ++i) surf_curl_u.Data[i] = sln[i];
+                    linearSolverVorticity.system.mtx = static_cast<RCP<MT>>(MatrixCL(1., M_p.Data, rho_p, C_p.Data));
+                    linearSolverVorticity.system.rhs = static_cast<RCP<SV>>(Q_pu.Data * u.Data);
+                    linearSolverVorticity.system.lhs = rcp(new SV(mapPressure, true));
+                    linearSolverVorticity.solve();
+                    for (size_t i = 0; i < m; ++i) surf_curl_u.Data[i] = (*linearSolverVorticity.system.lhs)[i];
                 };
                 projectVorticity();
-            auto projectTime = logger.end();
+            logger.end();
             logger.beg("output");
-                double Pe, u_N_max, alpha, b_norm, r_0_norm;
-                ReturnType belosSolverResult;
+                double Pe, u_N_max, alpha;
                 auto exportStats = [&](size_t i) {
                     std::ofstream stats(dirName + "/stats/t_" + std::to_string(i) + ".json");
                     ParamCL tJSON;
@@ -482,13 +462,10 @@ int main(int argc, char* argv[]) {
                     tJSON.put("MeshDepParams.rho_u", rho_u);
                     tJSON.put("MeshDepParams.tau_u", tau_u);
                     tJSON.put("ElapsedTime.Assemble", assembleTime);
-                    tJSON.put("ElapsedTime.Factorization", factorizationTime);
-                    tJSON.put("ElapsedTime.LinearSolve", solveTime);
-                    tJSON.put("ElapsedTime.LinearSolveWasted", solveWastedTime);
-                    tJSON.put("ElapsedTime.ProjectVorticity", projectTime);
-                    tJSON.put("Solver.ProjectVorticity.TotalIters", belosSolverW->getNumIters());
-                    tJSON.put("Solver.ProjectVorticity.Converged", belosSolverResultW == Converged);
-                    tJSON.put("Solver.ProjectVorticity.ResidualNormBelosRelative", belosSolverW->achievedTol());
+                    tJSON.put("ElapsedTime.ProjectVorticity", linearSolverVorticity.stats.time.solve);
+                    tJSON.put("Solver.ProjectVorticity.TotalIters", linearSolverVorticity.solver->getNumIters());
+                    tJSON.put("Solver.ProjectVorticity.Converged", linearSolverVorticity.stats.result == Converged);
+                    tJSON.put("Solver.ProjectVorticity.ResidualNormBelosRelative", linearSolverVorticity.solver->achievedTol());
                     auto surfArea = dot(I_p, M_p.Data * I_p);
                     tJSON.put("Integral.SurfacaAreaP1", surfArea);
                     tJSON.put("Integral.FESolution.PressureMean", dot(I_p, M_p.Data * p.Data) / surfArea);
@@ -522,21 +499,18 @@ int main(int argc, char* argv[]) {
                         tJSON.put("Integral.Error.PressureL2", sqrt(dot(p_diff, M_p.Data * p_diff)));
                     }
                     if (i > 0) {
-                        auto r_i_norm = residualNorm(*belosMTX, belosLHS, belosRHS);
-                        tJSON.put("Solver.Outer.ResidualNorm.r_i", r_i_norm);
-                        tJSON.put("Solver.Outer.ResidualNorm.b", b_norm);
-                        tJSON.put("Solver.Outer.ResidualNorm.r_0", r_0_norm);
-                        tJSON.put("Solver.Outer.ResidualNorm.r_i/b", r_i_norm / b_norm);
-                        tJSON.put("Solver.Outer.ResidualNorm.r_i/r_0", r_i_norm / r_0_norm);
-                        tJSON.put("Solver.Outer.ResidualNorm.BelosRelative", belosSolver->achievedTol());
-                        tJSON.put("Solver.Outer.TotalIters", belosSolver->getNumIters());
-                        tJSON.put("Solver.Outer.Converged", belosSolverResult == Converged);
-                        tJSON.put("Solver.Inner.A.TotalIters", numItersA);
-                        tJSON.put("Solver.Inner.A.MeanIters", static_cast<double>(numItersA) / belosSolver->getNumIters());
-                        tJSON.put("Solver.Inner.S.TotalIters.S_M", numItersS_M);
-                        tJSON.put("Solver.Inner.S.TotalIters.S_L", numItersS_L);
-                        tJSON.put("Solver.Inner.S.MeanIters.S_M", static_cast<double>(numItersS_M) / belosSolver->getNumIters());
-                        tJSON.put("Solver.Inner.S.MeanIters.S_L", static_cast<double>(numItersS_L) / belosSolver->getNumIters());
+                        tJSON.put("ElapsedTime.Factorization", linearSolver.stats.time.updatePreconditioner);
+                        tJSON.put("ElapsedTime.LinearSolve", linearSolver.stats.time.solve);
+                        tJSON.put("Solver.Outer.ResidualNorm.r_i", linearSolver.stats.norm.r_i);
+                        tJSON.put("Solver.Outer.ResidualNorm.b", linearSolver.stats.norm.b);
+                        tJSON.put("Solver.Outer.ResidualNorm.r_0", linearSolver.stats.norm.r_0);
+                        tJSON.put("Solver.Outer.ResidualNorm.r_i/b", linearSolver.stats.norm.r_i / linearSolver.stats.norm.b);
+                        tJSON.put("Solver.Outer.ResidualNorm.r_i/r_0", linearSolver.stats.norm.r_i / linearSolver.stats.norm.r_0);
+                        tJSON.put("Solver.Outer.ResidualNorm.BelosRelative", linearSolver.solver->achievedTol());
+                        tJSON.put("Solver.Outer.TotalIters", linearSolver.solver->getNumIters());
+                        tJSON.put("Solver.Outer.Converged", linearSolver.stats.result == Converged);
+                        tJSON.put("Solver.Inner.S.MeanIters.S_M", linearSolverS_M.solver->getNumIters());
+                        tJSON.put("Solver.Inner.S.MeanIters.S_L", linearSolverS_L.solver->getNumIters());
                         tJSON.put("Peclet", Pe);
                         tJSON.put("MaxSurfaceSpeed", u_N_max);
                         tJSON.put("MassMatrixCoef", alpha);
@@ -638,73 +612,34 @@ int main(int argc, char* argv[]) {
                 assembleTime = logger.end();
                 logger.beg("convert to Epetra");
                     A = static_cast<RCP<MT>>(A_sum);
-                    logCRS(*A, "A");
+                    logCRS(A, "A");
                     {
                         auto A_sum_blocks = A_sum.Split(numBlocksA, numBlocksA);
                         for (size_t i = 0; i < numBlocksA; ++i)
                             for (size_t j = 0; j < numBlocksA; ++j)
                                 A_block[i][j] = static_cast<RCP<MT>>(A_sum_blocks[i][j]);
                         if (numBlocksA != 1)
-                            logCRS(*A_block[0][0], "A_{ij}");
+                            logCRS(A_block[0][0], "A_{ij}");
                     }
                     B = static_cast<RCP<MT>>(B_pu.Data);
-                    logCRS(*B, "B");
+                    logCRS(B, "B");
                     C = static_cast<RCP<MT>>(MatrixCL(-rho_p, C_p.Data));
-                    logCRS(*C, "C := -rho_p (pressure volume stabilization mtx)");
-                    S_M = static_cast<RCP<MT>>(MatrixCL(1. / (gamma + nu), M_p.Data, rho_p, C_p.Data));
-                    logCRS(*S_M, "S_M := (nu + gamma)^{-1} M_p - C");
-                    S_L = static_cast<RCP<MT>>(MatrixCL(1. / alpha, A_p.Data, rho_p, C_p.Data));
-                    logCRS(*S_L, "S_L := \\alpha^{-1} L_p - C");
-                    belosRHS = static_cast<SV>(F_u.Data.append(G_p.Data));
+                    logCRS(C, "C := -rho_p (pressure volume stabilization mtx)");
+                    linearSolverS_M.system.mtx = static_cast<RCP<MT>>(MatrixCL(1. / (gamma + nu), M_p.Data, rho_p, C_p.Data));
+                    logCRS(linearSolverS_M.system.mtx, "S_M := (nu + gamma)^{-1} M_p - C");
+                    linearSolverS_L.system.mtx = static_cast<RCP<MT>>(MatrixCL(1. / alpha, A_p.Data, rho_p, C_p.Data));
+                    logCRS(linearSolverS_L.system.mtx, "S_L := \\alpha^{-1} L_p - C");
+                    linearSolver.system.rhs = static_cast<RCP<SV>>(F_u.Data.append(G_p.Data));
                 logger.end();
-                factorizationTime = 0.;
-                if (useInnerIters && i == 1) {
-                    logger.beg("build initial factorization");
-                        runFactorization();
-                    factorizationTime = logger.end();
-                }
-                solveWastedTime = 0.;
-                logger.beg("linear solve");
-                    numItersA = numItersS_M = numItersS_L = 0;
-                    belosLHS.PutScalar(0.);
-                    b_norm = r_0_norm = residualNorm(*belosMTX, belosLHS, belosRHS);
-                    if (usePrevGuess) {
-                        belosLHS = static_cast<SV>(u.Data.append(p.Data));
-                        r_0_norm = residualNorm(*belosMTX, belosLHS, belosRHS);
-                    }
-                    belosSolver->setParameters(rcpFromRef(belosParams->set("Convergence Tolerance", r_0_norm ? tol * b_norm / r_0_norm : 0.)));
-                    belosProblem.setProblem();
-                    belosSolver->setProblem(rcpFromRef(belosProblem));
-                    belosSolverResult = belosSolver->solve();
-                solveTime = logger.end();
-                if (belosSolverResult == Converged) logger.log("belos converged");
-                else {
-                    logger.wrn("belos did not converge");
-                    if (useInnerIters && i > 1) {
-                        solveWastedTime = solveTime;
-                        numItersA = numItersS_M = numItersS_L = 0;
-                        logger.beg("build new factorization");
-                            runFactorization();
-                        factorizationTime = logger.end();
-                        logger.beg("linear solve w/ new factorization");
-                            if (usePrevGuess) belosLHS = static_cast<SV>(u.Data.append(p.Data));
-                            else belosLHS.PutScalar(0.);
-                            belosProblem.setProblem();
-                            belosSolver->setProblem(rcpFromRef(belosProblem));
-                            belosSolverResult = belosSolver->solve();
-                            if (belosSolverResult == Converged) logger.log("belos converged");
-                            else logger.wrn("belos did not converge");
-                        solveTime = logger.end();
-                    }
-                }
+                linearSolver.solve();
                 logger.beg("convert from Epetra");
-                    for (size_t i = 0; i < n; ++i) u.Data[i] = belosLHS[i];
-                    for (size_t i = 0; i < m; ++i) p.Data[i] = belosLHS[n + i];
+                    for (size_t i = 0; i < n; ++i) u.Data[i] = (*linearSolver.system.lhs)[i];
+                    for (size_t i = 0; i < m; ++i) p.Data[i] = (*linearSolver.system.lhs)[n + i];
                     p.Data -= dot(M_p.Data * p.Data, I_p) / dot(M_p.Data * I_p, I_p) * I_p;
                 logger.end();
                 logger.beg("project surface vorticity");
                     projectVorticity();
-                projectTime = logger.end();
+                logger.end();
                 logger.beg("output");
                     exportStats(i);
                 logger.end();

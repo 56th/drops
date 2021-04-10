@@ -72,7 +72,7 @@
         "Scaling": 1.0
       },
       "VelocityStab":  {
-        "Power": -1.0,
+        "Power": 0.0,
         "Scaling": 1.0
       },
       "PressureStab":  {
@@ -101,7 +101,6 @@
           "RelResTol" : 1e-8
         },
         "Inner" : {
-            "Use" : true,
             "Type" : "BlockTriangular",
             "A" : {
               "Comment" : "use Iteration = Amesos2_* (e.g. Amesos2_Klu, Amesos2_SuperLU etc.) for the sparse-direct; Type = Full for full factorization, BlockTriangular for block Gauss-Seidel, BlockDiagonal for block Jacobi",
