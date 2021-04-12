@@ -96,8 +96,9 @@ int main(int argc, char* argv[]) {
             auto surfCahnHilliardData = surfCahnHilliardDataFactory(*surface, testName, inpJSON);
             auto mobilityScaling = inpJSON.get<double>("SurfCahnHilliard.MobilityScaling");
             auto beta_s = inpJSON.get<double>("SurfCahnHilliard.Beta_s");
-            auto useDegenerateMobility = inpJSON.get<bool>("SurfCahnHilliard.UseDegenerateMobility");
             FESystem surfCHSystem;
+            auto& useDegenerateMobility = surfCHSystem.params.surfCahnHilliardParams.useDegenerateMobility;
+            useDegenerateMobility = inpJSON.get<bool>("SurfCahnHilliard.UseDegenerateMobility");
             auto& t = surfCHSystem.params.t;
             auto& levelSet = surfCHSystem.params.levelSet;
             surfCHSystem.params.numbOfVirtualSubEdges = inpJSON.get<size_t>("SurfCahnHilliard.NumbOfVirtualSubEdges");

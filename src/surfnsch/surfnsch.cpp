@@ -115,12 +115,13 @@ int main(int argc, char* argv[]) {
             auto beta_s = inpJSON.get<double>("SurfNSCH.CH.Beta_s");
             auto& t = surfNSCHSystem.params.t;
             auto& levelSet = surfNSCHSystem.params.levelSet;
-            auto useDegenerateMobility = inpJSON.get<bool>("SurfNSCH.CH.UseDegenerateMobility");
             surfNSCHSystem.params.surfNavierStokesParams.lineTension = inpJSON.get<double>("SurfNSCH.NS.LineTension");
             surfNSCHSystem.params.numbOfVirtualSubEdges = inpJSON.get<size_t>("SurfNSCH.NumbOfVirtualSubEdges");
             surfNSCHSystem.params.surfNavierStokesParams.m_g = surfNavierStokesData.m_g;
             surfNSCHSystem.params.surfNavierStokesParams.f_T = surfNavierStokesData.f_T;
             surfNSCHSystem.params.surfCahnHilliardParams.f = surfCahnHilliardData.f;
+            auto& useDegenerateMobility = surfNSCHSystem.params.surfCahnHilliardParams.useDegenerateMobility;
+            useDegenerateMobility = inpJSON.get<bool>("SurfNSCH.CH.UseDegenerateMobility");
             auto formulation = inpJSON.get<std::string>("SurfNavierStokes.Formulation");
             auto stab = inpJSON.get<std::string>("SurfNavierStokes.PressureStab.Type");
             auto useTangMassMat = inpJSON.get<bool>("SurfNSCH.NS.UseTangentialMassMatrix");

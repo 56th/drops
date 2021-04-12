@@ -928,6 +928,7 @@ public:
             InstatScalarFunction m_g = nullptr; // - continuity eqn rhs
         } surfNavierStokesParams;
         struct {
+            bool useDegenerateMobility = false;
             VecDescCL* u_T = nullptr;
             VecDescCL* chi = nullptr;
             InstatScalarFunction f = nullptr;
@@ -1164,13 +1165,19 @@ private:
         }
     }
     void buildMobility() {
-        if (!params.surfCahnHilliardParams.chi) throw std::invalid_argument(__func__ + std::string(": chi is nullptr"));
-        LocalP1CL<> chiTet;
-        chiTet.assign(tet, *params.surfCahnHilliardParams.chi, BndDataCL<>());
-        resize_and_evaluate_on_vertexes(chiTet, qDomain, qMobility);
-        qMobility = qMobility * (1. - qMobility);
-        for (auto &val : qMobility) // cut-off function
-            if (val < 0.) val = 0.;
+        if (params.surfCahnHilliardParams.useDegenerateMobility) {
+            if (!params.surfCahnHilliardParams.chi) throw std::invalid_argument(__func__ + std::string(": chi is nullptr"));
+            LocalP1CL<> chiTet;
+            chiTet.assign(tet, *params.surfCahnHilliardParams.chi, BndDataCL<>());
+            resize_and_evaluate_on_vertexes(chiTet, qDomain, qMobility);
+            qMobility = qMobility * (1. - qMobility);
+            for (auto &val : qMobility) // cut-off function
+                if (val < 0.) val = 0.;
+        }
+        else {
+            qMobility.resize(qDomain.vertex_size());
+            qMobility = 1.;
+        }
     }
     void buildConcentration() {
         if (!params.surfNavierStokesParams.chi) throw std::invalid_argument(__func__ + std::string(": chi is nullptr"));
