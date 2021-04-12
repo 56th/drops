@@ -841,7 +841,7 @@ int main(int argc, char* argv[]) {
                         // system mtx
                         A_sum.LinComb(alpha, rho_M_u.Data, gamma, AL_u.Data, nu, A_u.Data, tau_u, S_u.Data, rho_u, C_u.Data);
                         if (Pe) A_sum.LinComb(1., MatrixCL(A_sum), 1., rho_N_u.Data);
-                        if (rho_delta && thermoConsistentTerm) A_sum.LinComb(1., MatrixCL(A_sum), -1., T_u.Data);
+                        if (rho_delta && thermoConsistentTerm) A_sum.LinComb(1., MatrixCL(A_sum), -mobilityScaling, T_u.Data);
                         // system rhs
                         if (i == 1) F_u.Data += (1. / dt) * (rho_M_u.Data * u.Data);
                         else F_u.Data += ((1. + r) / dt) * (rho_M_u.Data * u.Data) - (r * r / (1. + r) / dt) * (rho_M_u.Data * u_prev.Data);
