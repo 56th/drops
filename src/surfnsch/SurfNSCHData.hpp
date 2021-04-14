@@ -47,7 +47,7 @@ namespace DROPS {
         }
         else if (name == "RandomBernoulli") {
             dataNS = surfNavierStokesDataFactory(surface, "0", params);
-            auto raftRatio = params.get<double>("SurfNSCH.CH.Random.RaftRatio");
+            auto raftRatio = params.get<double>("SurfNSCH.IC.Params.RandomBernoulli.RaftRatio");
             params.put("SurfCahnHilliard.IC.Params." + name + ".RaftRatio", raftRatio);
             dataCH = surfCahnHilliardDataFactory(surface, "RandomBernoulli", params);
             dataCH.exact = false;

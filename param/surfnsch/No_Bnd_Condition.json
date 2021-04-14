@@ -1,7 +1,7 @@
 {
     "Output": {
       "Directory": "../../output/tmp",
-      "EveryStep": 1,
+      "EveryStep": 5,
       "Binary": true,
       "VTK": {
         "ExportFullGrid": false,
@@ -25,7 +25,7 @@
             "Freq": 0,
             "Width": 0,
             "CoarsestLevel": 0,
-            "FinestLevel": 4,
+            "FinestLevel": 5,
             "SD": 0.1,
             "CurvDiff": -1,
             "Discontinuous": 0
@@ -52,7 +52,7 @@
     "SurfNSCH": {
       "NumbOfVirtualSubEdges": 2,
       "IC": {
-        "Name": "RayleighTaylor",
+        "Name": "RandomBernoulli",
         "Params": {
           "KelvinHelmholtz": {
             "cn": 0.01,
@@ -61,19 +61,19 @@
           },
           "RayleighTaylor": { "GravityScaling": 1.0, "Noise": 1.0 },
           "WanDerVaalsExact": { "AngularVelocity": 3.14159265359 },
-          "RandomBernoulli": { "RaftRatio" : 0.5 },
+          "RandomBernoulli": { "RaftRatio" : 0.3 },
           "RandomUniform": { "RaftRatio" : 0.5, "RaftRatioNoiseFraction" : 0.1 }
         }
       },
       "NS": {
         "rho": { "max" : 3.0, "min" : 1.0 },
         "nu": 1e-2,
-        "gamma": 1.0,
+        "gamma": 0.025,
         "LineTension": 1.0,
         "Comment": "Use ConvectionTermType = Stokes (zero convection term), Oseen (convection term is given and equal to velocity), or NavierStokes (convection term will be extrapolated from prev time steps)",
         "ConvectionTermType": "NavierStokes",
         "UseTangentialMassMatrix": false,
-        "ThermoConsistentTerm": true,
+        "ThermoConsistentTerm": false,
         "NormalPenalty": {
           "Power": -2.0,
           "Scaling": 1.0
@@ -93,7 +93,7 @@
       "CH": {
         "c_0": 0.5,
         "Epsilon": 0.05,
-        "MobilityScaling": 0.1,
+        "MobilityScaling": 1.0,
         "ChemicalPotentialScaling": 1.0,
         "Beta_s": 1.0,
         "UseDegenerateMobility": false,
@@ -102,12 +102,13 @@
     },
 
     "Time": {
-      "StepSize": 0.1,
+      "StepSize": 0.0001,
       "FinalTime": 200.0,
       "Adaptive": {
         "rho": 0.9,
         "Tol": 0.005,
-        "MinStepSize": 0.1
+        "MinStepSize": 0.0001,
+        "MaxStepSize": 1.0
       }
     },
 
