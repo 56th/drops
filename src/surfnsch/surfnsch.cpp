@@ -102,9 +102,12 @@ int main(int argc, char* argv[]) {
             FESystem surfNSCHSystem;
             auto& gamma = surfNSCHSystem.params.surfNavierStokesParams.gamma;
             gamma = inpJSON.get<double>("SurfNSCH.NS.gamma");
-            auto& nu = surfNSCHSystem.params.surfNavierStokesParams.nu;
-            nu = inpJSON.get<double>("SurfNSCH.NS.nu");
-            if (nu <= 0.) throw std::invalid_argument("viscosity must be non-negative");
+            auto& nu_min = surfNSCHSystem.params.surfNavierStokesParams.nu.min;
+            auto& nu_max = surfNSCHSystem.params.surfNavierStokesParams.nu.max;
+            nu_min = inpJSON.get<double>("SurfNSCH.NS.nu.min");
+            nu_max = inpJSON.get<double>("SurfNSCH.NS.nu.max");
+            if (nu_max < nu_min) throw std::invalid_argument("nu_max < nu_min");
+            auto nu_delta = nu_max - nu_min;
             auto& rho_min = surfNSCHSystem.params.surfNavierStokesParams.rho.min;
             auto& rho_max = surfNSCHSystem.params.surfNavierStokesParams.rho.max;
             rho_min = inpJSON.get<double>("SurfNSCH.NS.rho.min");
@@ -231,6 +234,7 @@ int main(int argc, char* argv[]) {
                     rho_N_u(&velIdx, &velIdx, &LocalAssembler::rho_N_vecP2vecP2),
                     AL_u(&velIdx, &velIdx, &LocalAssembler::AL_vecP2vecP2),
                     A_u(&velIdx, &velIdx, formulation == "Consistent" ? &LocalAssembler::A_consistent_vecP2vecP2 : &LocalAssembler::A_vecP2vecP2),
+                    nu_A_u(&velIdx, &velIdx, formulation == "Consistent" ? &LocalAssembler::nu_A_consistent_vecP2vecP2 : &LocalAssembler::nu_A_vecP2vecP2),
                     T_u(&velIdx, &velIdx, &LocalAssembler::T_vecP2vecP2),
                     S_u(&velIdx, &velIdx, &LocalAssembler::S_vecP2vecP2),
                     C_u(&velIdx, &velIdx, &LocalAssembler::C_n_vecP2vecP2),
@@ -579,7 +583,8 @@ int main(int argc, char* argv[]) {
                     ParamCL tJSON;
                     tJSON.put("t", t);
                     tJSON.put("h", h);
-                    tJSON.put("nu", nu);
+                    tJSON.put("nu_max", nu_max);
+                    tJSON.put("nu_min", nu_min);
                     tJSON.put("gamma", gamma);
                     tJSON.put("c_h.Max", chi.Data.max());
                     tJSON.put("c_h.Min", chi.Data.min());
@@ -817,7 +822,7 @@ int main(int argc, char* argv[]) {
                     logger.beg("assemble");
                         if (surfNavierStokesData.w_T) w_T.Interpolate(mg, [&](Point3DCL const & x) { return surfNavierStokesData.w_T(x, t); }); // Oseen (and Stokes) case
                         else w_T.Data = (1. + r) * u.Data - r * u_prev.Data; // Navier-Stokes case
-                        Pe = supnorm(w_T.Data) / nu;
+                        Pe = supnorm(w_T.Data) / nu_max;
                         logger.buf << "Pe = " << Pe;
                         logger.log();
                         surfNSCHSystem.params.surfNavierStokesParams.w_T = &w_T;
@@ -832,6 +837,10 @@ int main(int argc, char* argv[]) {
                                 surfNSCHSystem.matrices.push_back(&T_u);
                             }
                         }
+                        if(nu_delta){
+                            surfNSCHSystem.matrices.push_back(&nu_A_u);
+                        }
+                        if(!nu_delta) nu_A_u.Data = MatrixCL(nu_max, A_u.Data);
                         if (Pe) {
                             logger.log("assembling convection mtx");
                             surfNSCHSystem.matrices.push_back(&rho_N_u);
@@ -840,7 +849,7 @@ int main(int argc, char* argv[]) {
                         setupFESystem(mg, surfNSCHSystem);
                         if (!rho_delta) rho_M_u.Data = MatrixCL(rho_max, M_u.Data);
                         // system mtx
-                        A_sum.LinComb(alpha, rho_M_u.Data, gamma, AL_u.Data, nu, A_u.Data, tau_u, S_u.Data, rho_u, C_u.Data);
+                        A_sum.LinComb(alpha, rho_M_u.Data, gamma, AL_u.Data, 1, nu_A_u.Data, tau_u, S_u.Data, rho_u, C_u.Data);
                         if (Pe) A_sum.LinComb(1., MatrixCL(A_sum), 1., rho_N_u.Data);
                         if (rho_delta && thermoConsistentTerm) A_sum.LinComb(1., MatrixCL(A_sum), -mobilityScaling, T_u.Data);
                         // system rhs
@@ -865,7 +874,7 @@ int main(int argc, char* argv[]) {
                         logCRS(B, "B");
                         C = static_cast<RCP<MT>>(MatrixCL(-rho_p, C_p.Data));
                         logCRS(C, "C := -rho_p (pressure volume stabilization mtx)");
-                        linearSolverS_M.system.mtx = static_cast<RCP<MT>>(MatrixCL(1. / (gamma + nu), M_p.Data, rho_p, C_p.Data));
+                        linearSolverS_M.system.mtx = static_cast<RCP<MT>>(MatrixCL(1. / (gamma + nu_max), M_p.Data, rho_p, C_p.Data));
                         logCRS(linearSolverS_M.system.mtx, "S_M := (nu + gamma)^{-1} M_p - C");
                         linearSolverS_L.system.mtx = static_cast<RCP<MT>>(MatrixCL(1. / alpha, A_p.Data, rho_p, C_p.Data));
                         logCRS(linearSolverS_L.system.mtx, "S_L := alpha^{-1} L_p - C");

@@ -918,7 +918,8 @@ public:
         double t = 0., dist = 0.;
         VecDescCL levelSet;
         struct {
-            double nu = 1., gamma = 0., lineTension = 0.;
+            double gamma = 0., lineTension = 0.;
+            struct { double min = 1., max = 1.; } nu;
             struct { double min = 1., max = 1., alpha = .1; } rho;
             VecDescCL* w_T = nullptr;
             VecDescCL* u_N = nullptr;
@@ -951,7 +952,7 @@ private:
     double absDet;
     QuadDomain2DCL qDomain;
     QuadDomainCL q3Domain;
-    GridFunctionCL<> qHatP2[10], qHatP1[4], qLsGradNorm, qSurfSpeed, qContinuityF, qConcentrationF, qChi, qOmega, qRho, qRhoPrime, qMobility;
+    GridFunctionCL<> qHatP2[10], qHatP1[4], qLsGradNorm, qSurfSpeed, qContinuityF, qConcentrationF, qChi, qOmega, qRho, qNu, qRhoPrime, qMobility;
     GridFunctionCL<Point3DCL> qGradP2[10], qSurfGradP2[10], q3DGradP2[10], qGradP1[4], qSurfGradP1[4], q3DGradP1[4], qNormal, q3DNormal, qSurfSpeedSurfGrad, qChiSurfGrad, qOmegaSurfGrad, qMomentumF, qHatP2CrossN[30];
     struct { GridFunctionCL<Point3DCL> NS, CH; } qWind;
     GridFunctionCL<SMatrixCL<3,3>> qP, qH, qVectorGradP2[30], qE[30];
@@ -1193,6 +1194,19 @@ private:
         resize_and_evaluate_on_vertexes(omegaTet, qDomain, qOmega);
         qOmegaSurfGrad = getSurfGradP1(omegaTet);
     }
+    void buildNu() {
+        qNu.resize(qDomain.vertex_size());
+        qNu = params.surfNavierStokesParams.nu.min;
+        auto nu_delta = params.surfNavierStokesParams.nu.max - params.surfNavierStokesParams.nu.min;
+        if (nu_delta < 0.) throw std::invalid_argument(__func__ + std::string(": nu_max < nu_min"));
+        if (nu_delta) {
+            require(qChi, &LocalAssembler::buildConcentration);
+            qNu += nu_delta * qChi;
+            for (auto &val : qNu) // cut-off function
+                if (val < params.surfNavierStokesParams.nu.min)
+                    val = params.surfNavierStokesParams.nu.min;
+        }
+    }
     void buildRho() {
         qRho.resize(qDomain.vertex_size());
         qRho = params.surfNavierStokesParams.rho.min;
@@ -1248,6 +1262,18 @@ public:
             }
         return A;
     }
+    mtx nu_A_vecP2vecP2() {
+        if (qDomain.empty()) return createMtx(n.vecP2, 0.);
+        require(qNu, &LocalAssembler::buildNu);
+        require(qE[0], &LocalAssembler::buildRateOfStrainTensor);
+        auto A = createMtx(n.vecP2);
+        for (size_t i = 0; i < n.vecP2; ++i)
+            for (size_t j = i; j < n.vecP2; ++j) {
+                A[i][j] = quad_2D(qNu * contract(qE[j], qE[i]), qDomain);
+                A[j][i] = A[i][j];
+            }
+        return A;
+    }
     mtx A_consistent_vecP2vecP2() {
         if (qDomain.empty()) return createMtx(n.vecP2, 0.);
         require(qHatP2[0], &LocalAssembler::buildHatP2);
@@ -1262,6 +1288,26 @@ public:
                 auto && [ js, jn ] = ind(n.P2, j);
                 auto e_jn = std_basis<3>(jn + 1);
                 A[i][j] = quad_2D(contract(qE[j] - (qHatP2[js] * dot(e_jn, qNormal)) * qH, qE[i] - (qHatP2[is] * dot(e_in, qNormal)) * qH), qDomain);
+                A[j][i] = A[i][j];
+            }
+        }
+        return A;
+    }
+    mtx nu_A_consistent_vecP2vecP2() {
+        if (qDomain.empty()) return createMtx(n.vecP2, 0.);
+        require(qNu, &LocalAssembler::buildNu);
+        require(qHatP2[0], &LocalAssembler::buildHatP2);
+        require(qNormal, &LocalAssembler::buildNormal);
+        require(qH, &LocalAssembler::buildShapeOp);
+        require(qE[0], &LocalAssembler::buildRateOfStrainTensor);
+        auto A = createMtx(n.vecP2);
+        for (size_t i = 0; i < n.vecP2; ++i) {
+            auto && [ is, in ] = ind(n.P2, i);
+            auto e_in = std_basis<3>(in + 1);
+            for (size_t j = i; j < n.vecP2; ++j) {
+                auto && [ js, jn ] = ind(n.P2, j);
+                auto e_jn = std_basis<3>(jn + 1);
+                A[i][j] = quad_2D(qNu * contract(qE[j] - (qHatP2[js] * dot(e_jn, qNormal)) * qH, qE[i] - (qHatP2[is] * dot(e_in, qNormal)) * qH), qDomain);
                 A[j][i] = A[i][j];
             }
         }
@@ -1432,11 +1478,12 @@ public:
             b[i] = quad_2D(dot(e_in, qMomentumF) * qHatP2[is], qDomain);
         }
         if (params.surfNavierStokesParams.u_N) {
+            require(qNu, &LocalAssembler::buildNu);
             require(qSurfSpeed, &LocalAssembler::buildSurfSpeed);
             require(qE[0], &LocalAssembler::buildRateOfStrainTensor);
             require(qH, &LocalAssembler::buildShapeOp);
             for (size_t i = 0; i < n.vecP2; ++i)
-                b[i] -= params.surfNavierStokesParams.nu * quad_2D(qSurfSpeed * contract(qH, qE[i]), qDomain);
+                b[i] -= quad_2D(qNu * qSurfSpeed * contract(qH, qE[i]), qDomain);
         }
         if (params.surfNavierStokesParams.gamma) {
             require(qContinuityF, &LocalAssembler::buildContinuityF);
