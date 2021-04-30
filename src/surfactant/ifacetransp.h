@@ -1224,11 +1224,11 @@ private:
         require(qChi, &LocalAssembler::buildConcentration);
         if (params.surfNavierStokesParams.rho.alpha <= 0.) throw std::invalid_argument(__func__ + std::string(": alpha <= 0"));
         qRhoPrime = qChi / params.surfNavierStokesParams.rho.alpha;
-        qRhoPrime.apply(atan);
-        qRhoPrime += M_PI / 2.;
+        qRhoPrime.apply(tanh);
+        qRhoPrime += 1.;
         auto rho_delta = params.surfNavierStokesParams.rho.max - params.surfNavierStokesParams.rho.min;
         if (rho_delta < 0.) throw std::invalid_argument(__func__ + std::string(": rho_max < rho_min"));
-        qRhoPrime *= rho_delta / M_PI;
+        qRhoPrime *= rho_delta / 2.;
     }
 public:
     LocalAssembler(TetraCL const & tet, LocalAssemblerParams const & params) : tet(tet), params(params) {
