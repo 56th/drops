@@ -27,10 +27,16 @@ namespace DROPS {
         data.description = "convection term type: " + convectionTermType + '\n';
         data.exact = false;
         // cf. mathematica/rhs.wls
-        if (name == "0") data.description += "u_0 = 0";
+        if (name == "0") {
+            if (surface.isStationary()) {
+                data.exact = true;
+                data.description += "u = 0, p = 0";
+            }
+            else data.description += "u_0 = 0, p_0 = 0";
+        }
         else if (name == "KelvinHelmholtz") {
             if (!surface.rotationalInvariance()[2]) throw std::invalid_argument(funcName + ": surface must be rotational invariant around z-axis for '" + name + "' test");
-            data.description += "u_0 = Kelvin-Helmholtz, cf. https://arxiv.org/abs/1909.02990";
+            data.description += "u_0 = Kelvin-Helmholtz, cf. https://arxiv.org/abs/1909.02990, p_0 = 0";
             auto delta_0 = params.get<double>("SurfNavierStokes.IC.Params." + name + ".delta_0");
             auto cn = params.get<double>("SurfNavierStokes.IC.Params." + name + ".cn");
             auto aa = params.get<double>("SurfNavierStokes.IC.Params." + name + ".aa");
