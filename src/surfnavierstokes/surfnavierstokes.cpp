@@ -102,11 +102,12 @@ int main(int argc, char* argv[]) {
             auto testName = inpJSON.get<std::string>("SurfNavierStokes.IC.Name");
             auto surfNavierStokesData = surfNavierStokesDataFactory(*surface, testName, inpJSON);
             FESystem surfNSystem;
+            auto& narrowBandWidth = surfNSystem.params.dist;
             auto& gamma = surfNSystem.params.surfNavierStokesParams.gamma;
             gamma = inpJSON.get<double>("SurfNavierStokes.gamma");
-            auto& nu = surfNSystem.params.surfNavierStokesParams.nu;
-            nu = inpJSON.get<double>("SurfNavierStokes.nu");
+            auto nu = inpJSON.get<double>("SurfNavierStokes.nu");
             if (nu <= 0.) throw std::invalid_argument("viscosity must be non-negative");
+            surfNSystem.params.surfNavierStokesParams.nu = { nu, nu };
             auto& t = surfNSystem.params.t;
             auto& levelSet = surfNSystem.params.levelSet;
             surfNSystem.params.numbOfVirtualSubEdges = inpJSON.get<size_t>("SurfNavierStokes.NumbOfVirtualSubEdges");
@@ -151,52 +152,35 @@ int main(int argc, char* argv[]) {
                 logger.log();
             logger.end();
         logger.end();
-        logger.beg("interpolate level-set");
-            IdxDescCL lstIdx(P2_FE); {
-                auto n = lstIdx.DistributeDOFs(mg.GetLastLevel(), mg);
-                logger.buf << "numb of active tetras for levelset: " << n << " (" << (100. * n) / mg.GetNumTriangTetra() << "%)";
-                logger.log();
-            }
+        logger.beg("define FE space for level-set");
+            struct { size_t vel, pre, speed, lst; } numActiveTetras;
+            IdxDescCL lstIdx(P2_FE);
             levelSet.SetIdx(&lstIdx);
-            levelSet.Interpolate(mg, [&](Point3DCL const & x) { return surface->dist(x); });
+            numActiveTetras.lst = lstIdx.DistributeDOFs(mg.GetLastLevel(), mg);
+            logger.buf << "numb of active tetras for levelset: " << numActiveTetras.lst << " (" << (100. * numActiveTetras.lst) / mg.GetNumTriangTetra() << "%)";
+            logger.log();
         logger.end();
-        logger.beg("set up FE spaces");
-            IdxDescCL velIdx(vecP2IF_FE); {
-                auto n = velIdx.DistributeDOFs(mg.GetLastLevel(), mg, &levelSet);
-                logger.buf << "numb of active tetras for velocity: " << n << " (" << (100. * n) / mg.GetNumTriangTetra() << "%)";
-                logger.log();
-            }
-            IdxDescCL preIdx(P1IF_FE); {
-                auto n = preIdx.DistributeDOFs(mg.GetLastLevel(), mg, &levelSet);
-                logger.buf << "numb of active tetras for pressure: " << n << " (" << (100. * n) / mg.GetNumTriangTetra() << "%)";
-                logger.log();
-            }
-            IdxDescCL speedIdx(P2IF_FE);
-            speedIdx.DistributeDOFs(mg.GetLastLevel(), mg, &levelSet);
-            size_t n = velIdx.NumUnknowns();
-            auto n_i = n / 3;
-            size_t m = preIdx.NumUnknowns();
-            logger.beg("set up FE system");
-                FEMatDescCL
-                    M_u(&velIdx, &velIdx, useTangMassMat ? &LocalAssembler::M_t_vecP2vecP2 : &LocalAssembler::M_vecP2vecP2),
-                    AL_u(&velIdx, &velIdx, &LocalAssembler::AL_vecP2vecP2),
-                    N_u(&velIdx, &velIdx, &LocalAssembler::rho_N_vecP2vecP2),
-                    H_u(&velIdx, &velIdx, &LocalAssembler::rho_H_vecP2vecP2),
-                    A_u(&velIdx, &velIdx, formulation == "Consistent" ? &LocalAssembler::A_consistent_vecP2vecP2 : &LocalAssembler::A_vecP2vecP2),
-                    S_u(&velIdx, &velIdx, &LocalAssembler::S_vecP2vecP2),
-                    C_u(&velIdx, &velIdx, &LocalAssembler::C_n_vecP2vecP2),
-                    B_pu(&preIdx, &velIdx, &LocalAssembler::B_P1vecP2),
-                    Q_pu(&preIdx, &velIdx, &LocalAssembler::Q_P1vecP2),
-                    M_p(&preIdx, &preIdx, &LocalAssembler::M_P1P1),
-                    C_p(&preIdx, &preIdx, stab == "Normal" ? &LocalAssembler::C_n_P1P1 : &LocalAssembler::C_full_P1P1),
-                    A_p(&preIdx, &preIdx, &LocalAssembler::A_P1P1);
-                FEVecDescCL
-                    F_u(&velIdx, &LocalAssembler::F_momentum_vecP2),
-                    G_p(&preIdx, &LocalAssembler::F_continuity_P1);
-                VecDescCL
-                    u_star(&velIdx), u(&velIdx), u_prev(&velIdx), surf_curl_u(&preIdx), w_T(&velIdx), u_N(&speedIdx),
-                    p_star(&preIdx), p(&preIdx);
-            logger.end();
+        logger.beg("define (bi)linear forms");
+            IdxDescCL velIdx(vecP2IF_FE), preIdx(P1IF_FE), speedIdx(P2IF_FE);
+            FEMatDescCL
+                M_u(&velIdx, &velIdx, useTangMassMat ? &LocalAssembler::M_t_vecP2vecP2 : &LocalAssembler::M_vecP2vecP2),
+                AL_u(&velIdx, &velIdx, &LocalAssembler::AL_vecP2vecP2),
+                N_u(&velIdx, &velIdx, &LocalAssembler::rho_N_vecP2vecP2),
+                H_u(&velIdx, &velIdx, &LocalAssembler::rho_H_vecP2vecP2),
+                A_u(&velIdx, &velIdx, formulation == "Consistent" ? &LocalAssembler::A_consistent_vecP2vecP2 : &LocalAssembler::A_vecP2vecP2),
+                S_u(&velIdx, &velIdx, &LocalAssembler::S_vecP2vecP2),
+                C_u(&velIdx, &velIdx, &LocalAssembler::C_n_vecP2vecP2),
+                B_pu(&preIdx, &velIdx, &LocalAssembler::B_P1vecP2),
+                Q_pu(&preIdx, &velIdx, &LocalAssembler::Q_P1vecP2),
+                M_p(&preIdx, &preIdx, &LocalAssembler::M_P1P1),
+                C_p(&preIdx, &preIdx, stab == "Normal" ? &LocalAssembler::C_n_P1P1 : &LocalAssembler::C_full_P1P1),
+                A_p(&preIdx, &preIdx, &LocalAssembler::A_P1P1);
+            FEVecDescCL
+                F_u(&velIdx, &LocalAssembler::F_momentum_vecP2),
+                G_p(&preIdx, &LocalAssembler::F_continuity_P1);
+            VecDescCL
+                u_star(&velIdx), u(&velIdx), u_prev(&velIdx), surf_curl_u(&preIdx), w_T(&velIdx), u_N(&speedIdx),
+                p_star(&preIdx), p(&preIdx);
         logger.end();
         logger.beg("set up vtk");
             VTKWriter::VTKParams vtkParams; {
@@ -211,6 +195,7 @@ int main(int argc, char* argv[]) {
             if (everyStep > 0) {
                 if (inpJSON.get<bool>("Output.VTK.Velocity")) {
                     vtkWriter.add({ "u_h", u });
+                    vtkWriter.add({ "u_h_prev", u_prev }); // tmp
                     if (surfNavierStokesData.exact) vtkWriter.add({"u_*", u_star });
                 }
                 if (inpJSON.get<bool>("Output.VTK.SurfSpeed")) vtkWriter.add({ "u_N", u_N });
@@ -246,16 +231,16 @@ int main(int argc, char* argv[]) {
                 logger.log();
             }
             linearSolver.zeroIniGuess = !inpJSON.get<bool>("Solver.UsePreviousFrameAsInitialGuess");
-            Epetra_Map mapVelocity(static_cast<int>(n), 0, comm), mapVelocityComp(static_cast<int>(n_i), 0, comm), mapVelocityPressure(static_cast<int>(n + m), 0, comm), mapPressure(static_cast<int>(m), 0, comm);
+            RCP<Epetra_Map> mapVelocity, mapVelocityComp, mapPressure;
             RCP<MT> A, B, C;
             linearSolver.system.mtx = rcp(new Epetra_OperatorApply([&](MV const & X, MV& Y) {
                 double* view;
                 X(0)->ExtractView(&view);
-                SV x1(Epetra_DataAccess::View, mapVelocity, view);
-                SV x2(Epetra_DataAccess::View, mapPressure, view + n);
+                SV x1(Epetra_DataAccess::View, *mapVelocity, view);
+                SV x2(Epetra_DataAccess::View, *mapPressure, view + velIdx.NumUnknowns());
                 Y(0)->ExtractView(&view);
-                SV y11(Epetra_DataAccess::View, mapVelocity, view), y12(mapVelocity, true);
-                SV y21(Epetra_DataAccess::View, mapPressure, view + n), y22(mapPressure, true);
+                SV y11(Epetra_DataAccess::View, *mapVelocity, view), y12(*mapVelocity, true);
+                SV y21(Epetra_DataAccess::View, *mapPressure, view + velIdx.NumUnknowns()), y22(*mapPressure, true);
                 // y1
                 A->Multiply(false, x1, y11);
                 B->Multiply(true, x2, y12);
@@ -302,9 +287,10 @@ int main(int argc, char* argv[]) {
                         std::vector<SV> x, y;
                         x.reserve(numBlocksA);
                         y.reserve(numBlocksA);
+                        auto n_i = velIdx.NumUnknowns() / 3;
                         for (size_t i = 0; i < numBlocksA; ++i) {
-                            x.emplace_back(Epetra_DataAccess::View, mapVelocityBlock, viewX + i * n_i);
-                            y.emplace_back(Epetra_DataAccess::View, mapVelocityBlock, viewY + i * n_i);
+                            x.emplace_back(Epetra_DataAccess::View, *mapVelocityBlock, viewX + i * n_i);
+                            y.emplace_back(Epetra_DataAccess::View, *mapVelocityBlock, viewY + i * n_i);
                         }
                         #pragma omp parallel for
                         for (size_t i = 0; i < numBlocksA; ++i) {
@@ -321,14 +307,15 @@ int main(int argc, char* argv[]) {
                             std::vector<SV> x, y;
                             x.reserve(numBlocksA);
                             y.reserve(numBlocksA);
+                            auto n_i = velIdx.NumUnknowns() / 3;
                             for (size_t i = 0; i < numBlocksA; ++i) {
-                                x.emplace_back(Epetra_DataAccess::View, mapVelocityBlock, viewX + i * n_i);
-                                y.emplace_back(Epetra_DataAccess::View, mapVelocityBlock, viewY + i * n_i);
+                                x.emplace_back(Epetra_DataAccess::View, *mapVelocityBlock, viewX + i * n_i);
+                                y.emplace_back(Epetra_DataAccess::View, *mapVelocityBlock, viewY + i * n_i);
                             }
                             for (int i = numBlocksA - 1; i >= 0; --i) { // backward substitution
                                 SV rhs(Epetra_DataAccess::Copy, x[i], 0);
                                 for (size_t j = i + 1; j < numBlocksA; ++j) {
-                                    SV A_y(mapVelocityBlock, true);
+                                    SV A_y(*mapVelocityBlock, true);
                                     A_block[i][j]->Multiply(false, y[j], A_y);
                                     rhs.Update(-1., A_y, 1.);
                                 }
@@ -356,7 +343,7 @@ int main(int argc, char* argv[]) {
                         auto X_nrm = X; { // normalized rhs
                             double mean;
                             X_nrm.MeanValue(&mean);
-                            for (size_t i = 0; i < m; ++i) (*X_nrm(0))[i] -= mean;
+                            for (size_t i = 0; i < preIdx.NumUnknowns(); ++i) (*X_nrm(0))[i] -= mean;
                         }
                         // Y_M
                         linearSolverS_M.system.lhs = rcpFromRef(*Y_M(0));
@@ -378,11 +365,11 @@ int main(int argc, char* argv[]) {
                     ? rcp(new Epetra_OperatorApply([&](MV const & X, MV& Y) {
                         double* view;
                         X(0)->ExtractView(&view);
-                        SV x1(Epetra_DataAccess::View, mapVelocity, view);
-                        SV x2(Epetra_DataAccess::View, mapPressure, view + n);
+                        SV x1(Epetra_DataAccess::View, *mapVelocity, view);
+                        SV x2(Epetra_DataAccess::View, *mapPressure, view + velIdx.NumUnknowns());
                         Y(0)->ExtractView(&view);
-                        SV y1(Epetra_DataAccess::View, mapVelocity, view);
-                        SV y2(Epetra_DataAccess::View, mapPressure, view + n);
+                        SV y1(Epetra_DataAccess::View, *mapVelocity, view);
+                        SV y2(Epetra_DataAccess::View, *mapPressure, view + velIdx.NumUnknowns());
                         #pragma omp parallel
                         {
                             #pragma omp single
@@ -397,15 +384,15 @@ int main(int argc, char* argv[]) {
                     : rcp(new Epetra_OperatorApply([&](MV const & X, MV& Y) {
                         double* view;
                         X(0)->ExtractView(&view);
-                        SV x1(Epetra_DataAccess::View, mapVelocity, view);
-                        SV x2(Epetra_DataAccess::View, mapPressure, view + n);
+                        SV x1(Epetra_DataAccess::View, *mapVelocity, view);
+                        SV x2(Epetra_DataAccess::View, *mapPressure, view + velIdx.NumUnknowns());
                         Y(0)->ExtractView(&view);
-                        SV y1(Epetra_DataAccess::View, mapVelocity, view);
-                        SV y2(Epetra_DataAccess::View, mapPressure, view + n);
+                        SV y1(Epetra_DataAccess::View, *mapVelocity, view);
+                        SV y2(Epetra_DataAccess::View, *mapPressure, view + velIdx.NumUnknowns());
                         // y2
                         invS(x2, y2);
                         // y1
-                        SV rhs(mapVelocity, true);
+                        SV rhs(*mapVelocity, true);
                         B->Multiply(true, y2, rhs);
                         rhs.Update(1., x1, -1.);
                         invA(rhs, y1);
@@ -414,19 +401,43 @@ int main(int argc, char* argv[]) {
         logger.end();
         logger.beg("t = t_0 = 0");
             t = 0.;
+            logger.beg("interpolate level-set");
+                levelSet.Interpolate(mg, [&](Point3DCL const & x) { return surface->dist(x, t); });
+            logger.end();
+            logger.beg("set up FE spaces");
+                logger.beg("set up pressure space");
+                    numActiveTetras.pre = preIdx.DistributeDOFs(mg.GetLastLevel(), mg, &levelSet);
+                    logger.buf << "numb of active tetras for pressure: " << numActiveTetras.pre << " (" << (100. * numActiveTetras.pre) / mg.GetNumTriangTetra() << "%)";
+                    logger.log();
+                    mapPressure = rcp(new Epetra_Map(static_cast<int>(preIdx.NumUnknowns()), 0, comm)); // for vorticity linear solve
+                logger.end();
+                logger.beg("set up velocity space");
+                    logger.beg("initialize surface speed u_N");
+                        speedIdx.DistributeDOFs(mg.GetLastLevel(), mg, &levelSet);
+                        u_N.Interpolate(mg, [&](Point3DCL const & x) { return surface->u_N(x, t); });
+                        auto u_N_max = supnorm(u_N.Data);
+                        narrowBandWidth = 1.1 * BDF * u_N_max * stepSize;
+                        logger.buf
+                            << "max |u_N| = " << u_N_max << '\n'
+                            << "narrow band width = " << narrowBandWidth;
+                        logger.log();
+                    logger.end();
+                    numActiveTetras.vel = velIdx.DistributeDOFs(mg.GetLastLevel(), mg, &levelSet, narrowBandWidth);
+                    logger.buf << "numb of active tetras for velocity: " << numActiveTetras.vel << " (" << (100. * numActiveTetras.vel) / mg.GetNumTriangTetra() << "%)";
+                    logger.log();
+                logger.end();
+            auto feTime = logger.end();
             logger.beg("assemble");
                 surfNSystem.matrices = { &M_u, &A_u, &AL_u, &S_u, &C_u, &M_p, &C_p, &A_p, &B_pu, &Q_pu };
                 setupFESystem(mg, surfNSystem);
                 MatrixCL A_sum;
-                VectorCL I_p(1., m);
+                VectorCL I_p(1., preIdx.NumUnknowns());
             auto assembleTime = logger.end();
             logger.beg("interpolate initial data");
-                u_N.Interpolate(mg, [&](Point3DCL const & x) { return surface->u_N(x, t); });
                 u.Interpolate(mg, [&](Point3DCL const & x) { return surfNavierStokesData.u_T(x, t); });
                 p.Interpolate(mg, [&](Point3DCL const & x) { return surfNavierStokesData.p(x, t); });
                 p.Data -= dot(M_p.Data * p.Data, I_p) / dot(M_p.Data * I_p, I_p) * I_p;
                 u_prev = u;
-                linearSolver.system.lhs = static_cast<RCP<SV>>(u.Data.append(p.Data));
             logger.end();
             logger.beg("project surface vorticity");
                 Belos_LinearSolver linearSolverVorticity; {
@@ -441,14 +452,14 @@ int main(int argc, char* argv[]) {
                 auto projectVorticity = [&]() {
                     linearSolverVorticity.system.mtx = static_cast<RCP<MT>>(MatrixCL(1., M_p.Data, rho_p, C_p.Data));
                     linearSolverVorticity.system.rhs = static_cast<RCP<SV>>(Q_pu.Data * u.Data);
-                    linearSolverVorticity.system.lhs = rcp(new SV(mapPressure, true));
+                    linearSolverVorticity.system.lhs = rcp(new SV(*mapPressure, true));
                     linearSolverVorticity.solve();
-                    for (size_t i = 0; i < m; ++i) surf_curl_u.Data[i] = (*linearSolverVorticity.system.lhs)[i];
+                    for (size_t i = 0; i < preIdx.NumUnknowns(); ++i) surf_curl_u.Data[i] = (*linearSolverVorticity.system.lhs)[i];
                 };
                 projectVorticity();
             logger.end();
             logger.beg("output");
-                double Pe, u_N_max, alpha;
+                double Pe, alpha;
                 auto exportStats = [&](size_t i) {
                     std::ofstream stats(dirName + "/stats/t_" + std::to_string(i) + ".json");
                     ParamCL tJSON;
@@ -456,11 +467,17 @@ int main(int argc, char* argv[]) {
                     tJSON.put("h", h);
                     tJSON.put("nu", nu);
                     tJSON.put("gamma", gamma);
-                    tJSON.put("DOF.Velocity", n);
-                    tJSON.put("DOF.Pressure", m);
+                    tJSON.put("DOF.Velocity", velIdx.NumUnknowns());
+                    tJSON.put("DOF.Pressure", preIdx.NumUnknowns());
+                    tJSON.put("NumTetras.Bulk", mg.GetNumTriangTetra());
+                    tJSON.put("NumTetras.Pressure", numActiveTetras.pre);
+                    tJSON.put("NumTetras.Velocity", numActiveTetras.vel);
+                    tJSON.put("NarrowBandWidth", narrowBandWidth);
+                    tJSON.put("MaxSurfaceSpeed", u_N_max);
                     tJSON.put("MeshDepParams.rho_p", rho_p);
                     tJSON.put("MeshDepParams.rho_u", rho_u);
                     tJSON.put("MeshDepParams.tau_u", tau_u);
+                    tJSON.put("ElapsedTime.RemapAndDistributeDOF", feTime);
                     tJSON.put("ElapsedTime.Assemble", assembleTime);
                     tJSON.put("ElapsedTime.ProjectVorticity", linearSolverVorticity.stats.time.solve);
                     tJSON.put("Solver.ProjectVorticity.TotalIters", linearSolverVorticity.solver->getNumIters());
@@ -512,7 +529,6 @@ int main(int argc, char* argv[]) {
                         tJSON.put("Solver.Inner.S.MeanIters.S_M", linearSolverS_M.solver->getNumIters());
                         tJSON.put("Solver.Inner.S.MeanIters.S_L", linearSolverS_L.solver->getNumIters());
                         tJSON.put("Peclet", Pe);
-                        tJSON.put("MaxSurfaceSpeed", u_N_max);
                         tJSON.put("MassMatrixCoef", alpha);
                     }
                     auto exportFiles = everyStep > 0 && (i % everyStep == 0 || i == numSteps);
@@ -572,30 +588,61 @@ int main(int argc, char* argv[]) {
             t = i * stepSize;
             std::stringstream header; header << "t = t_" << i << " = " << t << " (" << (100. * i) / numSteps << "%)";
             logger.beg(header.str());
-                logger.beg("initialize surface speed u_N");
-                    u_N.Interpolate(mg, [&](Point3DCL const & x) { return surface->u_N(x, t); });
+                logger.beg("interpolate level-set");
+                    levelSet.Interpolate(mg, [&](Point3DCL const & x) { return surface->dist(x, t); });
                 logger.end();
+                logger.beg("set up FE spaces");
+                    logger.beg("set up pressure space");
+                        {
+                            auto n = preIdx.DistributeDOFs(mg.GetLastLevel(), mg, &levelSet);
+                            logger.buf << "numb of active tetras for pressure: " << numActiveTetras.pre << " -> " << n << " (" << (100. * n) / mg.GetNumTriangTetra() << "%)";
+                            logger.log();
+                            std::swap(n, numActiveTetras.pre);
+                        }
+                        mapPressure = rcp(new Epetra_Map(static_cast<int>(preIdx.NumUnknowns()), 0, comm));
+                    logger.end();
+                    logger.beg("set up velocity space");
+                        logger.beg("initialize surface speed u_N");
+                            speedIdx.DistributeDOFs(mg.GetLastLevel(), mg, &levelSet);
+                            u_N.Interpolate(mg, [&](Point3DCL const & x) { return surface->u_N(x, t); });
+                            u_N_max = supnorm(u_N.Data);
+                            narrowBandWidth = 1.1 * BDF * u_N_max * stepSize;
+                            logger.buf
+                                << "max |u_N| = " << u_N_max << '\n'
+                                << "narrow band width = " << narrowBandWidth;
+                            logger.log();
+                        logger.end();
+                        {
+                            auto n = velIdx.DistributeDOFs(mg.GetLastLevel(), mg, &levelSet, narrowBandWidth);
+                            logger.buf << "numb of active tetras for velocity: " << numActiveTetras.vel << " -> " << n << " (" << (100. * n) / mg.GetNumTriangTetra() << "%)";
+                            logger.log();
+                            std::swap(n, numActiveTetras.vel);
+                        }
+                        mapVelocity = rcp(new Epetra_Map(static_cast<int>(velIdx.NumUnknowns()), 0, comm));
+                        mapVelocityComp = rcp(new Epetra_Map(static_cast<int>(velIdx.NumUnknowns() / 3), 0, comm));
+                    logger.end();
+                feTime = logger.end();
                 logger.beg("assemble");
                     alpha = i == 1 || BDF == 1 ? 1. / stepSize : 1.5 / stepSize;
                     if (surfNavierStokesData.w_T) w_T.Interpolate(mg, [&](Point3DCL const & x) { return surfNavierStokesData.w_T(x, t); }); // Oseen (and Stokes) case
-                    else w_T.Data = 2. * u.Data - u_prev.Data; // Navier-Stokes case
+                    else { // Navier-Stokes case
+                        if (BDF == 1) w_T.Data = u.Data;
+                        else w_T.Data = 2. * u.Data - u_prev.Data;
+                    }
                     Pe = supnorm(w_T.Data) / nu;
-                    u_N_max = supnorm(u_N.Data);
                     logger.buf
                         << "alpha = " << alpha << '\n'
-                        << "Pe = " << Pe << '\n'
-                        << "max |u_N| = " << u_N_max;
+                        << "Pe = " << Pe;
                     logger.log();
-                    surfNSystem.matrices = {};
                     surfNSystem.params.surfNavierStokesParams.w_T = Pe ? &w_T : nullptr;
                     surfNSystem.params.surfNavierStokesParams.u_N = u_N_max ? &u_N : nullptr;
-                    if (Pe || u_N_max) {
-                        logger.log("assembling convection mtx");
-                        surfNSystem.matrices.push_back(&N_u);
-                    }
                     if (u_N_max) {
-                        logger.log("assembling surf speed mtx");
-                        surfNSystem.matrices.push_back(&H_u);
+                        logger.log("assembling all matrices due to nnz surf speed");
+                        surfNSystem.matrices = { &N_u, &H_u, &M_u, &A_u, &AL_u, &S_u, &C_u, &M_p, &C_p, &A_p, &B_pu, &Q_pu };
+                    }
+                    else if (Pe) {
+                        logger.log("assembling convection mtx");
+                        surfNSystem.matrices = { &N_u };
                     }
                     surfNSystem.vectors = { &F_u, &G_p };
                     setupFESystem(mg, surfNSystem);
@@ -606,6 +653,7 @@ int main(int argc, char* argv[]) {
                     // system rhs
                     if (i == 1 || BDF == 1) F_u.Data += (1. / stepSize) * (M_u.Data * u.Data);
                     else F_u.Data += (2. / stepSize) * (M_u.Data * u.Data) - (.5 / stepSize) * (M_u.Data * u_prev.Data);
+                    I_p.resize(preIdx.NumUnknowns(), 1.);
                     G_p.Data -= (dot(G_p.Data, I_p) / dot(I_p, I_p)) * I_p;
                     // for the next step
                     u_prev = u;
@@ -630,11 +678,12 @@ int main(int argc, char* argv[]) {
                     linearSolverS_L.system.mtx = static_cast<RCP<MT>>(MatrixCL(1. / alpha, A_p.Data, rho_p, C_p.Data));
                     logCRS(linearSolverS_L.system.mtx, "S_L := alpha^{-1} L_p - C");
                     linearSolver.system.rhs = static_cast<RCP<SV>>(F_u.Data.append(G_p.Data));
+                    linearSolver.system.lhs = static_cast<RCP<SV>>(u.Data.append(p.Data));
                 logger.end();
                 linearSolver.solve();
                 logger.beg("convert from Epetra");
-                    for (size_t i = 0; i < n; ++i) u.Data[i] = (*linearSolver.system.lhs)[i];
-                    for (size_t i = 0; i < m; ++i) p.Data[i] = (*linearSolver.system.lhs)[n + i];
+                    for (size_t i = 0; i < velIdx.NumUnknowns(); ++i) u.Data[i] = (*linearSolver.system.lhs)[i];
+                    for (size_t i = 0; i < preIdx.NumUnknowns(); ++i) p.Data[i] = (*linearSolver.system.lhs)[velIdx.NumUnknowns() + i];
                     p.Data -= dot(M_p.Data * p.Data, I_p) / dot(M_p.Data * I_p, I_p) * I_p;
                 logger.end();
                 logger.beg("project surface vorticity");
