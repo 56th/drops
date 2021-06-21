@@ -295,7 +295,6 @@ private:
     BndCondCL                Bnd_;         ///< boundary conditions and  matching function for periodic boundaries
     BndCondCL                Bnd_aux_;     ///< auxiliary boundary conditions (second phase)
     ExtIdxDescCL             extIdx_;      ///< extended index for XFEM
-
 #ifdef _PAR
     ExchangeCL*              ex_;          ///< exchanging numerical data
 #else
@@ -311,6 +310,7 @@ private:
     /// \brief Number unknowns on the vertices surrounding an interface.
     void CreateNumbNearInterface(Uint level, MultiGridCL& mg, const VecDescCL& ls, const BndDataCL<>& lsetbnd,double width, double dist=0./*default to using dof in cut tetra*/);
 public:
+    std::vector<VectorCL*> vecs;
     std::vector<IdxT> Loc2Glo(TetraCL const & tet) {
         auto idx = GetIdx();
         if (!tet.Unknowns.Exist(idx)) return {};
@@ -685,9 +685,8 @@ public:
     /// \brief The triangulation-level of the index.
     Uint GetLevel() const { return RowIdx->TriangLevel(); }
     /// \brief Use a new index for accessing the components.
-    void SetIdx(IdxDescCL*);
+    void SetIdx(IdxDescCL const * idx);
     void SetIdx(MLIdxDescCL* idx) {SetIdx( &( idx->GetFinest()) );}
-    void SetIdx(const IdxDescCL*);
     void SetIdx(const MLIdxDescCL* idx) {SetIdx( &( idx->GetFinest()) );}
     /// \brief Resize a vector according to RowIdx.
     void Clear( double time);
@@ -892,20 +891,8 @@ template<class BndDataT>
     }
 }
 
-
 template<class T>
-void VecDescBaseCL<T>::SetIdx(IdxDescCL* idx)
-/// Prepares the vector for usage with a new index-object for
-/// its components. The vector is resized to size 0 and
-/// then to the new size.
-{
-    RowIdx = idx;
-    Data.resize(0);
-    Data.resize(idx->NumUnknowns());
-}
-
-template<class T>
-void VecDescBaseCL<T>::SetIdx(const IdxDescCL* idx)
+void VecDescBaseCL<T>::SetIdx(IdxDescCL const * idx)
 /// Prepares the vector for usage with a new index-object for
 /// its components. The vector is resized to size 0 and
 /// then to the new size.
@@ -914,6 +901,9 @@ void VecDescBaseCL<T>::SetIdx(const IdxDescCL* idx)
     Data.resize(0);
     Data.resize(idx->NumUnknowns());
 }
+
+template<>
+void VecDescBaseCL<VectorCL>::SetIdx(IdxDescCL const *);
 
 template<class T>
 void VecDescBaseCL<T>::Clear( double time)
@@ -1183,11 +1173,7 @@ class MLVecDescCL : public MLDataCL<VecDescCL> {
   public:
     MLVecDescCL() { this->resize(1);}
     MLVecDescCL( MLIdxDescCL* idx) { this->resize(idx->size()); SetIdx( idx); }
-    void SetIdx(MLIdxDescCL* idx) {
-        MLIdxDescCL::const_iterator idx_it = idx->begin();
-        for (MLDataCL<VecDescCL>::iterator it = this->begin(); it != this->end(); ++it, ++idx_it)
-            it->SetIdx(&*idx_it);
-    }
+    void SetIdx(MLIdxDescCL* idx);
 };
 
 } // end of namespace DROPS

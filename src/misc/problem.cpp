@@ -28,9 +28,21 @@
 #include "num/lattice-eval.h"
 #include "parallel/exchange.h"
 
-
 namespace DROPS
 {
+
+template<> void VecDescBaseCL<VectorCL>::SetIdx(IdxDescCL const * idx) {
+    RowIdx = const_cast<IdxDescCL*>(idx);
+    RowIdx->vecs.push_back(&this->Data);
+    Data.resize(0);
+    Data.resize(RowIdx->NumUnknowns());
+}
+
+void MLVecDescCL::SetIdx(MLIdxDescCL* idx) {
+    MLIdxDescCL::const_iterator idx_it = idx->begin();
+    for (MLDataCL<VecDescCL>::iterator it = this->begin(); it != this->end(); ++it, ++idx_it)
+        it->SetIdx(&*idx_it);
+}
 
 const Uint        IdxDescCL::InvalidIdx = std::numeric_limits<Uint>::max();
 std::vector<bool> IdxDescCL::IdxFree;
@@ -269,9 +281,10 @@ void ExtractComponent( const VectorCL& vecFE, VectorCL& scalarFE, Uint comp, Uin
 }
 
 size_t IdxDescCL::DistributeDOFs(Uint level, MultiGridCL& mg, VecDescCL const * levelSet, double dist) {
-    auto idx = GetIdx();
+    auto idx = GetFreeIdx();
     TriangLevel_ = level;
-    NumUnknowns_ = 0;
+    auto blockSize = 0;
+    size_t dim = IsScalar() ? 1 : 3;
     auto n = NumUnknownsEdge_ ? NumAllVertsC : NumVertsC;
     size_t numTetra = 0;
     for (auto it = mg.GetTriangTetraBegin(level); it != mg.GetTriangTetraEnd(level); ++it) {
@@ -292,12 +305,52 @@ size_t IdxDescCL::DistributeDOFs(Uint level, MultiGridCL& mg, VecDescCL const * 
                 auto& unknowns = i < NumVertsC ? const_cast<VertexCL *>(it->GetVertex(i))->Unknowns : const_cast<EdgeCL *>(it->GetEdge(i - NumVertsC))->Unknowns;
                 if (unknowns.Exist(idx)) continue;
                 unknowns.Prepare(idx);
-                unknowns(idx) = NumUnknowns_++;
+                unknowns(idx) = blockSize++;
             }
         }
     }
-    size_t dim = IsScalar() ? 1 : 3;
-    NumUnknowns_ *= dim;
+    NumUnknowns_ = dim * blockSize;
+
+    for (auto v : vecs) { // remap
+        size_t n_old = 0, n_new = 0, n_common = 0;
+        auto v_old = *v;
+        v->resize(NumUnknowns_, 0.);
+        if (NumUnknownsVertex_)
+            for (auto it = mg.GetTriangVertexBegin(level); it != mg.GetTriangVertexEnd(level); ++it) {
+                n_old += dim * it->Unknowns.Exist(Idx_);
+                n_new += dim * it->Unknowns.Exist(idx);
+                n_common += dim * (it->Unknowns.Exist(Idx_) && it->Unknowns.Exist(idx));
+            }
+        if (NumUnknownsEdge_)
+            for (auto it = mg.GetTriangEdgeBegin(level); it != mg.GetTriangEdgeEnd(level); ++it) {
+                n_old += dim * it->Unknowns.Exist(Idx_);
+                n_new += dim * it->Unknowns.Exist(idx);
+                n_common += dim * (it->Unknowns.Exist(Idx_) && it->Unknowns.Exist(idx));
+            }
+        std::cout << "n_old = " << n_old << '\n' << "n_new = " << n_new << '\n' << "n_common = " << n_common << '\n';
+    }
+
+    for (auto v : vecs) { // remap
+        auto v_old = *v;
+        v->resize(NumUnknowns_, 0.);
+        if (NumUnknownsVertex_)
+            for (auto it = mg.GetTriangVertexBegin(level); it != mg.GetTriangVertexEnd(level); ++it)
+                if (it->Unknowns.Exist(Idx_) && it->Unknowns.Exist(idx))
+                    for (size_t d = 0; d < dim; ++d)
+                        (*v)[it->Unknowns(idx) + d * blockSize] = v_old[it->Unknowns(Idx_) + d * blockSize];
+        if (NumUnknownsEdge_)
+            for (auto it = mg.GetTriangEdgeBegin(level); it != mg.GetTriangEdgeEnd(level); ++it)
+                if (it->Unknowns.Exist(Idx_) && it->Unknowns.Exist(idx))
+                    for (size_t d = 0; d < dim; ++d)
+                        (*v)[it->Unknowns(idx) + d * blockSize] = v_old[it->Unknowns(Idx_) + d * blockSize];
+    }
+    // free old idx
+    for (auto it = mg.GetTriangTetraBegin(level); it != mg.GetTriangTetraEnd(level); ++it) if (it->Unknowns.Exist(Idx_)) it->Unknowns.Invalidate(Idx_);
+    if (NumUnknownsVertex_) for (auto it = mg.GetTriangVertexBegin(level); it != mg.GetTriangVertexEnd(level); ++it) if (it->Unknowns.Exist(Idx_)) it->Unknowns.Invalidate(Idx_);
+    if (NumUnknownsEdge_) for (auto it = mg.GetTriangEdgeBegin(level); it != mg.GetTriangEdgeEnd(level); ++it) if (it->Unknowns.Exist(Idx_)) it->Unknowns.Invalidate(Idx_);
+    IdxFree[Idx_] = true;
+    // fix
+    Idx_ = idx;
     return numTetra;
 }
 
