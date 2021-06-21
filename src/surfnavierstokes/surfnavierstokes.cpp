@@ -195,7 +195,6 @@ int main(int argc, char* argv[]) {
             if (everyStep > 0) {
                 if (inpJSON.get<bool>("Output.VTK.Velocity")) {
                     vtkWriter.add({ "u_h", u });
-                    vtkWriter.add({ "u_h_prev", u_prev }); // tmp
                     if (surfNavierStokesData.exact) vtkWriter.add({"u_*", u_star });
                 }
                 if (inpJSON.get<bool>("Output.VTK.SurfSpeed")) vtkWriter.add({ "u_N", u_N });
