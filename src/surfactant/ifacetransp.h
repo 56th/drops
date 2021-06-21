@@ -1070,6 +1070,10 @@ private:
         q3DNormal = get3DGradP2(levelSetTet);
         q3DNormal = q3DNormal / sqrt(dot(q3DNormal, q3DNormal));
     }
+    void build3DNormal() {
+        q3DNormal = get3DGradP2(levelSetTet);
+        q3DNormal = q3DNormal / sqrt(dot(q3DNormal, q3DNormal));
+    }
     void buildProjector() {
         require(qNormal, &LocalAssembler::buildNormal);
         qP.resize(qDomain.vertex_size());
@@ -1455,7 +1459,7 @@ public:
     mtx C_n_vecP2vecP2() {
         if (q3Domain.empty()) return createMtx(n.vecP2, 0.);
         require(q3DGradP2[0], &LocalAssembler::buildGradP2);
-        require(q3DNormal, &LocalAssembler::buildNormal);
+        require(q3DNormal, &LocalAssembler::build3DNormal);
         auto A = createMtx(n.vecP2);
         for (size_t i = 0; i < n.vecP2; ++i) {
             auto && [ is, in ] = ind(n.P2, i);
@@ -1542,7 +1546,7 @@ public:
     mtx C_n_P1P1() {
         if (q3Domain.empty()) return createMtx(n.P1, 0.);
         require(q3DGradP1[0], &LocalAssembler::buildGradP1);
-        require(q3DNormal, &LocalAssembler::buildNormal);
+        require(q3DNormal, &LocalAssembler::build3DNormal);
         auto A = createMtx(n.P1);
         for (size_t i = 0; i < n.P1; ++i)
             for (size_t j = i; j < n.P1; ++j) {
