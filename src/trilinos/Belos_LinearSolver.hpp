@@ -26,7 +26,7 @@ namespace DROPS {
         bool zeroIniGuess = false;
         bool mute = false;
         struct Stats {
-            size_t counter = 0;
+            int problemSize = -1;
             Belos::ReturnType result = Belos::Converged;
             struct { double r_0 = 0., r_i = 0., b = 0.; } norm;
             struct { double solve = 0., updatePreconditioner = 0.; } time;
@@ -37,13 +37,18 @@ namespace DROPS {
             using namespace Belos;
             std::string funcName = __func__;
             if (!system.mtx || !system.lhs || !system.rhs) throw std::invalid_argument(funcName + ": setup system mtx, lhs, and rhs");
+            if (system.lhs->GlobalLength() != system.rhs->GlobalLength()) throw std::invalid_argument(funcName + ": lhs and rhs sizes are inconsistent");
             auto& logger = SingletonLogger::instance();
             std::swap(logger.mute, mute);
             auto& s = const_cast<Stats&>(stats);
-            if (updatePreconditioner && !s.counter++) {
-                logger.beg("build initial preconditioner");
+            auto updated = false;
+            if (updatePreconditioner && s.problemSize != system.lhs->GlobalLength()) {
+                if (s.problemSize == -1) logger.beg("build initial preconditioner");
+                else logger.beg("update preconditioner (problem size changed)");
                     updatePreconditioner();
                 s.time.updatePreconditioner = logger.end();
+                s.problemSize = system.lhs->GlobalLength();
+                updated = true;
             }
             else s.time.updatePreconditioner = 0.;
             logger.beg("linear solve");
@@ -75,7 +80,7 @@ namespace DROPS {
             s.time.solve = logger.end();
             if (s.result != Converged) {
                 logger.wrn("belos did not converge");
-                if (updatePreconditioner) {
+                if (updatePreconditioner && !updated) {
                     logger.beg("update preconditioner");
                         updatePreconditioner();
                     s.time.updatePreconditioner += logger.end();
