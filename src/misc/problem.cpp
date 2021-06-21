@@ -310,39 +310,20 @@ size_t IdxDescCL::DistributeDOFs(Uint level, MultiGridCL& mg, VecDescCL const * 
         }
     }
     NumUnknowns_ = dim * blockSize;
-
-    for (auto v : vecs) { // remap
-        size_t n_old = 0, n_new = 0, n_common = 0;
-        auto v_old = *v;
-        v->resize(NumUnknowns_, 0.);
-        if (NumUnknownsVertex_)
-            for (auto it = mg.GetTriangVertexBegin(level); it != mg.GetTriangVertexEnd(level); ++it) {
-                n_old += dim * it->Unknowns.Exist(Idx_);
-                n_new += dim * it->Unknowns.Exist(idx);
-                n_common += dim * (it->Unknowns.Exist(Idx_) && it->Unknowns.Exist(idx));
-            }
-        if (NumUnknownsEdge_)
-            for (auto it = mg.GetTriangEdgeBegin(level); it != mg.GetTriangEdgeEnd(level); ++it) {
-                n_old += dim * it->Unknowns.Exist(Idx_);
-                n_new += dim * it->Unknowns.Exist(idx);
-                n_common += dim * (it->Unknowns.Exist(Idx_) && it->Unknowns.Exist(idx));
-            }
-        std::cout << "n_old = " << n_old << '\n' << "n_new = " << n_new << '\n' << "n_common = " << n_common << '\n';
-    }
-
     for (auto v : vecs) { // remap
         auto v_old = *v;
+        auto blockSizeOld = v_old.size() / dim;
         v->resize(NumUnknowns_, 0.);
         if (NumUnknownsVertex_)
             for (auto it = mg.GetTriangVertexBegin(level); it != mg.GetTriangVertexEnd(level); ++it)
                 if (it->Unknowns.Exist(Idx_) && it->Unknowns.Exist(idx))
                     for (size_t d = 0; d < dim; ++d)
-                        (*v)[it->Unknowns(idx) + d * blockSize] = v_old[it->Unknowns(Idx_) + d * blockSize];
+                        (*v)[it->Unknowns(idx) + d * blockSize] = v_old[it->Unknowns(Idx_) + d * blockSizeOld];
         if (NumUnknownsEdge_)
             for (auto it = mg.GetTriangEdgeBegin(level); it != mg.GetTriangEdgeEnd(level); ++it)
                 if (it->Unknowns.Exist(Idx_) && it->Unknowns.Exist(idx))
                     for (size_t d = 0; d < dim; ++d)
-                        (*v)[it->Unknowns(idx) + d * blockSize] = v_old[it->Unknowns(Idx_) + d * blockSize];
+                        (*v)[it->Unknowns(idx) + d * blockSize] = v_old[it->Unknowns(Idx_) + d * blockSizeOld];
     }
     // free old idx
     for (auto it = mg.GetTriangTetraBegin(level); it != mg.GetTriangTetraEnd(level); ++it) if (it->Unknowns.Exist(Idx_)) it->Unknowns.Invalidate(Idx_);
