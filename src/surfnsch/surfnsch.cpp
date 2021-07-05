@@ -161,7 +161,7 @@ int main(int argc, char* argv[]) {
             auto xi = inpJSON.get<double>("SurfNSCH.CH.ChemicalPotentialScaling");
             auto c0 = inpJSON.get<double>("SurfNSCH.CH.c_0");
             auto c0_l = std::min(c0, 1. - c0) / sqrt(3.);
-            auto chemicalPotential = [&](double c) {
+            /*auto chemicalPotential = [&](double c) {
                 if (c < 0.) return xi * (1. - c0) * c;
                 if (c > 1.) return xi * c0 * (c - 1.);
                 double x[1], f[1], d[1], s[1], t[1];
@@ -171,6 +171,10 @@ int main(int argc, char* argv[]) {
                 else if (c < c0 + c0_l) hermite_cubic_value(c0, 0., -std::max(c0 * c0, (1. - c0) * (1. - c0)), c0 + c0_l, -1. / (12. * sqrt(3.)), 0., 1, x, f, d, s, t);
                 else                    hermite_cubic_value(c0 + c0_l, -1. / (12. * sqrt(3.)), 0., 1., 0., c0, 1, x, f, d, s, t);
                 return xi * f[0];
+            };*/
+            auto chemicalPotential = [&](double c) {
+                //use c0 to control minima.
+                return c * c * c - c * c - c0 * c * c / 4 + c0 * c / 4;
             };
         logger.end();
         logger.beg("build mesh");
