@@ -59,6 +59,12 @@ namespace DROPS {
                     };
             }
         }
+        else if (name == "SixSpots") {
+            data.description = "Initial condition with with six spots on sphere";
+            chi = [=](Point3DCL const & x, double) mutable {
+                return 4*( exp(-1.5 * (pow( x[0], 2)+ pow(x[1], 2) + pow(x[2] - 1, 2) )) + exp(-1.5 * (pow( x[0], 2)+ pow(x[1], 2) + pow(x[2] + 1, 2) )) + exp(-1.5 * (pow( x[0], 2)+ pow(x[1] - 1, 2) + pow(x[2], 2) )) + exp(-1.5 * (pow( x[0], 2)+ pow(x[1] + 1, 2) + pow(x[2], 2) )) + exp(-1.5 * (pow( x[0] - 1, 2)+ pow(x[1], 2) + pow(x[2], 2) )) + exp(-1.5 * (pow( x[0] + 1, 2)+ pow(x[1], 2) + pow(x[2] , 2) )) ) - 3.29;
+            };
+        }
         else if (name == "RandomUniform") {
             data.raftRatio = params.get<double>("SurfCahnHilliard.IC.Params." + name + ".RaftRatio");
             auto raftRatioNoisePercent = params.get<double>("SurfCahnHilliard.IC.Params." + name + ".RaftRatioNoiseFraction");

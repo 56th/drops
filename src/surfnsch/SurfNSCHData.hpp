@@ -63,6 +63,12 @@ namespace DROPS {
             dataCH.exact = false;
             dataCH.f = zeroInstatScalarFunction;
         }
+        else if (name == "SixSpots") {
+            dataNS = surfNavierStokesDataFactory(surface, "0", params);
+            dataCH = surfCahnHilliardDataFactory(surface, "SixSpots", params);
+            dataCH.exact = false;
+            dataCH.f = zeroInstatScalarFunction;
+        }
         else throw std::invalid_argument(funcName + ": IC '" + name + "' is not defined");
         return { dataNS, dataCH };
     }
