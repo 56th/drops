@@ -63,9 +63,9 @@ namespace DROPS {
             dataCH.exact = false;
             dataCH.f = zeroInstatScalarFunction;
         }
-        else if (name == "SixSpots") {
+        else if (name == "SyntheticRafts") {
             dataNS = surfNavierStokesDataFactory(surface, "0", params);
-            dataCH = surfCahnHilliardDataFactory(surface, "SixSpots", params);
+            dataCH = surfCahnHilliardDataFactory(surface, "SyntheticRafts", params);
             dataCH.exact = false;
             dataCH.f = zeroInstatScalarFunction;
         }

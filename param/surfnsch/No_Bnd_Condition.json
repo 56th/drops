@@ -52,7 +52,7 @@
     "SurfNSCH": {
       "NumbOfVirtualSubEdges": 2,
       "IC": {
-        "Name": "RandomBernoulli",
+        "Name": "SyntheticRafts",
         "Params": {
           "KelvinHelmholtz": {
             "cn": 0.01,
@@ -62,14 +62,15 @@
           "RayleighTaylor": { "GravityScaling": 1.0, "Noise": 1.0 },
           "WanDerVaalsExact": { "AngularVelocity": 3.14159265359 },
           "RandomBernoulli": { "RaftRatio" : 0.3 },
-          "RandomUniform": { "RaftRatio" : 0.5, "RaftRatioNoiseFraction" : 0.1 }
+          "RandomUniform": { "RaftRatio" : 0.5, "RaftRatioNoiseFraction" : 0.1 },
+          "SyntheticRafts": {"RaftCount":  9}
         }
       },
       "NS": {
-        "rho": { "max" : 3.0, "min" : 1.0 },
-        "nu": {"max" :  1e-2, "min" :  1e-3},
+        "rho": { "max" : 6e-14, "min" : 5.1e-14 },
+        "nu": {"max" :  6e-5, "min" :  0.3e-5},
         "gamma": 0.025,
-        "LineTension": 0.0,
+        "LineTension": 2.7e-4,
         "Comment": "Use ConvectionTermType = Stokes (zero convection term), Oseen (convection term is given and equal to velocity), or NavierStokes (convection term will be extrapolated from prev time steps)",
         "ConvectionTermType": "NavierStokes",
         "UseTangentialMassMatrix": false,
@@ -92,8 +93,8 @@
       },
       "CH": {
         "c_0": 0.5,
-        "Epsilon": 0.05,
-        "MobilityScaling": 1.0,
+        "Epsilon": 0.02,
+        "MobilityScaling": 0.76,
         "ChemicalPotentialScaling": 1.0,
         "Beta_s": 1.0,
         "UseDegenerateMobility": false,

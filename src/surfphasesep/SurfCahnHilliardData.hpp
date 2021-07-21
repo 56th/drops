@@ -59,11 +59,27 @@ namespace DROPS {
                     };
             }
         }
-        else if (name == "SixSpots") {
-            data.description = "Initial condition with with six spots on sphere";
-            chi = [=](Point3DCL const & x, double) mutable {
-                return 4*( exp(-1.5 * (pow( x[0], 2)+ pow(x[1], 2) + pow(x[2] - 1, 2) )) + exp(-1.5 * (pow( x[0], 2)+ pow(x[1], 2) + pow(x[2] + 1, 2) )) + exp(-1.5 * (pow( x[0], 2)+ pow(x[1] - 1, 2) + pow(x[2], 2) )) + exp(-1.5 * (pow( x[0], 2)+ pow(x[1] + 1, 2) + pow(x[2], 2) )) + exp(-1.5 * (pow( x[0] - 1, 2)+ pow(x[1], 2) + pow(x[2], 2) )) + exp(-1.5 * (pow( x[0] + 1, 2)+ pow(x[1], 2) + pow(x[2] , 2) )) ) - 3.29;
-            };
+        else if (name == "SyntheticRafts") {
+            data.description = "Initial concentration (chi) is given with 6 (12) synthetic rafts symmetrically placed on the sphere with ~70 raft area fraction";
+            auto raftCount = params.get<double>("SurfNSCH.IC.Params." + name + ".RaftCount");
+            if (raftCount == 6){
+                chi = [=](Point3DCL const & x, double) mutable {
+                    return 4*( exp(-1.5 * (pow( x[0], 2)+ pow(x[1], 2) + pow(x[2] - 1, 2) )) + exp(-1.5 * (pow( x[0], 2)+ pow(x[1], 2) + pow(x[2] + 1, 2) )) + exp(-1.5 * (pow( x[0], 2)+ pow(x[1] - 1, 2) + pow(x[2], 2) )) + exp(-1.5 * (pow( x[0], 2)+ pow(x[1] + 1, 2) + pow(x[2], 2) )) + exp(-1.5 * (pow( x[0] - 1, 2)+ pow(x[1], 2) + pow(x[2], 2) )) + exp(-1.5 * (pow( x[0] + 1, 2)+ pow(x[1], 2) + pow(x[2] , 2) )) ) - 3.29;
+                };
+            }
+            else if (raftCount == 12){
+                auto Phi = (std::sqrt(5) + 1) / 2;
+                auto p = Phi / std::sqrt(Phi + 2);
+                auto q = 1 / std::sqrt(Phi + 2);
+                chi = [=](Point3DCL const & x, double) mutable {
+                    return 2 * ( exp(-2.85 * (pow( x[0] - p, 2)+ pow(x[1], 2) + pow(x[2] - q, 2) )) + exp(-2.85 * (pow( x[0] - p, 2)+ pow(x[1], 2) + pow(x[2] + q, 2) )) + exp(-2.85 * (pow( x[0] + p, 2)+ pow(x[1], 2) + pow(x[2] - q, 2) )) + exp(-2.85 * (pow( x[0] + p, 2)+ pow(x[1], 2) + pow(x[2] + q, 2) )) + exp(-2.85 * (pow( x[0] - q, 2)+ pow(x[1] - p, 2) + pow(x[2], 2) )) + exp(-2.85 * (pow( x[0] -q, 2)+ pow(x[1] + p, 2) + pow(x[2], 2) )) + exp(-2.85 * (pow( x[0] + q, 2)+ pow(x[1] - p, 2) + pow(x[2], 2) )) + exp(-2.85 * (pow( x[0] + q, 2)+ pow(x[1] + p, 2) + pow(x[2], 2) )) + exp(-2.85 * (pow( x[0], 2)+ pow(x[1] - q, 2) + pow(x[2] - p, 2) )) + exp(-2.85 * (pow( x[0], 2)+ pow(x[1] - q, 2) + pow(x[2] + p, 2) )) + exp(-2.85 * (pow( x[0], 2)+ pow(x[1] + q, 2) + pow(x[2] - p, 2) )) + exp(-2.85 * (pow( x[0], 2)+ pow(x[1] + q, 2) + pow(x[2] + p, 2) ))  ) - 1.4;
+                };
+            }
+            else if (raftCount == 9){
+                chi = [=](Point3DCL const & x, double) mutable {
+                    return 2 * exp(-0.775*(pow((x[0]) , 2 )+pow((x[1]) , 2 )+pow((x[2]-1) , 2 )))+ exp(-2 * (pow((x[0]+0.86) , 2 )+pow((x[1]-0.01) , 2 )+pow((x[2]+0.5) , 2 ))) + exp(-3*(pow((x[0]+0.04) , 2 )+pow((x[1]+0.86) , 2 )+pow((x[2]+0.5) , 2 ))) +exp(-2*(pow((x[0]-0.86) , 2 )+pow((x[1]+0.02) , 2 )+pow((x[2]+0.5) , 2 ))) + exp(-4*(pow((x[0]) , 2 )+pow((x[1]-0.86) , 2 )+pow((x[2]+0.5) , 2 )))+exp(-4*(pow((x[0]) , 2 )+pow((x[1]) , 2 )+pow((x[2]+1) , 2 )))+exp(-10*(pow((x[0]-1/std::sqrt(2)) , 2 )+pow((x[1]-1/std::sqrt(2)) , 2 )+pow((x[2]) , 2 )))+exp(-10*(pow((x[0]-1/std::sqrt(2)) , 2 )+pow((x[1]+1/std::sqrt(2)) , 2 )+pow((x[2]) , 2 )))+exp(-10 * (pow((x[0]+1/std::sqrt(2)) , 2 )+pow((x[1]+1/std::sqrt(2)) , 2 )+pow((x[2]) , 2 )))-0.5 ;
+                };
+            }
         }
         else if (name == "RandomUniform") {
             data.raftRatio = params.get<double>("SurfCahnHilliard.IC.Params." + name + ".RaftRatio");
