@@ -25,7 +25,7 @@
             "Freq": 0,
             "Width": 0,
             "CoarsestLevel": 0,
-            "FinestLevel": 5,
+            "FinestLevel": 4,
             "SD": 0.1,
             "CurvDiff": -1,
             "Discontinuous": 0
@@ -52,7 +52,7 @@
     "SurfNSCH": {
       "NumbOfVirtualSubEdges": 2,
       "IC": {
-        "Name": "SyntheticRafts",
+        "Name": "WanDerVaalsExact",
         "Params": {
           "KelvinHelmholtz": {
             "cn": 0.01,
@@ -67,10 +67,10 @@
         }
       },
       "NS": {
-        "rho": { "max" : 6e-14, "min" : 5.1e-14 },
-        "nu": {"max" :  6e-5, "min" :  0.3e-5},
+        "rho": { "max" : 1, "min" : 1 },
+        "nu": {"max" :  1, "min" :  1},
         "gamma": 0.025,
-        "LineTension": 2.7e-4,
+        "LineTension": 0.0,
         "Comment": "Use ConvectionTermType = Stokes (zero convection term), Oseen (convection term is given and equal to velocity), or NavierStokes (convection term will be extrapolated from prev time steps)",
         "ConvectionTermType": "NavierStokes",
         "UseTangentialMassMatrix": false,
@@ -103,6 +103,8 @@
     },
 
     "Time": {
+      "BDF_CH" : 1,
+      "BDF_NS" : 1,
       "StepSize": 0.0001,
       "FinalTime": 200.0,
       "Adaptive": {

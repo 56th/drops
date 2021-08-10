@@ -139,6 +139,8 @@ int main(int argc, char* argv[]) {
             auto prolongationLevel = inpJSON.get<int>("SurfNSCH.CH.ProlongateFromLevelNo");
             if (prolongationLevel < meshCoarseLevel) prolongationLevel = meshCoarseLevel;
             if (prolongationLevel > meshFineLevel) prolongationLevel = meshFineLevel;
+            auto BDF_CH = inpJSON.get<double>("Time.BDF_CH");
+            auto BDF_NS = inpJSON.get<double>("Time.BDF_NS");
             auto F_rho = inpJSON.get<double>("Time.Adaptive.rho");
             auto F_tol = inpJSON.get<double>("Time.Adaptive.Tol");
             auto F_min = inpJSON.get<double>("Time.Adaptive.MinStepSize", 0.);
@@ -161,7 +163,7 @@ int main(int argc, char* argv[]) {
             auto xi = inpJSON.get<double>("SurfNSCH.CH.ChemicalPotentialScaling");
             auto c0 = inpJSON.get<double>("SurfNSCH.CH.c_0");
             auto c0_l = std::min(c0, 1. - c0) / sqrt(3.);
-            /*auto chemicalPotential = [&](double c) {
+            auto chemicalPotential = [&](double c) {
                 if (c < 0.) return xi * (1. - c0) * c;
                 if (c > 1.) return xi * c0 * (c - 1.);
                 double x[1], f[1], d[1], s[1], t[1];
@@ -171,11 +173,11 @@ int main(int argc, char* argv[]) {
                 else if (c < c0 + c0_l) hermite_cubic_value(c0, 0., -std::max(c0 * c0, (1. - c0) * (1. - c0)), c0 + c0_l, -1. / (12. * sqrt(3.)), 0., 1, x, f, d, s, t);
                 else                    hermite_cubic_value(c0 + c0_l, -1. / (12. * sqrt(3.)), 0., 1., 0., c0, 1, x, f, d, s, t);
                 return xi * f[0];
-            };*/
-            auto chemicalPotential = [&](double c) {
+            };
+            /*auto chemicalPotential = [&](double c) {
                 //use c0 to control minima.
                 return c * c * c - c * c - c0 * c * c / 4 + c0 * c / 4;
-            };
+            };*/
         logger.end();
         logger.beg("build mesh");
             logger.beg("build initial bulk mesh");
@@ -816,16 +818,20 @@ int main(int argc, char* argv[]) {
                             logger.log();
                         logger.end();
                     } while (e > F_tol && F_min < dt && dt < F_max);
-                    logger.beg("save BDF2 soln");
+                    logger.beg("save solution with given BDF type");
                         for (size_t i = 0; i < m; ++i) omega.Data[i] = (*linearSolverCH.system.lhs)[i + m];
                         chi_prev = chi;
-                        chi = chi_BDF2;
+                        chi = BDF_CH == 2 ? chi_BDF2 : chi_BDF1;
                     logger.end();
                 logger.end();
                 logger.beg("Navier-Stokes step");
                     logger.beg("assemble");
+                        alpha = i == 1 || BDF_NS == 1 ? 1. / dt : (1. + 2. * r) / (1. + r) / dt;
                         if (surfNavierStokesData.w_T) w_T.Interpolate(mg, [&](Point3DCL const & x) { return surfNavierStokesData.w_T(x, t); }); // Oseen (and Stokes) case
-                        else w_T.Data = (1. + r) * u.Data - r * u_prev.Data; // Navier-Stokes case
+                        else { // Navier-Stokes case
+                            if (BDF_NS == 1) w_T.Data = u.Data;
+                            else w_T.Data = (1. + r) * u.Data - r * u_prev.Data;
+                        }
                         Pe = supnorm(w_T.Data) / nu_max;
                         logger.buf << "Pe = " << Pe;
                         logger.log();
@@ -857,7 +863,7 @@ int main(int argc, char* argv[]) {
                         if (Pe) A_sum.LinComb(1., MatrixCL(A_sum), 1., rho_N_u.Data);
                         if (rho_delta && thermoConsistentTerm) A_sum.LinComb(1., MatrixCL(A_sum), -mobilityScaling, T_u.Data);
                         // system rhs
-                        if (i == 1) F_u.Data += (1. / dt) * (rho_M_u.Data * u.Data);
+                        if (i == 1 || BDF_NS == 1) F_u.Data += (1. / dt) * (rho_M_u.Data * u.Data);
                         else F_u.Data += ((1. + r) / dt) * (rho_M_u.Data * u.Data) - (r * r / (1. + r) / dt) * (rho_M_u.Data * u_prev.Data);
                         F_p.Data -= (dot(F_p.Data, I_p) / dot(I_p, I_p)) * I_p;
                         // for the next step
