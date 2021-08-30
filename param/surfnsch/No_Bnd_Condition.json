@@ -1,7 +1,7 @@
 {
     "Output": {
       "Directory": "../../output/tmp",
-      "EveryStep": 5,
+      "EveryStep": 1,
       "Binary": true,
       "VTK": {
         "ExportFullGrid": false,
@@ -11,7 +11,7 @@
         "Concentration": true
       },
       "Matrices": false,
-      "Vectors": false
+      "Vectors": true
     },
 
     "Mesh": {
@@ -52,7 +52,9 @@
     "SurfNSCH": {
       "NumbOfVirtualSubEdges": 2,
       "IC": {
-        "Name": "WanDerVaalsExact",
+        "Name": "RandomBernoulli",
+        "ImportChi": true,
+        "ChiPath": "/home/yerbol/Documents/56thdrops/drops/output/chi_0.dat",
         "Params": {
           "KelvinHelmholtz": {
             "cn": 0.01,
@@ -61,7 +63,7 @@
           },
           "RayleighTaylor": { "GravityScaling": 1.0, "Noise": 1.0 },
           "WanDerVaalsExact": { "AngularVelocity": 3.14159265359 },
-          "RandomBernoulli": { "RaftRatio" : 0.3 },
+          "RandomBernoulli": { "RaftRatio" : 0.5 },
           "RandomUniform": { "RaftRatio" : 0.5, "RaftRatioNoiseFraction" : 0.1 },
           "SyntheticRafts": {"RaftCount":  9}
         }

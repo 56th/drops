@@ -98,6 +98,7 @@ int main(int argc, char* argv[]) {
             auto exportVectors = inpJSON.get<bool>("Output.Vectors");
             auto surface = surfaceFactory(inpJSON);
             auto testName = inpJSON.get<std::string>("SurfNSCH.IC.Name");
+            bool import_chi_from_file = inpJSON.get<bool>("SurfNSCH.IC.ImportChi");
             auto && [surfNavierStokesData, surfCahnHilliardData] = surfNSCHDataFactory(*surface, testName, inpJSON);
             FESystem surfNSCHSystem;
             auto& gamma = surfNSCHSystem.params.surfNavierStokesParams.gamma;
@@ -524,7 +525,14 @@ int main(int argc, char* argv[]) {
                 VectorCL I_p(1., m);
             auto assembleTime = logger.end();
             logger.beg("interpolate initial data");
-                {
+                if(import_chi_from_file){
+                    logger.beg("Reading initial values of chi from file");
+                        auto path = inpJSON.get<std::string>("SurfNSCH.IC.ChiPath");
+                        std::ifstream file(path);
+                        chi.Read(file, binary);
+                    logger.end();
+                }
+                else {
                     IdxDescCL chiIdxExtCoarse(P1_FE), chiIdxExt(P1_FE);
                     chiIdxExtCoarse.CreateNumbering(prolongationLevel, mg);
                     chiIdxExt.CreateNumbering(meshFineLevel, mg);
