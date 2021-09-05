@@ -629,6 +629,10 @@ int main(int argc, char* argv[]) {
                     tJSON.put("Integral.FESolution.SurfaceVorticityH1", sqrt(vorH1Sq));
                     tJSON.put("Integral.FESolution.RaftFraction", dot(M_p.Data * chi.Data, I_p) / surfArea);
                     tJSON.put("Integral.FESolution.PerimeterEstimate", eps * dot(A_p.Data * chi.Data, chi.Data));
+                    VecDescCL chemPot(&preIdx);
+                    chemPot.Data = chi.Data;
+                    for (auto& el : chemPot.Data) el = chemicalPotential(el);
+                    tJSON.put("Integral.FESolution.LyapunovEnergy", dot(M_p.Data * I_p, chemPot.Data) + .5 * eps * eps * dot(A_p.Data * chi.Data, chi.Data));
                     if (exactSoln) {
                         chi_star.Interpolate(mg, [&](Point3DCL const & x) { return surfCahnHilliardData.chi(x, t); });
                         u_star.Interpolate(mg, [&](Point3DCL const & x) { return surfNavierStokesData.u_T(x, t); });
@@ -636,6 +640,9 @@ int main(int argc, char* argv[]) {
                         p_star.Data -= dot(M_p.Data * p_star.Data, I_p) / dot(M_p.Data * I_p, I_p) * I_p;
                         tJSON.put("Integral.ExactSolution.RaftFraction", dot(M_p.Data * chi_star.Data, I_p) / surfArea);
                         tJSON.put("Integral.ExactSolution.PerimeterEstimate", eps * dot(A_p.Data * chi_star.Data, chi_star.Data));
+                        chemPot.Data = chi_star.Data;
+                        for (auto& el : chemPot.Data) el = chemicalPotential(el);
+                        tJSON.put("Integral.ExactSolution.LyapunovEnergy", dot(M_p.Data * I_p, chemPot.Data) + .5 * eps * eps * dot(A_p.Data * chi_star.Data, chi_star.Data));
                         auto chi_diff = chi_star.Data - chi.Data;
                         tJSON.put("Integral.Error.ConcentrationL2", sqrt(dot(chi_diff, M_p.Data * chi_diff)));
                         tJSON.put("Integral.Error.ConcentrationH1", sqrt(dot(chi_diff, A_p.Data * chi_diff)));
