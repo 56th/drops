@@ -131,7 +131,12 @@ int main(int argc, char* argv[]) {
             auto xi = inpJSON.get<double>("SurfCahnHilliard.ChemicalPotentialScaling");
             auto c0 = inpJSON.get<double>("SurfCahnHilliard.c_0");
             auto c0_l = std::min(c0, 1. - c0) / sqrt(3.);
-            auto chemicalPotential = [&](double c) {
+            auto f_0 = [&](VectorCL const & c) {
+                auto res = c;
+                for (auto& el : res) el = xi * std::pow(el * (1. - el), 2.);
+                return res;
+            };
+            auto chemicalPotential = [&](double c) { // f'_0
                 if (c < 0.) return xi * (1. - c0) * c;
                 if (c > 1.) return xi * c0 * (c - 1.);
                 double x[1], f[1], d[1], s[1], t[1];
@@ -329,17 +334,12 @@ int main(int argc, char* argv[]) {
                     tJSON.put("Integral.SurfacaAreaP1", surfArea);
                     tJSON.put("Integral.FESolution.RaftFraction", dot(M.Data * chi.Data, I_p) / surfArea);
                     tJSON.put("Integral.FESolution.PerimeterEstimate", eps * dot(A_one.Data * chi.Data, chi.Data));
-                    VecDescCL chemPot(&chiIdx);
-                    chemPot.Data = chi.Data;
-                    for (auto& el : chemPot.Data) el = xi * std::pow(el * (1. - el), 2.);
-                    tJSON.put("Integral.FESolution.LyapunovEnergy", dot(M.Data * I_p, chemPot.Data) + .5 * eps * eps * dot(A_one.Data * chi.Data, chi.Data));
+                    tJSON.put("Integral.FESolution.LyapunovEnergy", dot(M.Data * I_p, f_0(chi.Data)) + .5 * eps * eps * dot(A_one.Data * chi.Data, chi.Data));
                     if (surfCahnHilliardData.exact) {
                         chi_star.Interpolate(mg, [&](Point3DCL const & x) { return surfCahnHilliardData.chi(x, t); });
                         tJSON.put("Integral.ExactSolution.RaftFraction", dot(M.Data * chi_star.Data, I_p) / surfArea);
                         tJSON.put("Integral.ExactSolution.PerimeterEstimate", eps * dot(A_one.Data * chi_star.Data, chi_star.Data));
-                        chemPot.Data = chi_star.Data;
-                        for (auto& el : chemPot.Data) el = xi * std::pow(el * (1. - el), 2.);
-                        tJSON.put("Integral.ExactSolution.LyapunovEnergy", dot(M.Data * I_p, chemPot.Data) + .5 * eps * eps * dot(A_one.Data * chi_star.Data, chi_star.Data));
+                        tJSON.put("Integral.ExactSolution.LyapunovEnergy", dot(M.Data * I_p, f_0(chi_star.Data)) + .5 * eps * eps * dot(A_one.Data * chi_star.Data, chi_star.Data));
                         auto chi_diff = chi_star.Data - chi.Data;
                         tJSON.put("Integral.Error.ConcentrationL2", sqrt(dot(chi_diff, M.Data * chi_diff)));
                         tJSON.put("Integral.Error.ConcentrationH1", sqrt(dot(chi_diff, A_one.Data * chi_diff)));
