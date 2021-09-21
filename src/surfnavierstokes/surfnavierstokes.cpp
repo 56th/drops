@@ -99,6 +99,8 @@ int main(int argc, char* argv[]) {
             auto mtxExpFunc = binary ? &MatrixCL::exportMAT : &MatrixCL::exportMTX;
             auto exportVectors = inpJSON.get<bool>("Output.Vectors");
             auto surface = surfaceFactory(inpJSON);
+            InstatScalarFunction phi = [&](Point3DCL const & x, double t) { return surface->phi(x, t); };
+            if (inpJSON.get<bool>("Surface.UseExactDistanceFunc")) phi = [&](Point3DCL const & x, double t) { return surface->dist(x, t); };
             auto testName = inpJSON.get<std::string>("SurfNavierStokes.IC.Name");
             auto surfNavierStokesData = surfNavierStokesDataFactory(*surface, testName, inpJSON);
             FESystem surfNSystem;
@@ -142,7 +144,7 @@ int main(int argc, char* argv[]) {
             logger.end();
             logger.beg("refine towards the surface");
                 AdapTriangCL adap(mg);
-                DistMarkingStrategyCL markerLset([&](Point3DCL const & x, double) { return surface->dist(x); }, inpJSON.get<double>("Mesh.AdaptRef.Width"), inpJSON.get<int>("Mesh.AdaptRef.CoarsestLevel"), inpJSON.get<int>("Mesh.AdaptRef.FinestLevel"));
+                DistMarkingStrategyCL markerLset([&](Point3DCL const & x, double) { return phi(x, 0.); }, inpJSON.get<double>("Mesh.AdaptRef.Width"), inpJSON.get<int>("Mesh.AdaptRef.CoarsestLevel"), inpJSON.get<int>("Mesh.AdaptRef.FinestLevel"));
                 adap.set_marking_strategy(&markerLset);
                 adap.MakeInitialTriang();
                 adap.set_marking_strategy(nullptr);
@@ -401,7 +403,7 @@ int main(int argc, char* argv[]) {
         logger.beg("t = t_0 = 0");
             t = 0.;
             logger.beg("interpolate level-set");
-                levelSet.Interpolate(mg, [&](Point3DCL const & x) { return surface->dist(x, t); });
+                levelSet.Interpolate(mg, [&](Point3DCL const & x) { return phi(x, t); });
             logger.end();
             logger.beg("set up FE spaces");
                 logger.beg("set up pressure space");
@@ -588,7 +590,7 @@ int main(int argc, char* argv[]) {
             std::stringstream header; header << "t = t_" << i << " = " << t << " (" << (100. * i) / numSteps << "%)";
             logger.beg(header.str());
                 logger.beg("interpolate level-set");
-                    levelSet.Interpolate(mg, [&](Point3DCL const & x) { return surface->dist(x, t); });
+                    levelSet.Interpolate(mg, [&](Point3DCL const & x) { return phi(x, t); });
                 logger.end();
                 logger.beg("set up FE spaces");
                     logger.beg("set up pressure space");

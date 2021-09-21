@@ -34,6 +34,7 @@
 
     "Surface": {
       "Name": "Sphere",
+      "UseExactDistanceFunc": true,
       "Params": {
         "Sphere": {
           "r_0": 1.0,
