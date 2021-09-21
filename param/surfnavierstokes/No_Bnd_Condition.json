@@ -1,14 +1,14 @@
 {
     "Output": {
-      "Directory": "../../output/tmp",
+      "Directory": "../../output/evolving_conv_lvl4_gamma=0",
       "EveryStep": 1,
       "Binary": true,
       "VTK": {
         "ExportFullGrid": false,
         "Velocity": true,
-        "Vorticity": true,
-        "SurfSpeed": true,
-        "Pressure": true
+        "Vorticity": false,
+        "SurfSpeed": false,
+        "Pressure": false
       },
       "Matrices": false,
       "Vectors": false
@@ -23,9 +23,9 @@
         "AdaptRef": {
             "Comment": "adaptive refinement",
             "Freq": 0,
-            "Width": 0,
+            "Width": 10.0,
             "CoarsestLevel": 0,
-            "FinestLevel": 3,
+            "FinestLevel": 4,
             "SD": 0.1,
             "CurvDiff": -1,
             "Discontinuous": 0
@@ -38,7 +38,7 @@
       "Params": {
         "Sphere": {
           "r_0": 1.0,
-          "A": 0.0
+          "A": 0.3
         },
         "Torus": {
           "R": 1.0,
@@ -49,12 +49,12 @@
     },
 
     "SurfNavierStokes": {
-      "nu": 1.0,
+      "nu": 1e-2,
       "gamma": 0.0,
       "Comment": "Use ConvectionTermType = Stokes (zero convection term), Oseen (convection term is given and equal to velocity), or NavierStokes (convection term will be extrapolated from prev time steps)",
-      "ConvectionTermType": "Stokes",
+      "ConvectionTermType": "NavierStokes",
       "IC": {
-        "Name": "PolynomialExact",
+        "Name": "DirectionChangeExact",
         "Params": {
           "KelvinHelmholtz": {
             "delta_0": 0.05,
@@ -67,13 +67,13 @@
           "KillingExact": { "AngularVelocity": 1.0 }
         }
       },
-      "UseTangentialMassMatrix": false,
+      "UseTangentialMassMatrix": true,
       "NormalPenalty": {
         "Power": -2.0,
         "Scaling": 1.0
       },
       "VelocityStab":  {
-        "Power": 0.0,
+        "Power": -1.0,
         "Scaling": 1.0
       },
       "PressureStab":  {
@@ -83,30 +83,30 @@
         "Scaling": 1.0
       },
       "Formulation": "Consistent",
-      "NumbOfVirtualSubEdges": 2
+      "NumbOfVirtualSubEdges": 4
     },
 
     "Time": {
       "BDF": 2,
-      "NumbOfSteps": 1,
+      "NumbOfSteps": 100,
       "FinalTime": 1.0
     },
 
     "Solver": {
-        "UsePreviousFrameAsInitialGuess" : false,
+        "UsePreviousFrameAsInitialGuess" : true,
         "Outer" : {
           "Iteration" : "FLEXIBLE GMRES",
           "OutputFrequency" : 1,
           "KrylovSubspaceSize" : 100,
-          "MaxIter" : 50,
-          "RelResTol" : 1e-8
+          "MaxIter" : 200,
+          "RelResTol" : 1e-6
         },
         "Inner" : {
             "Type" : "BlockTriangular",
             "A" : {
               "Comment" : "use Iteration = Amesos2_* (e.g. Amesos2_Klu, Amesos2_SuperLU etc.) for the sparse-direct; Type = Full for full factorization, BlockTriangular for block Gauss-Seidel, BlockDiagonal for block Jacobi",
               "Iteration" : "Amesos2_KLU",
-              "Type" : "Full"
+              "Type" : "BlockTriangular"
             },
             "S" : {
               "S_L" : true,
