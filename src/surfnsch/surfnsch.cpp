@@ -119,7 +119,9 @@ int main(int argc, char* argv[]) {
             auto beta_s = inpJSON.get<double>("SurfNSCH.CH.Beta_s");
             auto& t = surfNSCHSystem.params.t;
             auto& levelSet = surfNSCHSystem.params.levelSet;
-            surfNSCHSystem.params.surfNavierStokesParams.lineTension = inpJSON.get<double>("SurfNSCH.NS.LineTension");
+            auto sigma_1 = inpJSON.get<double>("SurfNSCH.NS.LineTension.before");
+            auto sigma_2 = inpJSON.get<double>("SurfNSCH.NS.LineTension.after");
+            auto switch_step = inpJSON.get<double>("SurfNSCH.NS.LineTension.step");
             surfNSCHSystem.params.numbOfVirtualSubEdges = inpJSON.get<size_t>("SurfNSCH.NumbOfVirtualSubEdges");
             surfNSCHSystem.params.surfNavierStokesParams.m_g = surfNavierStokesData.m_g;
             surfNSCHSystem.params.surfNavierStokesParams.f_T = surfNavierStokesData.f_T;
@@ -870,6 +872,8 @@ int main(int argc, char* argv[]) {
                             logger.log("assembling convection mtx");
                             surfNSCHSystem.matrices.push_back(&rho_N_u);
                         }
+                        if( i < switch_step) {surfNSCHSystem.params.surfNavierStokesParams.lineTension = sigma_1;}
+                        else surfNSCHSystem.params.surfNavierStokesParams.lineTension = sigma_2;
                         surfNSCHSystem.vectors = { &F_u, &F_p };
                         setupFESystem(mg, surfNSCHSystem);
                         if (!rho_delta) rho_M_u.Data = MatrixCL(rho_max, M_u.Data);

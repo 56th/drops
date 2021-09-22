@@ -72,7 +72,7 @@
         "rho": { "max" : 1, "min" : 1 },
         "nu": {"max" :  1, "min" :  1},
         "gamma": 0.025,
-        "LineTension": 0.0,
+        "LineTension": {"step":  11, "before":  0, "after":  0.025},
         "Comment": "Use ConvectionTermType = Stokes (zero convection term), Oseen (convection term is given and equal to velocity), or NavierStokes (convection term will be extrapolated from prev time steps)",
         "ConvectionTermType": "NavierStokes",
         "UseTangentialMassMatrix": false,
