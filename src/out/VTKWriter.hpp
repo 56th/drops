@@ -88,10 +88,7 @@ namespace DROPS {
                 auto cellArray = vtkSmartPointer<vtkCellArray>::New();
                 size_t n = 0;
                 auto isActive = [&](TetraCL const & tet) {
-                    for (auto const & var : vars)
-                        if (var.vec.RowIdx->IsOnInterface() && tet.Unknowns.Exist(var.vec.RowIdx->GetIdx()))
-                            return true;
-                    return false;
+                    return std::any_of(vars.begin(), vars.end(), [&](VTKVar const & var) { return var.vec.RowIdx->IsOnInterface() && tet.Unknowns.Exist(var.vec.RowIdx->GetIdx()); });
                 };
                 for (auto it = params.mg->GetTriangTetraBegin(); it != params.mg->GetTriangTetraEnd(); ++it) {
                     if (!isActive(*it)) continue;
