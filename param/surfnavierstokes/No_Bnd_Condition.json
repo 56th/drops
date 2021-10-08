@@ -34,7 +34,8 @@
 
     "Surface": {
       "Name": "Sphere",
-      "UseExactDistanceFunc": true,
+      "Comment": "UseExactDistanceFunc = true will use Surface.dist(x, t) everywhere, and false will use Surface.phi(x, t) everywhere except for building interface/narrow-band FE spaces; Surface.dist(x, t) will be used for the latter",
+      "UseExactDistanceFunc": false,
       "Params": {
         "Sphere": {
           "r_0": 1.0,
@@ -99,7 +100,7 @@
           "OutputFrequency" : 1,
           "KrylovSubspaceSize" : 100,
           "MaxIter" : 200,
-          "RelResTol" : 1e-6
+          "RelResTol" : 1e-7
         },
         "Inner" : {
             "Type" : "BlockTriangular",
