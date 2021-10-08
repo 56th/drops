@@ -41,11 +41,6 @@ ListPlot[Map[{#["t"], #["Solver", "Outer", "ResidualNorm", "r_i"]}&, files /@ io
 (*Num iters*)
 
 
-(*
-Do[
-	Print@ListPlot[#["Solver", "Outer", "TotalIters"]& /@ files[run], PlotRange\[Rule]All],
-{run, io["runs"]}]
-*)
 ListPlot[Map[{#["t"], #["Solver", "Outer", "TotalIters"]}&, files /@ io["runs"], {2}], Filling -> Bottom, PlotLabel->"# iters", PlotLegends -> io["runs"], PlotRange -> All]
 
 
@@ -63,7 +58,10 @@ order[table_, i_] := Module[{col = Transpose[table][[i]], stepSize = h /@ io["ru
 	Prepend[Table[Log[col[[j]] / col[[j - 1]]]/Log[stepSize[[j]] / stepSize[[j - 1]]], {j, 2, Length@col}], ""]
 ]
 insertCol[table_, col_, i_] := Transpose[Join[Transpose[table][[;;i - 1]], {col}, Transpose[table][[i;;]]]]
-applyCol[f_, table_, i_] := Transpose[Join[Transpose[table][[;;i - 1]], {f /@ Transpose[table][[i]]}, Transpose[table][[i + 1;;]]]]
+applyCol[f_, table_, I_] := Module[{res = Transpose@table}, 
+	Do[res[[i]] = f /@ res[[i]], {i, I}];
+	Transpose@res
+]
 
 
 header = {"h", "# d.o.f.", "velH1", "order", "velL2", "order", "preL2", "order"};
@@ -80,14 +78,6 @@ orderPreL2 = order[table, 5];
 table = insertCol[table, orderVelH1, 4];
 table = insertCol[table, orderVelL2, 6];
 table = insertCol[table, orderPreL2, 8];
-table = applyCol[ScientificForm[#, 3]&, table, 1];
-table = applyCol[ScientificForm[#, 3]&, table, 3];
-table = applyCol[ScientificForm[#, 3]&, table, 5];
-table = applyCol[ScientificForm[#, 3]&, table, 7];
-table = applyCol[NumberForm[#, 2]&, table, 4];
-table = applyCol[NumberForm[#, 2]&, table, 6];
-table = applyCol[NumberForm[#, 2]&, table, 8];
+table = applyCol[ScientificForm[#, 3]&, table, {1, 3, 7, 5}];
+table = applyCol[NumberForm[#, 2]&, table, {4, 6, 8}];
 Grid[Prepend[table, header], Frame -> All]
-
-
-ScientificForm[, 3]
