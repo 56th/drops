@@ -104,7 +104,6 @@ int main(int argc, char* argv[]) {
             auto testName = inpJSON.get<std::string>("SurfNavierStokes.IC.Name");
             auto surfNavierStokesData = surfNavierStokesDataFactory(*surface, testName, inpJSON);
             FESystem surfNSystem;
-            auto& narrowBandWidth = surfNSystem.params.dist;
             auto& gamma = surfNSystem.params.surfNavierStokesParams.gamma;
             gamma = inpJSON.get<double>("SurfNavierStokes.gamma");
             auto nu = inpJSON.get<double>("SurfNavierStokes.nu");
@@ -419,7 +418,7 @@ int main(int argc, char* argv[]) {
                         speedIdx.DistributeDOFs(mg.GetLastLevel(), mg, &distFunc);
                         u_N.Interpolate(mg, [&](Point3DCL const & x) { return surface->u_N(x, t); });
                         auto u_N_max = supnorm(u_N.Data);
-                        narrowBandWidth = 1.1 * BDF * u_N_max * stepSize;
+                        auto narrowBandWidth = 1.1 * BDF * u_N_max * stepSize;
                         logger.buf
                             << "max |u_N| = " << u_N_max << '\n'
                             << "narrow band width = " << narrowBandWidth;

@@ -583,6 +583,12 @@ public:
     }
     void visit(TetraCL const & tet) {
         std::string funcName = __func__;
+        auto isActive = std::any_of(system.matrices.begin(), system.matrices.end(), [&](FEMatDescCL const * mtx) {
+            return tet.Unknowns.Exist(mtx->RowIdx->GetIdx()) && tet.Unknowns.Exist(mtx->ColIdx->GetIdx());
+        }) || std::any_of(system.vectors.begin(), system.vectors.end(), [&](FEVecDescCL const * vec) {
+            return tet.Unknowns.Exist(vec->RowIdx->GetIdx());
+        });
+        if (!isActive) return;
         LocalAssembler assembler(tet, system.params);
         for (auto& matrix : system.matrices) {
             auto I = matrix->RowIdx->Loc2Glo(tet);

@@ -915,7 +915,7 @@ class LocalAssembler {
 public:
     struct LocalAssemblerParams {
         size_t numbOfVirtualSubEdges = 2;
-        double t = 0., dist = 0.;
+        double t = 0.;
         VecDescCL levelSet;
         struct {
             double gamma = 0., lineTension = 0.;
@@ -1240,20 +1240,15 @@ public:
         if (I.empty()) throw std::invalid_argument(__func__ + std::string(": undefined levelset"));
         for (size_t i = 0; i < I.size(); ++i)
             levelSetTet[i] = params.levelSet.Data[I[i]];
-        auto distTetra = distance(levelSetTet);
-        if (distTetra == 0.) {
-            auto const & lattice = PrincipalLatticeCL::instance(params.numbOfVirtualSubEdges);
-            GridFunctionCL<> levelSetTetLat(lattice.vertex_size());
-            evaluate_on_vertexes(levelSetTet, lattice, Addr(levelSetTetLat));
-            SurfacePatchCL spatch;
-            spatch.make_patch<MergeCutPolicyCL>(lattice, levelSetTetLat);
-            make_CompositeQuad5Domain2D(qDomain, spatch, tet);
-        }
-        if (distTetra <= params.dist) {
-            make_SimpleQuadDomain<Quad5DataCL>(q3Domain, AllTetraC);
-            GetTrafoTr(T, absDet, tet);
-            absDet = std::fabs(absDet);
-        }
+        auto const & lattice = PrincipalLatticeCL::instance(params.numbOfVirtualSubEdges);
+        GridFunctionCL<> levelSetTetLat(lattice.vertex_size());
+        evaluate_on_vertexes(levelSetTet, lattice, Addr(levelSetTetLat));
+        SurfacePatchCL spatch;
+        spatch.make_patch<MergeCutPolicyCL>(lattice, levelSetTetLat);
+        make_CompositeQuad5Domain2D(qDomain, spatch, tet);
+        make_SimpleQuadDomain<Quad5DataCL>(q3Domain, AllTetraC);
+        GetTrafoTr(T, absDet, tet);
+        absDet = std::fabs(absDet);
     }
     mtx A_vecP2vecP2() {
         if (qDomain.empty()) return createMtx(n.vecP2, 0.);
