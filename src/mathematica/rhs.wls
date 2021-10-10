@@ -2,7 +2,7 @@
 (* ::Package:: *)
 
 surface = "Sphere";
-solution = "KillingExact";
+solution = "PolynomialExact";
 
 
 surfaces = <|
@@ -99,8 +99,7 @@ fStokes[{x_,y_,z_}, t_] := Evaluate@simplify[
 	+ D[uT[{x, y, z}, t], t] 
 	- \[Nu] P[{x, y, z}, t] . surfMatDiv[{x, y, z}, t][Es[{x, y, z}, t][uT[{x, y, z}, t]] + uNH[{x, y, z}, t]] 
 	+ uNH[{x, y, z}, t] . uT[{x, y, z}, t] 
-	- uN[{x, y, z}, t]surfGrad[{x, y, z}, t][uN[{x, y, z}, t]] 
-	+ surfGrad[{x, y, z}, t][p[{x, y, z}, t]],
+	- uN[{x, y, z}, t]surfGrad[{x, y, z}, t][uN[{x, y, z}, t]],
 \[Phi][{x, y, z}, t] == 0]
 
 

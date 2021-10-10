@@ -15,6 +15,7 @@ namespace DROPS {
     using MatchFunction = std::function<bool(const Point3DCL&, const Point3DCL&)>;
     inline double zeroInstatScalarFunction(Point3DCL const &, double) { return 0.; }
     inline Point3DCL zeroInstatVectorFunction(Point3DCL const &, double) { return Point3DCL(0., 0., 0.); }
+    struct InstatDiffFunction { std::string description; InstatScalarFunction f; InstatVectorFunction grad; };
 }
 
 #endif // FUNCTIONS_HPP

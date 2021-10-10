@@ -55,17 +55,26 @@
       "Comment": "Use ConvectionTermType = Stokes (zero convection term), Oseen (convection term is given and equal to velocity), or NavierStokes (convection term will be extrapolated from prev time steps)",
       "ConvectionTermType": "NavierStokes",
       "IC": {
-        "Name": "DirectionChangeExact",
-        "Params": {
-          "KelvinHelmholtz": {
-            "delta_0": 0.05,
-            "cn": 0.01,
-            "aa": 1.0, "ma": 16.0,
-            "ab": 0.1, "mb": 20.0
-          },
-          "PolynomialExact": {},
-          "DirectionChangeExact": {},
-          "KillingExact": { "AngularVelocity": 1.0 }
+        "Velocity": {
+          "Name": "DirectionChangeExact",
+          "Params": {
+            "0": {},
+            "PolynomialExact": {},
+            "DirectionChangeExact": {},
+            "KillingExact": { "AngularVelocity": 1.0 },
+            "KelvinHelmholtz": {
+              "delta_0": 0.05,
+              "cn": 0.01,
+              "aa": 1.0, "ma": 16.0,
+              "ab": 0.1, "mb": 20.0
+            }
+          }
+        },
+        "Pressure": {
+          "Name": "0",
+          "Params": {
+            "0": {}
+          }
         }
       },
       "UseTangentialMassMatrix": true,

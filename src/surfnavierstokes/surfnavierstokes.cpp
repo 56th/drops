@@ -101,8 +101,9 @@ int main(int argc, char* argv[]) {
             auto surface = surfaceFactory(inpJSON);
             InstatScalarFunction phi = [&](Point3DCL const & x, double t) { return surface->phi(x, t); };
             if (inpJSON.get<bool>("Surface.UseExactDistanceFunc")) phi = [&](Point3DCL const & x, double t) { return surface->dist(x, t); };
-            auto testName = inpJSON.get<std::string>("SurfNavierStokes.IC.Name");
-            auto surfNavierStokesData = surfNavierStokesDataFactory(*surface, testName, inpJSON);
+            auto velName = inpJSON.get<std::string>("SurfNavierStokes.IC.Velocity.Name");
+            auto preName = inpJSON.get<std::string>("SurfNavierStokes.IC.Pressure.Name");
+            auto surfNavierStokesData = surfNavierStokesDataFactory(*surface, velName, preName, inpJSON);
             FESystem surfNSystem;
             auto& gamma = surfNSystem.params.surfNavierStokesParams.gamma;
             gamma = inpJSON.get<double>("SurfNavierStokes.gamma");
@@ -186,7 +187,7 @@ int main(int argc, char* argv[]) {
         logger.end();
         logger.beg("set up vtk");
             VTKWriter::VTKParams vtkParams; {
-                vtkParams.path = dirName + "/vtk/" + testName + inpJSON.get<std::string>("Surface.Name");
+                vtkParams.path = dirName + "/vtk/" + velName + inpJSON.get<std::string>("Surface.Name");
                 vtkParams.mg = &mg;
                 vtkParams.binary = binary;
                 vtkParams.staticGrid = surface->isStationary();
