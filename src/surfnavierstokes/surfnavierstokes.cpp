@@ -419,7 +419,7 @@ int main(int argc, char* argv[]) {
                         speedIdx.DistributeDOFs(mg.GetLastLevel(), mg, &distFunc);
                         u_N.Interpolate(mg, [&](Point3DCL const & x) { return surface->u_N(x, t); });
                         auto u_N_max = supnorm(u_N.Data);
-                        auto narrowBandWidth = 1.1 * BDF * u_N_max * stepSize;
+                        auto narrowBandWidth = inpJSON.get<double>("SurfNavierStokes.NarrowBandWidthScaling") * BDF * u_N_max * stepSize;
                         logger.buf
                             << "max |u_N| = " << u_N_max << '\n'
                             << "narrow band width = " << narrowBandWidth;
@@ -610,7 +610,7 @@ int main(int argc, char* argv[]) {
                             speedIdx.DistributeDOFs(mg.GetLastLevel(), mg, &distFunc);
                             u_N.Interpolate(mg, [&](Point3DCL const & x) { return surface->u_N(x, t); });
                             u_N_max = supnorm(u_N.Data);
-                            narrowBandWidth = 1.1 * BDF * u_N_max * stepSize;
+                            narrowBandWidth = inpJSON.get<double>("SurfNavierStokes.NarrowBandWidthScaling") * BDF * u_N_max * stepSize;
                             logger.buf
                                 << "max |u_N| = " << u_N_max << '\n'
                                 << "narrow band width = " << narrowBandWidth;

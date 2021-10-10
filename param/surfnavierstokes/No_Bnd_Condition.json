@@ -77,6 +77,7 @@
           }
         }
       },
+      "NarrowBandWidthScaling": 1.1,
       "UseTangentialMassMatrix": true,
       "NormalPenalty": {
         "Power": -2.0,
