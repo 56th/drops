@@ -420,7 +420,7 @@ int main(int argc, char* argv[]) {
                         u_N.Interpolate(mg, [&](Point3DCL const & x) { return surface->u_N(x, t); });
                         auto u_N_max = supnorm(u_N.Data);
                         auto narrowBandWidth = inpJSON.get<double>("SurfNavierStokes.NarrowBandWidthScaling") * BDF * u_N_max * stepSize;
-                        if (!surface->isStationary()) narrowBandWidth = std::max(narrowBandWidth, 1.5 * h);
+                        if (!surface->isStationary()) narrowBandWidth = std::max(narrowBandWidth, 2. * h);
                         logger.buf
                             << "max |u_N| = " << u_N_max << '\n'
                             << "narrow band width = " << narrowBandWidth;
@@ -612,7 +612,7 @@ int main(int argc, char* argv[]) {
                             u_N.Interpolate(mg, [&](Point3DCL const & x) { return surface->u_N(x, t); });
                             u_N_max = supnorm(u_N.Data);
                             narrowBandWidth = inpJSON.get<double>("SurfNavierStokes.NarrowBandWidthScaling") * BDF * u_N_max * stepSize;
-                            if (!surface->isStationary()) narrowBandWidth = std::max(narrowBandWidth, 1.5 * h);
+                            if (!surface->isStationary()) narrowBandWidth = std::max(narrowBandWidth, 2. * h);
                             logger.buf
                                 << "max |u_N| = " << u_N_max << '\n'
                                 << "narrow band width = " << narrowBandWidth;
