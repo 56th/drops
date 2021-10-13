@@ -1,7 +1,7 @@
 {
     "Output": {
-      "Directory": "../../output/evolving_conv_lvl4_gamma=0",
-      "EveryStep": 1,
+      "Directory": "/scratch/alex/evolving_conv_lvl3",
+      "EveryStep": -1,
       "Binary": true,
       "VTK": {
         "ExportFullGrid": false,
@@ -25,7 +25,7 @@
             "Freq": 0,
             "Width": 10.0,
             "CoarsestLevel": 0,
-            "FinestLevel": 4,
+            "FinestLevel": 3,
             "SD": 0.1,
             "CurvDiff": -1,
             "Discontinuous": 0
@@ -36,6 +36,8 @@
       "Name": "Sphere",
       "Comment": "UseExactDistanceFunc = true will use Surface.dist(x, t) everywhere, and false will use Surface.phi(x, t) everywhere except for building interface/narrow-band FE spaces; Surface.dist(x, t) will be used for the latter",
       "UseExactDistanceFunc": false,
+      "MinSurfaceSpeed": 1.0,
+      "NarrowBandWidthScaling": 1.1,
       "Params": {
         "Sphere": {
           "r_0": 1.0,
@@ -77,7 +79,6 @@
           }
         }
       },
-      "NarrowBandWidthScaling": 1.1,
       "UseTangentialMassMatrix": true,
       "NormalPenalty": {
         "Power": -2.0,
@@ -94,12 +95,12 @@
         "Scaling": 1.0
       },
       "Formulation": "Consistent",
-      "NumbOfVirtualSubEdges": 4
+      "NumbOfVirtualSubEdges": 2
     },
 
     "Time": {
-      "BDF": 2,
-      "NumbOfSteps": 100,
+      "BDF": 1,
+      "NumbOfSteps": 50,
       "FinalTime": 1.0
     },
 

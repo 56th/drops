@@ -104,6 +104,8 @@ int main(int argc, char* argv[]) {
             auto velName = inpJSON.get<std::string>("SurfNavierStokes.IC.Velocity.Name");
             auto preName = inpJSON.get<std::string>("SurfNavierStokes.IC.Pressure.Name");
             auto surfNavierStokesData = surfNavierStokesDataFactory(*surface, velName, preName, inpJSON);
+            auto u_N_min = inpJSON.get<double>("Surface.MinSurfaceSpeed");
+            auto NarrowBandWidthScaling = inpJSON.get<double>("Surface.NarrowBandWidthScaling");
             FESystem surfNSystem;
             auto& gamma = surfNSystem.params.surfNavierStokesParams.gamma;
             gamma = inpJSON.get<double>("SurfNavierStokes.gamma");
@@ -419,8 +421,8 @@ int main(int argc, char* argv[]) {
                         speedIdx.DistributeDOFs(mg.GetLastLevel(), mg, &distFunc);
                         u_N.Interpolate(mg, [&](Point3DCL const & x) { return surface->u_N(x, t); });
                         auto u_N_max = supnorm(u_N.Data);
-                        auto narrowBandWidth = inpJSON.get<double>("SurfNavierStokes.NarrowBandWidthScaling") * BDF * u_N_max * stepSize;
-                        if (!surface->isStationary()) narrowBandWidth = std::max(narrowBandWidth, 2. * h);
+                        if (u_N_max) u_N_max = std::max(u_N_min, u_N_max);
+                        auto narrowBandWidth = NarrowBandWidthScaling * BDF * u_N_max * stepSize;
                         logger.buf
                             << "max |u_N| = " << u_N_max << '\n'
                             << "narrow band width = " << narrowBandWidth;
@@ -611,8 +613,8 @@ int main(int argc, char* argv[]) {
                             speedIdx.DistributeDOFs(mg.GetLastLevel(), mg, &distFunc);
                             u_N.Interpolate(mg, [&](Point3DCL const & x) { return surface->u_N(x, t); });
                             u_N_max = supnorm(u_N.Data);
-                            narrowBandWidth = inpJSON.get<double>("SurfNavierStokes.NarrowBandWidthScaling") * BDF * u_N_max * stepSize;
-                            if (!surface->isStationary()) narrowBandWidth = std::max(narrowBandWidth, 2. * h);
+                            if (u_N_max) u_N_max = std::max(u_N_min, u_N_max);
+                            narrowBandWidth = NarrowBandWidthScaling * BDF * u_N_max * stepSize;
                             logger.buf
                                 << "max |u_N| = " << u_N_max << '\n'
                                 << "narrow band width = " << narrowBandWidth;
