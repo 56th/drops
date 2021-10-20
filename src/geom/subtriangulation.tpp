@@ -36,10 +36,10 @@ namespace DROPS {
     }
 
     template <class GridFunT>
-    double  distance(const GridFunT& f) {
+    double distance(const GridFunT& f) {
         if (f.size() == 0) throw std::invalid_argument(__func__ + std::string(": empty levelset levelset"));
         if (equalSigns(f))
-            return std::abs(*std::min_element(std::begin(f), std::end(f), [](double a, double b) { return std::abs(a) < std::abs(b); }));
+            return std::fabs(*std::min_element(std::begin(f), std::end(f), [](double a, double b) { return std::fabs(a) < std::fabs(b); }));
         if (std::count(std::begin(f), std::end(f), 0.))
             throw std::invalid_argument(__func__ + std::string(": levelset is exactly zero at node(s); not implemented yet"));
         return 0.;
