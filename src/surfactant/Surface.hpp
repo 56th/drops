@@ -38,6 +38,11 @@ namespace DROPS {
             std::string funcName = __func__;
             throw std::logic_error(funcName + ": distance function not available");
         }
+        virtual double dist(double, double) const {
+            if (isStationary_) return 0.;
+            std::string funcName = __func__;
+            throw std::logic_error(funcName + ": dist(Gamma(t0), Gamma(t1)) is not available");
+        }
         virtual double phi(Point3DCL const & x, double t = 0.) const { return dist(x, t); }
         virtual Point3DCL normal(Point3DCL const &, double t = 0.) const = 0;
         SMatrixCL<3, 3> P(Point3DCL const & x, double t = 0.) const { return eye<3, 3>() - outer_product(normal(x, t), normal(x, t)); }
@@ -61,6 +66,7 @@ namespace DROPS {
         std::array<bool, 3> rotationalInvariance(double) const final { return { true, true, true }; }
         double u_N(Point3DCL const &, double t) const final { return r_prime(t); }
         double dist(Point3DCL const & x, double t) const final { return norm(x) - r(t); }
+        double dist(double t0, double t1) const final { return std::fabs(r(t0) - r(t1)); }
         double phi(Point3DCL const & x, double t) const final { return norm_sq(x) - r(t) * r(t); } // global P2 func
         Point3DCL normal(Point3DCL const & x, double) const final { return x / norm(x); }
     };

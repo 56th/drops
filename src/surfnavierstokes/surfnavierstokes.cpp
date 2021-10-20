@@ -105,6 +105,7 @@ int main(int argc, char* argv[]) {
             auto preName = inpJSON.get<std::string>("SurfNavierStokes.IC.Pressure.Name");
             auto surfNavierStokesData = surfNavierStokesDataFactory(*surface, velName, preName, inpJSON);
             auto u_N_min = inpJSON.get<double>("Surface.MinSurfaceSpeed");
+            auto narrowBandWidth = 0.;
             auto NarrowBandWidthScaling = inpJSON.get<double>("Surface.NarrowBandWidthScaling");
             FESystem surfNSystem;
             auto& gamma = surfNSystem.params.surfNavierStokesParams.gamma;
@@ -421,12 +422,25 @@ int main(int argc, char* argv[]) {
                         speedIdx.DistributeDOFs(mg.GetLastLevel(), mg, &distFunc);
                         u_N.Interpolate(mg, [&](Point3DCL const & x) { return surface->u_N(x, t); });
                         auto u_N_max = supnorm(u_N.Data);
-                        if (u_N_max) u_N_max = std::max(u_N_min, u_N_max);
-                        auto narrowBandWidth = NarrowBandWidthScaling * BDF * u_N_max * stepSize;
-                        logger.buf
-                            << "max |u_N| = " << u_N_max << '\n'
-                            << "narrow band width = " << narrowBandWidth;
+                        logger.buf << "max |u_N| = " << u_N_max;
                         logger.log();
+                    logger.end();
+                    logger.beg("compute narrow-band width");
+                        auto computeNarrowBandWidth = [&]() {
+                            narrowBandWidth = 0.;
+                            try {
+                                for (size_t i = 0; i < BDF; ++i) narrowBandWidth += surface->dist(t + i * stepSize, t + (i + 1) * stepSize);
+                                logger.log("narrow-band width is computed from dist(Gamma(t0), Gamma(t1))");
+                            }
+                            catch (...) {
+                                narrowBandWidth = BDF * std::max(u_N_min, u_N_max) * stepSize;
+                                logger.log("narrow-band width is computed from max |u_N|");
+                            }
+                            narrowBandWidth *= NarrowBandWidthScaling;
+                            logger.buf << "narrow band width = " << narrowBandWidth;
+                            logger.log();
+                        };
+                        computeNarrowBandWidth();
                     logger.end();
                     numActiveTetras.vel = velIdx.DistributeDOFs(mg.GetLastLevel(), mg, &distFunc, narrowBandWidth);
                     logger.buf << "numb of active tetras for velocity: " << numActiveTetras.vel << " (" << (100. * numActiveTetras.vel) / mg.GetNumTriangTetra() << "%)";
@@ -613,12 +627,11 @@ int main(int argc, char* argv[]) {
                             speedIdx.DistributeDOFs(mg.GetLastLevel(), mg, &distFunc);
                             u_N.Interpolate(mg, [&](Point3DCL const & x) { return surface->u_N(x, t); });
                             u_N_max = supnorm(u_N.Data);
-                            if (u_N_max) u_N_max = std::max(u_N_min, u_N_max);
-                            narrowBandWidth = NarrowBandWidthScaling * BDF * u_N_max * stepSize;
-                            logger.buf
-                                << "max |u_N| = " << u_N_max << '\n'
-                                << "narrow band width = " << narrowBandWidth;
+                            logger.buf << "max |u_N| = " << u_N_max;
                             logger.log();
+                        logger.end();
+                        logger.beg("compute narrow-band width");
+                            computeNarrowBandWidth();
                         logger.end();
                         {
                             auto n = velIdx.DistributeDOFs(mg.GetLastLevel(), mg, &distFunc, narrowBandWidth);
