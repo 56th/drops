@@ -1,6 +1,6 @@
 {
     "Output": {
-      "Directory": "/scratch/alex/evolving_conv_lvl3",
+      "Directory": "../../output/evolving_conv_lvl3",
       "EveryStep": -1,
       "Binary": true,
       "VTK": {
@@ -75,7 +75,8 @@
         "Pressure": {
           "Name": "0",
           "Params": {
-            "0": {}
+            "0": {},
+            "PolynomialExact": {}
           }
         }
       },
@@ -99,7 +100,7 @@
     },
 
     "Time": {
-      "BDF": 1,
+      "BDF": 2,
       "NumbOfSteps": 50,
       "FinalTime": 1.0
     },
