@@ -73,7 +73,7 @@
           }
         },
         "Pressure": {
-          "Name": "0",
+          "Name": "PolynomialExact",
           "Params": {
             "0": {},
             "PolynomialExact": {}
@@ -86,7 +86,7 @@
         "Scaling": 1.0
       },
       "VelocityStab":  {
-        "Power": -1.0,
+        "Power": 0.0,
         "Scaling": 1.0
       },
       "PressureStab":  {

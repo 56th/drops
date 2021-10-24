@@ -4,7 +4,7 @@
 io = <|
 	"in" -> "/home/alexander/Documents/drops/output",
 	"out" -> "/home/alexander/Documents/Trace-FEM",
-	"runs" -> {"evolving_conv_lvl3", "evolving_conv_lvl4", "evolving_conv_lvl5", "evolving_conv_lvl6"}
+	"runs" -> {"evolving_conv_lvl2", "evolving_conv_lvl3"}
 |>;
 
 
@@ -24,28 +24,21 @@ Do[
 
 
 (* ::Section:: *)
-(*Num tetras (velocity)*)
+(*Stats*)
 
 
 ListLogPlot[Map[{#["t"], #["NumTetras", "Velocity"]}&, files /@ io["runs"], {2}], Joined -> True, PlotLabel->"# of active elements", PlotLegends -> io["runs"], PlotRange -> All]
-
-
-(* ::Section:: *)
-(*Residual*)
-
-
 ListPlot[Map[{#["t"], #["Solver", "Outer", "ResidualNorm", "r_i"]}&, files /@ io["runs"], {2}], Filling -> Bottom, PlotLabel -> "residual norm", PlotLegends -> io["runs"], PlotRange -> All]
-
-
-(* ::Section:: *)
-(*Num iters*)
-
-
+ListPlot[Map[{#["t"], #["MaxSurfaceSpeed"]}&, files /@ io["runs"], {2}], Joined -> True, PlotLabel->"max |u_N|", PlotLegends -> io["runs"], PlotRange -> {-0.01, Automatic}]
+ListPlot[Map[{#["t"], #["NarrowBandWidth"]}&, files /@ io["runs"], {2}], Joined -> True, PlotLabel->"narrow-band width", PlotLegends -> io["runs"], AspectRatio -> 1, AxesOrigin-> {0, 0}, PlotRange -> {-0.01, All}]
 ListPlot[Map[{#["t"], #["Solver", "Outer", "TotalIters"]}&, files /@ io["runs"], {2}], Filling -> Bottom, PlotLabel->"# iters", PlotLegends -> io["runs"], PlotRange -> All]
 
 
 (* ::Section:: *)
 (*Error*)
+
+
+Map[{#["t"], #["Integral", "Error", "VelocityH1"]}&, files /@ io["runs"], {2}]
 
 
 ListLogPlot[Map[{#["t"], #["Integral", "Error", "VelocityH1"]}&, files /@ io["runs"], {2}], Joined -> True, PlotLabel->"VelocityH1 err", PlotLegends -> io["runs"], PlotRange -> All]
@@ -67,7 +60,7 @@ applyCol[f_, table_, I_] := Module[{res = Transpose@table},
 header = {"h", "# d.o.f.", "velH1", "order", "velL2", "order", "preL2", "order"};
 table = Table[{
 	h[run],
-	files[run][[1]]["DOF", "Velocity"] + files[run][[1]]["DOF", "Pressure"],
+	Mean[#["DOF", "Velocity"] + #["DOF", "Pressure"]& /@ files[run]],
 	trapezoidalRule[#["Integral", "Error", "VelocityH1"]& /@ files[run], files[run][[2]]["t"]],
 	trapezoidalRule[#["Integral", "Error", "VelocityL2"]& /@ files[run], files[run][[2]]["t"]],
 	trapezoidalRule[#["Integral", "Error", "PressureL2"]& /@ files[run], files[run][[2]]["t"]]
@@ -78,6 +71,7 @@ orderPreL2 = order[table, 5];
 table = insertCol[table, orderVelH1, 4];
 table = insertCol[table, orderVelL2, 6];
 table = insertCol[table, orderPreL2, 8];
+table = applyCol[ScientificForm[N@#, 3]&, table, {2}];
 table = applyCol[ScientificForm[#, 3]&, table, {1, 3, 7, 5}];
 table = applyCol[NumberForm[#, 2]&, table, {4, 6, 8}];
 Grid[Prepend[table, header], Frame -> All]

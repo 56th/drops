@@ -429,7 +429,7 @@ int main(int argc, char* argv[]) {
                         auto computeNarrowBandWidth = [&]() {
                             narrowBandWidth = 0.;
                             try {
-                                for (size_t i = 0; i < BDF; ++i) narrowBandWidth += surface->dist(t + i * stepSize, t + (i + 1) * stepSize);
+                                for (size_t i = 1; i <= BDF; ++i) narrowBandWidth = std::max(narrowBandWidth, surface->dist(t, t + i * stepSize));
                                 logger.log("narrow-band width is computed from dist(Gamma(t0), Gamma(t1))");
                             }
                             catch (...) {
