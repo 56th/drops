@@ -38,9 +38,6 @@ ListPlot[Map[{#["t"], #["Solver", "Outer", "TotalIters"]}&, files /@ io["runs"],
 (*Error*)
 
 
-Map[{#["t"], #["Integral", "Error", "VelocityH1"]}&, files /@ io["runs"], {2}]
-
-
 ListLogPlot[Map[{#["t"], #["Integral", "Error", "VelocityH1"]}&, files /@ io["runs"], {2}], Joined -> True, PlotLabel->"VelocityH1 err", PlotLegends -> io["runs"], PlotRange -> All]
 ListLogPlot[Map[{#["t"], #["Integral", "Error", "VelocityL2"]}&, files /@ io["runs"], {2}], Joined -> True, PlotLabel->"VelocityL2 err", PlotLegends -> io["runs"], PlotRange -> All]
 ListLogPlot[Map[{#["t"], #["Integral", "Error", "PressureL2"]}&, files /@ io["runs"], {2}], Joined -> True, PlotLabel->"PressureL2 err", PlotLegends -> io["runs"], PlotRange -> All]

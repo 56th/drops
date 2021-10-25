@@ -425,8 +425,8 @@ int main(int argc, char* argv[]) {
                         logger.buf << "max |u_N| = " << u_N_max;
                         logger.log();
                     logger.end();
-                    logger.beg("compute narrow-band width");
-                        auto computeNarrowBandWidth = [&]() {
+                    auto computeNarrowBandWidth = [&]() {
+                        logger.beg("compute narrow-band width");
                             narrowBandWidth = 0.;
                             try {
                                 for (size_t i = 1; i <= BDF; ++i) narrowBandWidth = std::max(narrowBandWidth, surface->dist(t, t + i * stepSize));
@@ -437,13 +437,27 @@ int main(int argc, char* argv[]) {
                                 logger.log("narrow-band width is computed from max |u_N|");
                             }
                             narrowBandWidth *= NarrowBandWidthScaling;
-                            logger.buf << "narrow band width = " << narrowBandWidth;
+                        logger.end();
+                    };
+                    auto setupVelSpace = [&]() {
+                        try {
+                            std::vector<double> T;
+                            for (size_t i = 0; i <= BDF; ++i) T.push_back(t + i * stepSize);
+                            auto res = velIdx.DistributeDOFs(mg.GetLastLevel(), mg, [&](Point3DCL const &x, double t) { return surface->dist(x, t); }, T);
+                            numActiveTetras.vel = get<0>(res);
+                            narrowBandWidth = get<1>(res);
+                            logger.buf << "narrow-band width is computed from dist(t0), ..., dist(t" << BDF << ')';
                             logger.log();
-                        };
-                        computeNarrowBandWidth();
-                    logger.end();
-                    numActiveTetras.vel = velIdx.DistributeDOFs(mg.GetLastLevel(), mg, &distFunc, narrowBandWidth);
-                    logger.buf << "numb of active tetras for velocity: " << numActiveTetras.vel << " (" << (100. * numActiveTetras.vel) / mg.GetNumTriangTetra() << "%)";
+                        }
+                        catch (...) {
+                            computeNarrowBandWidth();
+                            numActiveTetras.vel = velIdx.DistributeDOFs(mg.GetLastLevel(), mg, &distFunc, narrowBandWidth);
+                        }
+                    };
+                    setupVelSpace();
+                    logger.buf
+                        << "narrow band width = " << narrowBandWidth << '\n'
+                        << "numb of active tetras for velocity: " << numActiveTetras.vel << " (" << (100. * numActiveTetras.vel) / mg.GetNumTriangTetra() << "%)";
                     logger.log();
                 logger.end();
             auto feTime = logger.end();
@@ -630,14 +644,13 @@ int main(int argc, char* argv[]) {
                             logger.buf << "max |u_N| = " << u_N_max;
                             logger.log();
                         logger.end();
-                        logger.beg("compute narrow-band width");
-                            computeNarrowBandWidth();
-                        logger.end();
                         {
-                            auto n = velIdx.DistributeDOFs(mg.GetLastLevel(), mg, &distFunc, narrowBandWidth);
-                            logger.buf << "numb of active tetras for velocity: " << numActiveTetras.vel << " -> " << n << " (" << (100. * n) / mg.GetNumTriangTetra() << "%)";
+                            auto n = numActiveTetras.vel;
+                            setupVelSpace();
+                            logger.buf
+                                << "narrow band width = " << narrowBandWidth << '\n'
+                                << "numb of active tetras for velocity: " << n << " -> " << numActiveTetras.vel << " (" << (100. * numActiveTetras.vel) / mg.GetNumTriangTetra() << "%)";
                             logger.log();
-                            std::swap(n, numActiveTetras.vel);
                         }
                         mapVelocity = rcp(new Epetra_Map(static_cast<int>(velIdx.NumUnknowns()), 0, comm));
                         mapVelocityComp = rcp(new Epetra_Map(static_cast<int>(velIdx.NumUnknowns() / 3), 0, comm));

@@ -374,6 +374,7 @@ public:
     /// \{
     /// \brief Used to number unknowns.
     size_t DistributeDOFs(Uint level, MultiGridCL& mg, VecDescCL const * levelSet = nullptr, double dist = 0.);
+    std::pair<size_t, double> DistributeDOFs(Uint, MultiGridCL&, InstatScalarFunction const &, std::vector<double> const &);
     size_t CreateNumbering( Uint level, MultiGridCL& mg, const VecDescCL* lsetp= 0, const BndDataCL<>* lsetbnd =0);
     // void CreateNumbering(MultiGridCL&, std::vector<MultiGridCL::const_TriangTetraIteratorCL> const &);
     /// \brief Used to number unknowns and store boundary condition.

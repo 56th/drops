@@ -8,7 +8,7 @@
         "Velocity": true,
         "Vorticity": false,
         "SurfSpeed": false,
-        "Pressure": false
+        "Pressure": true
       },
       "Matrices": false,
       "Vectors": false
@@ -86,7 +86,7 @@
         "Scaling": 1.0
       },
       "VelocityStab":  {
-        "Power": 0.0,
+        "Power": -1.0,
         "Scaling": 1.0
       },
       "PressureStab":  {

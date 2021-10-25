@@ -335,6 +335,82 @@ size_t IdxDescCL::DistributeDOFs(Uint level, MultiGridCL& mg, VecDescCL const * 
     return numTetra;
 }
 
+std::pair<size_t, double> IdxDescCL::DistributeDOFs(Uint level, MultiGridCL& mg, InstatScalarFunction const & distFunc, std::vector<double> const & T) {
+    auto idx = GetFreeIdx();
+    TriangLevel_ = level;
+    auto blockSize = 0;
+    size_t dim = IsScalar() ? 1 : 3;
+    auto n = NumUnknownsEdge_ ? NumAllVertsC : NumVertsC;
+    size_t numTetra = 0;
+    for (auto it = mg.GetTriangTetraBegin(level); it != mg.GetTriangTetraEnd(level); ++it)
+        for (auto const t : T) {
+            std::vector<double> distFuncTet;
+            for (auto vit = it->GetVertBegin(); vit != it->GetVertEnd(); ++vit)
+                distFuncTet.push_back(distFunc((*vit)->GetCoord(), t));
+            if (distance(distFuncTet) == 0. && it->Unknowns(idx) != idx) {
+                ++numTetra;
+                it->Unknowns.Prepare(idx);
+                it->Unknowns(idx) = idx; // mark tetrahedron
+                for (size_t i = 0; i < n; ++i) {
+                    auto& unknowns = i < NumVertsC ? const_cast<VertexCL *>(it->GetVertex(i))->Unknowns : const_cast<EdgeCL *>(it->GetEdge(i - NumVertsC))->Unknowns;
+                    if (unknowns.Exist(idx)) continue;
+                    unknowns.Prepare(idx);
+                    unknowns(idx) = blockSize++;
+                }
+            }
+        }
+    auto narrowBandWidth = 0.;
+    for (auto it = mg.GetTriangTetraBegin(level); it != mg.GetTriangTetraEnd(level); ++it)
+        if (it->Unknowns(idx) == idx) {
+            std::vector<double> distFuncTet;
+            for (auto vit = it->GetVertBegin(); vit != it->GetVertEnd(); ++vit)
+                distFuncTet.push_back(distFunc((*vit)->GetCoord(), T[0]));
+            narrowBandWidth = std::max(narrowBandWidth, distance(distFuncTet));
+        }
+    if (narrowBandWidth)
+        for (auto it = mg.GetTriangTetraBegin(level); it != mg.GetTriangTetraEnd(level); ++it)
+            if (it->Unknowns(idx) != idx) {
+                std::vector<double> distFuncTet;
+                for (auto vit = it->GetVertBegin(); vit != it->GetVertEnd(); ++vit)
+                    distFuncTet.push_back(distFunc((*vit)->GetCoord(), T[0]));
+                if (distance(distFuncTet) <= narrowBandWidth) {
+                    ++numTetra;
+                    it->Unknowns.Prepare(idx);
+                    it->Unknowns(idx) = idx; // mark tetrahedron
+                    for (size_t i = 0; i < n; ++i) {
+                        auto& unknowns = i < NumVertsC ? const_cast<VertexCL *>(it->GetVertex(i))->Unknowns : const_cast<EdgeCL *>(it->GetEdge(i - NumVertsC))->Unknowns;
+                        if (unknowns.Exist(idx)) continue;
+                        unknowns.Prepare(idx);
+                        unknowns(idx) = blockSize++;
+                    }
+                }
+            }
+    NumUnknowns_ = dim * blockSize;
+    for (auto v : vecs) { // remap
+        auto v_old = *v;
+        auto blockSizeOld = v_old.size() / dim;
+        v->resize(NumUnknowns_, 0.);
+        if (NumUnknownsVertex_)
+            for (auto it = mg.GetTriangVertexBegin(level); it != mg.GetTriangVertexEnd(level); ++it)
+                if (it->Unknowns.Exist(Idx_) && it->Unknowns.Exist(idx))
+                    for (size_t d = 0; d < dim; ++d)
+                        (*v)[it->Unknowns(idx) + d * blockSize] = v_old[it->Unknowns(Idx_) + d * blockSizeOld];
+        if (NumUnknownsEdge_)
+            for (auto it = mg.GetTriangEdgeBegin(level); it != mg.GetTriangEdgeEnd(level); ++it)
+                if (it->Unknowns.Exist(Idx_) && it->Unknowns.Exist(idx))
+                    for (size_t d = 0; d < dim; ++d)
+                        (*v)[it->Unknowns(idx) + d * blockSize] = v_old[it->Unknowns(Idx_) + d * blockSizeOld];
+    }
+    // free old idx
+    for (auto it = mg.GetTriangTetraBegin(level); it != mg.GetTriangTetraEnd(level); ++it) if (it->Unknowns.Exist(Idx_)) it->Unknowns.Invalidate(Idx_);
+    if (NumUnknownsVertex_) for (auto it = mg.GetTriangVertexBegin(level); it != mg.GetTriangVertexEnd(level); ++it) if (it->Unknowns.Exist(Idx_)) it->Unknowns.Invalidate(Idx_);
+    if (NumUnknownsEdge_) for (auto it = mg.GetTriangEdgeBegin(level); it != mg.GetTriangEdgeEnd(level); ++it) if (it->Unknowns.Exist(Idx_)) it->Unknowns.Invalidate(Idx_);
+    IdxFree[Idx_] = true;
+    // fix
+    Idx_ = idx;
+    return { numTetra, narrowBandWidth };
+}
+
 void CreateNumbOnTetra( const Uint idx, IdxT& counter, Uint stride,
                         const MultiGridCL::TriangTetraIteratorCL& begin,
                         const MultiGridCL::TriangTetraIteratorCL& end, const Uint level)
