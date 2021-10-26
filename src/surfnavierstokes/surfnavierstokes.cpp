@@ -104,7 +104,6 @@ int main(int argc, char* argv[]) {
             auto velName = inpJSON.get<std::string>("SurfNavierStokes.IC.Velocity.Name");
             auto preName = inpJSON.get<std::string>("SurfNavierStokes.IC.Pressure.Name");
             auto surfNavierStokesData = surfNavierStokesDataFactory(*surface, velName, preName, inpJSON);
-            auto u_N_min = inpJSON.get<double>("Surface.MinSurfaceSpeed");
             auto narrowBandWidth = 0.;
             auto NarrowBandWidthScaling = inpJSON.get<double>("Surface.NarrowBandWidthScaling");
             FESystem surfNSystem;
@@ -411,12 +410,6 @@ int main(int argc, char* argv[]) {
                 distFunc.Interpolate(mg, [&](Point3DCL const & x) { return surface->dist(x, t); });
             logger.end();
             logger.beg("set up FE spaces");
-                logger.beg("set up pressure space");
-                    numActiveTetras.pre = preIdx.DistributeDOFs(mg.GetLastLevel(), mg, &distFunc);
-                    logger.buf << "numb of active tetras for pressure: " << numActiveTetras.pre << " (" << (100. * numActiveTetras.pre) / mg.GetNumTriangTetra() << "%)";
-                    logger.log();
-                    mapPressure = rcp(new Epetra_Map(static_cast<int>(preIdx.NumUnknowns()), 0, comm)); // for vorticity linear solve
-                logger.end();
                 logger.beg("set up velocity space");
                     logger.beg("initialize surface speed u_N");
                         speedIdx.DistributeDOFs(mg.GetLastLevel(), mg, &distFunc);
@@ -433,32 +426,24 @@ int main(int argc, char* argv[]) {
                                 logger.log("narrow-band width is computed from dist(Gamma(t0), Gamma(t1))");
                             }
                             catch (...) {
-                                narrowBandWidth = BDF * std::max(u_N_min, u_N_max) * stepSize;
+                                narrowBandWidth = BDF * u_N_max * stepSize;
                                 logger.log("narrow-band width is computed from max |u_N|");
                             }
                             narrowBandWidth *= NarrowBandWidthScaling;
                         logger.end();
                     };
-                    auto setupVelSpace = [&]() {
-                        try {
-                            std::vector<double> T;
-                            for (size_t i = 0; i <= BDF; ++i) T.push_back(t + i * stepSize);
-                            auto res = velIdx.DistributeDOFs(mg.GetLastLevel(), mg, [&](Point3DCL const &x, double t) { return surface->dist(x, t); }, T);
-                            numActiveTetras.vel = get<0>(res);
-                            narrowBandWidth = get<1>(res);
-                            logger.buf << "narrow-band width is computed from dist(t0), ..., dist(t" << BDF << ')';
-                            logger.log();
-                        }
-                        catch (...) {
-                            computeNarrowBandWidth();
-                            numActiveTetras.vel = velIdx.DistributeDOFs(mg.GetLastLevel(), mg, &distFunc, narrowBandWidth);
-                        }
-                    };
-                    setupVelSpace();
+                    computeNarrowBandWidth();
+                    numActiveTetras.vel = velIdx.DistributeDOFs(mg.GetLastLevel(), mg, &distFunc, narrowBandWidth);
                     logger.buf
                         << "narrow band width = " << narrowBandWidth << '\n'
                         << "numb of active tetras for velocity: " << numActiveTetras.vel << " (" << (100. * numActiveTetras.vel) / mg.GetNumTriangTetra() << "%)";
                     logger.log();
+                logger.end();
+                logger.beg("set up pressure space");
+                    numActiveTetras.pre = preIdx.DistributeDOFs(mg.GetLastLevel(), mg, &distFunc, narrowBandWidth);
+                    logger.buf << "numb of active tetras for pressure: " << numActiveTetras.pre << " (" << (100. * numActiveTetras.pre) / mg.GetNumTriangTetra() << "%)";
+                    logger.log();
+                    mapPressure = rcp(new Epetra_Map(static_cast<int>(preIdx.NumUnknowns()), 0, comm)); // for vorticity linear solve
                 logger.end();
             auto feTime = logger.end();
             logger.beg("assemble");
@@ -627,15 +612,6 @@ int main(int argc, char* argv[]) {
                     distFunc.Interpolate(mg, [&](Point3DCL const & x) { return surface->dist(x, t); });
                 logger.end();
                 logger.beg("set up FE spaces");
-                    logger.beg("set up pressure space");
-                        {
-                            auto n = preIdx.DistributeDOFs(mg.GetLastLevel(), mg, &distFunc);
-                            logger.buf << "numb of active tetras for pressure: " << numActiveTetras.pre << " -> " << n << " (" << (100. * n) / mg.GetNumTriangTetra() << "%)";
-                            logger.log();
-                            std::swap(n, numActiveTetras.pre);
-                        }
-                        mapPressure = rcp(new Epetra_Map(static_cast<int>(preIdx.NumUnknowns()), 0, comm));
-                    logger.end();
                     logger.beg("set up velocity space");
                         logger.beg("initialize surface speed u_N");
                             speedIdx.DistributeDOFs(mg.GetLastLevel(), mg, &distFunc);
@@ -644,9 +620,10 @@ int main(int argc, char* argv[]) {
                             logger.buf << "max |u_N| = " << u_N_max;
                             logger.log();
                         logger.end();
+                        computeNarrowBandWidth();
                         {
                             auto n = numActiveTetras.vel;
-                            setupVelSpace();
+                            numActiveTetras.vel = velIdx.DistributeDOFs(mg.GetLastLevel(), mg, &distFunc, narrowBandWidth);
                             logger.buf
                                 << "narrow band width = " << narrowBandWidth << '\n'
                                 << "numb of active tetras for velocity: " << n << " -> " << numActiveTetras.vel << " (" << (100. * numActiveTetras.vel) / mg.GetNumTriangTetra() << "%)";
@@ -654,6 +631,15 @@ int main(int argc, char* argv[]) {
                         }
                         mapVelocity = rcp(new Epetra_Map(static_cast<int>(velIdx.NumUnknowns()), 0, comm));
                         mapVelocityComp = rcp(new Epetra_Map(static_cast<int>(velIdx.NumUnknowns() / 3), 0, comm));
+                    logger.end();
+                    logger.beg("set up pressure space");
+                        {
+                            auto n = numActiveTetras.pre;
+                            numActiveTetras.pre = preIdx.DistributeDOFs(mg.GetLastLevel(), mg, &distFunc, narrowBandWidth);
+                            logger.buf << "numb of active tetras for pressure: " << n << " -> " << numActiveTetras.pre << " (" << (100. * numActiveTetras.pre) / mg.GetNumTriangTetra() << "%)";
+                            logger.log();
+                        }
+                        mapPressure = rcp(new Epetra_Map(static_cast<int>(preIdx.NumUnknowns()), 0, comm));
                     logger.end();
                 feTime = logger.end();
                 logger.beg("assemble");

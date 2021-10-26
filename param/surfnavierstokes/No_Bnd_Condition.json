@@ -36,12 +36,11 @@
       "Name": "Sphere",
       "Comment": "UseExactDistanceFunc = true will use Surface.dist(x, t) everywhere, and false will use Surface.phi(x, t) everywhere except for building interface/narrow-band FE spaces; Surface.dist(x, t) will be used for the latter",
       "UseExactDistanceFunc": false,
-      "MinSurfaceSpeed": 1.0,
       "NarrowBandWidthScaling": 1.1,
       "Params": {
         "Sphere": {
           "r_0": 1.0,
-          "A": 0.3
+          "A": 0.25
         },
         "Torus": {
           "R": 1.0,
@@ -101,7 +100,7 @@
 
     "Time": {
       "BDF": 2,
-      "NumbOfSteps": 50,
+      "NumbOfSteps": 40,
       "FinalTime": 1.0
     },
 
