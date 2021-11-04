@@ -4,11 +4,33 @@
 io = <|
 	"in" -> "/home/alexander/Documents/drops/output",
 	"out" -> "/home/alexander/Documents/Trace-FEM",
-	"runs" -> {"evolving_conv_lvl2", "evolving_conv_lvl3"}
+	"runs" -> {"evolving_conv_lvl2", "evolving_conv_lvl3", "evolving_conv_lvl4", "evolving_conv_lvl5"}
 |>;
+(* modules *)
+Get[NotebookDirectory[] <> "TeXTableForm.m"]
+(* functions *)
+str2exp[s_] := Quiet@ToExpression@StringReplace[ToString@s, {"e+" :> "*^", "e-" :> "*^-", "\\" :> ""}]
+exportTable[table_, name_] := Module[{tex, path = io["out"] <> "/tab/" <> name <> ".tex"},
+	TeXTableForm[table, 1, path];
+	tex = Append[#[[;;-2]], "\\\\ \hline"]& /@ Import[path, "Table"][[2;;-2]];
+	Export[path, tex, "Table"]
+]
+trapezoidalRule[val_, dt_] := dt/2 (First@val + 2 Total[val[[2;;-2]]] + Last@val)
+spaceTimeNorm[val_, dt_] := dt Total[val]
+order[table_, i_] := Module[{col = Transpose[table][[i]], stepSize = h /@ io["runs"]},
+	Prepend[Table[Log[col[[j]] / col[[j - 1]]]/Log[stepSize[[j]] / stepSize[[j - 1]]], {j, 2, Length@col}], ""]
+]
+insertCol[table_, col_, i_] := Transpose[Join[Transpose[table][[;;i - 1]], {col}, Transpose[table][[i;;]]]]
+applyCol[f_, table_, I_] := Module[{res = Transpose@table}, 
+	Do[res[[i]] = f /@ res[[i]], {i, I}];
+	Transpose@res
+]
 
 
-str2exp[s_] := Quiet@ToExpression@StringReplace[ToString@s, {"e+" :> "*^", "e-" :> "*^-", "\\" :> ""}];
+(* ::Section:: *)
+(*Import data*)
+
+
 Do[
 	SetDirectory[io["in"] <> "/" <> run];
 	fileNames = Sort[
@@ -23,7 +45,7 @@ Do[
 {run, io["runs"]}]
 
 
-(* ::Section:: *)
+(* ::Section::Closed:: *)
 (*Stats*)
 
 
@@ -43,24 +65,13 @@ ListLogPlot[Map[{#["t"], #["Integral", "Error", "VelocityL2"]}&, files /@ io["ru
 ListLogPlot[Map[{#["t"], #["Integral", "Error", "PressureL2"]}&, files /@ io["runs"], {2}], Joined -> True, PlotLabel->"PressureL2 err", PlotLegends -> io["runs"], PlotRange -> All]
 
 
-trapezoidalRule[val_, dt_] := dt/2 (First@val + 2 Total[val[[2;;-2]]] + Last@val)
-order[table_, i_] := Module[{col = Transpose[table][[i]], stepSize = h /@ io["runs"]},
-	Prepend[Table[Log[col[[j]] / col[[j - 1]]]/Log[stepSize[[j]] / stepSize[[j - 1]]], {j, 2, Length@col}], ""]
-]
-insertCol[table_, col_, i_] := Transpose[Join[Transpose[table][[;;i - 1]], {col}, Transpose[table][[i;;]]]]
-applyCol[f_, table_, I_] := Module[{res = Transpose@table}, 
-	Do[res[[i]] = f /@ res[[i]], {i, I}];
-	Transpose@res
-]
-
-
 header = {"h", "# d.o.f.", "velH1", "order", "velL2", "order", "preL2", "order"};
 table = Table[{
 	h[run],
 	Mean[#["DOF", "Velocity"] + #["DOF", "Pressure"]& /@ files[run]],
-	trapezoidalRule[#["Integral", "Error", "VelocityH1"]& /@ files[run], files[run][[2]]["t"]],
-	trapezoidalRule[#["Integral", "Error", "VelocityL2"]& /@ files[run], files[run][[2]]["t"]],
-	trapezoidalRule[#["Integral", "Error", "PressureL2"]& /@ files[run], files[run][[2]]["t"]]
+	spaceTimeNorm[#["Integral", "Error", "VelocityH1"]& /@ files[run], files[run][[2]]["t"]],
+	spaceTimeNorm[#["Integral", "Error", "VelocityL2"]& /@ files[run], files[run][[2]]["t"]],
+	spaceTimeNorm[#["Integral", "Error", "PressureL2"]& /@ files[run], files[run][[2]]["t"]]
 }, {run, io["runs"]}];
 orderVelH1 = order[table, 3];
 orderVelL2 = order[table, 4];
@@ -69,6 +80,10 @@ table = insertCol[table, orderVelH1, 4];
 table = insertCol[table, orderVelL2, 6];
 table = insertCol[table, orderPreL2, 8];
 table = applyCol[ScientificForm[N@#, 3]&, table, {2}];
-table = applyCol[ScientificForm[#, 3]&, table, {1, 3, 7, 5}];
-table = applyCol[NumberForm[#, 2]&, table, {4, 6, 8}];
-Grid[Prepend[table, header], Frame -> All]
+table = applyCol[ScientificForm[#, 2]&, table, {1, 3, 7, 5}];
+table = applyCol[NumberForm[#, 3]&, table, {4, 6, 8}];
+table = Prepend[table, header];
+Grid[table, Frame -> All]
+
+
+exportTable[table, "evolving_conv"]
