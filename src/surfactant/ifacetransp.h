@@ -918,7 +918,7 @@ public:
         double t = 0.;
         VecDescCL levelSet;
         struct {
-            double gamma = 0., lineTension = 0.;
+            double gamma = 0., lineTension = 0. , coulomb = 0.;
             struct { double min = 1., max = 1.; } nu;
             struct { double min = 1., max = 1., alpha = .1; } rho;
             VecDescCL* w_T = nullptr;
@@ -1149,6 +1149,10 @@ private:
             require(qSurfSpeed, &LocalAssembler::buildSurfSpeed);
             require(qSurfSpeedSurfGrad, &LocalAssembler::buildSurfSpeed);
             qMomentumF += qSurfSpeed * qSurfSpeedSurfGrad;
+        }
+        if (params.surfNavierStokesParams.coulomb) {
+            require(qChi, &LocalAssembler::buildConcentration);
+            qMomentumF = qChi * qMomentumF;
         }
         require(qRho, &LocalAssembler::buildRho);
         qMomentumF = qRho * qMomentumF;

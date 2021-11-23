@@ -20,7 +20,7 @@ namespace DROPS {
             if (params.get<double>("SurfNSCH.NS.rho.min") != params.get<double>("SurfNSCH.NS.rho.max") || params.get<double>("SurfNSCH.NS.rho.max") != 1.) throw std::invalid_argument(funcName + ": use rho_min = rho_max = 1 for '" + name + "' test");
             auto omega = params.get<double>("SurfNSCH.IC.Params." + name + ".AngularVelocity");
             params.put("SurfNavierStokes.IC.Params.KillingExact.AngularVelocity", omega);
-            dataNS = surfNavierStokesDataFactory(surface, "KillingExact", params);
+            dataNS = surfNavierStokesDataFactory(surface, "KillingExact", "0", params);
             params.put("SurfCahnHilliard.IC.Params.WanDerVaals.AngularVelocity", omega);
             params.put("SurfCahnHilliard.IC.Params.WanDerVaals.Noise", 0.);
             dataCH = surfCahnHilliardDataFactory(surface, "WanDerVaals", params);
@@ -28,7 +28,7 @@ namespace DROPS {
         else if (name == "KelvinHelmholtz") {
             params.put_child("SurfNavierStokes.IC.Params." + name, params.get_child("SurfNSCH.IC.Params." + name));
             params.put("SurfNavierStokes.IC.Params." + name + ".delta_0", params.get<double>("SurfNSCH.CH.Epsilon"));
-            dataNS = surfNavierStokesDataFactory(surface, name, params);
+            dataNS = surfNavierStokesDataFactory(surface, name, "0", params);
             params.put("SurfCahnHilliard.IC.Params.WanDerVaals.AngularVelocity", 0.);
             params.put("SurfCahnHilliard.IC.Params.WanDerVaals.Noise", 0.);
             dataCH = surfCahnHilliardDataFactory(surface, "WanDerVaals", params);
@@ -36,7 +36,7 @@ namespace DROPS {
             dataCH.f = zeroInstatScalarFunction;
         }
         else if (name == "RayleighTaylor") {
-            dataNS = surfNavierStokesDataFactory(surface, "0", params);
+            dataNS = surfNavierStokesDataFactory(surface, "0", "0", params);
             auto g = params.get<double>("SurfNSCH.IC.Params." + name + ".GravityScaling");
             dataNS.f_T = [=, &surface](Point3DCL const & x, double t) { return surface.P(surface.ext(x, t), t) * Point3DCL(0., 0., -g); };
             params.put("SurfCahnHilliard.IC.Params.WanDerVaals.AngularVelocity", 0.);
@@ -46,7 +46,7 @@ namespace DROPS {
             dataCH.f = zeroInstatScalarFunction;
         }
         else if (name == "RandomBernoulli") {
-            dataNS = surfNavierStokesDataFactory(surface, "0", params);
+            dataNS = surfNavierStokesDataFactory(surface, "0", "0", params);
             auto raftRatio = params.get<double>("SurfNSCH.IC.Params.RandomBernoulli.RaftRatio");
             params.put("SurfCahnHilliard.IC.Params." + name + ".RaftRatio", raftRatio);
             dataCH = surfCahnHilliardDataFactory(surface, "RandomBernoulli", params);
@@ -54,7 +54,7 @@ namespace DROPS {
             dataCH.f = zeroInstatScalarFunction;
         }
         else if (name == "RandomUniform") {
-            dataNS = surfNavierStokesDataFactory(surface, "0", params);
+            dataNS = surfNavierStokesDataFactory(surface, "0", "0", params);
             auto raftRatio = params.get<double>("SurfNSCH.IC.Params.RandomUniform.RaftRatio");
             auto raftRatioNoisePercent = params.get<double>("SurfNSCH.IC.Params.RandomUniform.RaftRatioNoiseFraction");
             params.put("SurfCahnHilliard.IC.Params." + name + ".RaftRatioNoiseFraction", raftRatioNoisePercent);
@@ -64,8 +64,17 @@ namespace DROPS {
             dataCH.f = zeroInstatScalarFunction;
         }
         else if (name == "SyntheticRafts") {
-            dataNS = surfNavierStokesDataFactory(surface, "0", params);
+            dataNS = surfNavierStokesDataFactory(surface, "0", "0", params);
             dataCH = surfCahnHilliardDataFactory(surface, "SyntheticRafts", params);
+            dataCH.exact = false;
+            dataCH.f = zeroInstatScalarFunction;
+        }
+        else if (name == "MembraneFusion") {
+            dataNS = surfNavierStokesDataFactory(surface, "0", "0", params);
+            auto raftRatio = params.get<double>("SurfNSCH.IC.Params.RandomBernoulli.RaftRatio");
+            params.put("SurfCahnHilliard.IC.Params.RandomBernoulli.RaftRatio", raftRatio);
+            dataCH = surfCahnHilliardDataFactory(surface, "RandomBernoulli", params);
+            dataNS.f_T = [=, &surface](Point3DCL const & x, double t) { return surface.P(surface.ext(x, t), t) * Point3DCL(0., 0., 1 / pow(x[2]+2,2) ); };
             dataCH.exact = false;
             dataCH.f = zeroInstatScalarFunction;
         }

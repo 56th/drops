@@ -122,6 +122,7 @@ int main(int argc, char* argv[]) {
             auto sigma_1 = inpJSON.get<double>("SurfNSCH.NS.LineTension.before");
             auto sigma_2 = inpJSON.get<double>("SurfNSCH.NS.LineTension.after");
             auto switch_step = inpJSON.get<double>("SurfNSCH.NS.LineTension.step");
+            if(testName == "MembraneFusion"){surfNSCHSystem.params.surfNavierStokesParams.coulomb = inpJSON.get<double>("SurfNSCH.IC.Params.MembraneFusion.CoulombConstant");}
             surfNSCHSystem.params.numbOfVirtualSubEdges = inpJSON.get<size_t>("SurfNSCH.NumbOfVirtualSubEdges");
             surfNSCHSystem.params.surfNavierStokesParams.m_g = surfNavierStokesData.m_g;
             surfNSCHSystem.params.surfNavierStokesParams.f_T = surfNavierStokesData.f_T;
