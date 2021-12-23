@@ -28,7 +28,7 @@ namespace DROPS {
         if (pressureData.find(preName) == pressureData.end()) throw std::invalid_argument(funcName + ": pressure data '" + preName + "' is not defined");
         auto convectionTermType = params.get<std::string>("SurfNavierStokes.ConvectionTermType");
         InstatVectorFunction u_T = zeroInstatVectorFunction;
-        struct { InstatVectorFunction stokesTerm, convTerm; } f_T = { zeroInstatVectorFunction, zeroInstatVectorFunction };
+        struct { InstatVectorFunction stokesTerm, convTerm, preGrad; } f_T = { zeroInstatVectorFunction, zeroInstatVectorFunction, zeroInstatVectorFunction };
         InstatScalarFunction p = zeroInstatScalarFunction, m_g = zeroInstatScalarFunction;
         SurfNavierStokesData data;
         data.description = "convection term type: " + convectionTermType + '\n';
@@ -69,7 +69,7 @@ namespace DROPS {
                     (-0.5*(aa*ma*sin(0.5*ma*arctan(x[0], x[1])) + ab * mb * sin(0.5 * mb * arctan(x[0], x[1])))) / (pow(2.718281828459045, (0.10132118364233778 * pow(asin(x[2] / std::sqrt(pow(x[0], 2) + pow(x[1], 2) + pow(x[2], 2))), 2)) / pow(delta_0, 2)) * std::sqrt(pow(x[0], 2) + pow(x[1], 2) + pow(x[2], 2)))
                 );
             };
-            auto r = [&surface](double x, double y) { return (std::sqrt(x * x + y * y) - surface.radius()[0].min) / (surface.radius()[0].max - surface.radius()[0].min); };
+            auto r = [&surface](double x, double y) { return (std::sqrt(x * x + y * y) - surface.bounds()[0].min) / (surface.bounds()[0].max - surface.bounds()[0].min); };
             u_T = [=](Point3DCL const & x, double) { return r(x[0], x[1]) * (Hs(eta(x)) * eXi(x) + cn * pert(x)); };
         }
         else if (velName == "PolynomialExact") {
@@ -140,11 +140,16 @@ namespace DROPS {
         data.u_T = [=, &surface](Point3DCL const & x, double t) { return u_T(surface.ext(x, t), t); };
         data.p = [=, &surface](Point3DCL const & x, double t) { return pressureData[preName].f(surface.ext(x, t), t); };
         data.m_g = [=, &surface](Point3DCL const & x, double t) { return m_g(surface.ext(x, t), t); };
+        if (data.exact)
+            f_T.preGrad = [=, &surface](Point3DCL const & y, double t) {
+                auto x = surface.ext(y, t);
+                return surface.P(x, t) * pressureData[preName].grad(x, t);
+            };
         if (convectionTermType == "Stokes") {
             data.w_T = zeroInstatVectorFunction;
             data.f_T = [=, &surface](Point3DCL const & y, double t) {
                 auto x = surface.ext(y, t);
-                return f_T.stokesTerm(x, t) + surface.P(x, t) * pressureData[preName].grad(x, t);
+                return f_T.stokesTerm(x, t) + f_T.preGrad(x, t);
             };
         }
         else if (convectionTermType == "Oseen") {
@@ -152,14 +157,14 @@ namespace DROPS {
             data.w_T = data.u_T;
             data.f_T = [=, &surface](Point3DCL const & y, double t) {
                 auto x = surface.ext(y, t);
-                return f_T.stokesTerm(x, t) + f_T.convTerm(x, t) + surface.P(x, t) * pressureData[preName].grad(x, t);
+                return f_T.stokesTerm(x, t) + f_T.convTerm(x, t) + f_T.preGrad(x, t);
             };
         }
         else if (convectionTermType == "NavierStokes") {
             data.w_T = nullptr;
             data.f_T = [=, &surface](Point3DCL const & y, double t) {
                 auto x = surface.ext(y, t);
-                return f_T.stokesTerm(x, t) + f_T.convTerm(x, t) + surface.P(x, t) * pressureData[preName].grad(x, t);
+                return f_T.stokesTerm(x, t) + f_T.convTerm(x, t) + f_T.preGrad(x, t);
             };
         }
         else throw std::invalid_argument(funcName + ": convection term type '" + convectionTermType + "' is not defined");
