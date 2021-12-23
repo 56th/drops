@@ -99,8 +99,6 @@ int main(int argc, char* argv[]) {
             auto mtxExpFunc = binary ? &MatrixCL::exportMAT : &MatrixCL::exportMTX;
             auto exportVectors = inpJSON.get<bool>("Output.Vectors");
             auto surface = surfaceFactory(inpJSON);
-            InstatScalarFunction phi = [&](Point3DCL const & x, double t) { return surface->phi(x, t); };
-            if (inpJSON.get<bool>("Surface.UseExactDistanceFunc")) phi = [&](Point3DCL const & x, double t) { return surface->dist(x, t); };
             auto velName = inpJSON.get<std::string>("SurfNavierStokes.IC.Velocity.Name");
             auto preName = inpJSON.get<std::string>("SurfNavierStokes.IC.Pressure.Name");
             auto surfNavierStokesData = surfNavierStokesDataFactory(*surface, velName, preName, inpJSON);
@@ -146,7 +144,7 @@ int main(int argc, char* argv[]) {
             logger.end();
             logger.beg("refine towards the surface");
                 AdapTriangCL adap(mg);
-                DistMarkingStrategyCL markerLset([&](Point3DCL const & x, double) { return phi(x, 0.); }, inpJSON.get<double>("Mesh.AdaptRef.Width"), inpJSON.get<int>("Mesh.AdaptRef.CoarsestLevel"), inpJSON.get<int>("Mesh.AdaptRef.FinestLevel"));
+                DistMarkingStrategyCL markerLset([&](Point3DCL const & x, double) { return surface->dist(x); }, inpJSON.get<double>("Mesh.AdaptRef.Width"), inpJSON.get<int>("Mesh.AdaptRef.CoarsestLevel"), inpJSON.get<int>("Mesh.AdaptRef.FinestLevel"));
                 adap.set_marking_strategy(&markerLset);
                 adap.MakeInitialTriang();
                 adap.set_marking_strategy(nullptr);
@@ -161,7 +159,6 @@ int main(int argc, char* argv[]) {
             IdxDescCL lstIdx(P2_FE);
             numActiveTetras.lst = lstIdx.DistributeDOFs(mg.GetLastLevel(), mg);
             levelSet.SetIdx(&lstIdx);
-            VecDescCL distFunc(&lstIdx);
             logger.buf << "numb of active tetras for levelset: " << numActiveTetras.lst << " (" << (100. * numActiveTetras.lst) / mg.GetNumTriangTetra() << "%)";
             logger.log();
         logger.end();
@@ -406,41 +403,26 @@ int main(int argc, char* argv[]) {
         logger.beg("t = t_0 = 0");
             t = 0.;
             logger.beg("interpolate level-set");
-                levelSet.Interpolate(mg, [&](Point3DCL const & x) { return phi(x, t); });
-                distFunc.Interpolate(mg, [&](Point3DCL const & x) { return surface->dist(x, t); });
+                levelSet.Interpolate(mg, [&](Point3DCL const & x) { return surface->dist(x); });
             logger.end();
             logger.beg("set up FE spaces");
                 logger.beg("set up velocity space");
                     logger.beg("initialize surface speed u_N");
-                        speedIdx.DistributeDOFs(mg.GetLastLevel(), mg, &distFunc);
+                        speedIdx.DistributeDOFs(mg.GetLastLevel(), mg, &levelSet);
                         u_N.Interpolate(mg, [&](Point3DCL const & x) { return surface->u_N(x, t); });
                         auto u_N_max = supnorm(u_N.Data);
                         logger.buf << "max |u_N| = " << u_N_max;
                         logger.log();
                     logger.end();
-                    auto computeNarrowBandWidth = [&]() {
-                        logger.beg("compute narrow-band width");
-                            narrowBandWidth = 0.;
-                            try {
-                                for (size_t i = 1; i <= BDF; ++i) narrowBandWidth = std::max(narrowBandWidth, surface->dist(t, t + i * stepSize));
-                                logger.log("narrow-band width is computed from dist(Gamma(t0), Gamma(t1))");
-                            }
-                            catch (...) {
-                                narrowBandWidth = BDF * u_N_max * stepSize;
-                                logger.log("narrow-band width is computed from max |u_N|");
-                            }
-                            narrowBandWidth *= NarrowBandWidthScaling;
-                        logger.end();
-                    };
-                    computeNarrowBandWidth();
-                    numActiveTetras.vel = velIdx.DistributeDOFs(mg.GetLastLevel(), mg, &distFunc, narrowBandWidth);
+                    narrowBandWidth = NarrowBandWidthScaling * BDF * u_N_max * stepSize;
+                    numActiveTetras.vel = velIdx.DistributeDOFs(mg.GetLastLevel(), mg, &levelSet, narrowBandWidth);
                     logger.buf
                         << "narrow band width = " << narrowBandWidth << '\n'
                         << "numb of active tetras for velocity: " << numActiveTetras.vel << " (" << (100. * numActiveTetras.vel) / mg.GetNumTriangTetra() << "%)";
                     logger.log();
                 logger.end();
                 logger.beg("set up pressure space");
-                    numActiveTetras.pre = preIdx.DistributeDOFs(mg.GetLastLevel(), mg, &distFunc, narrowBandWidth);
+                    numActiveTetras.pre = preIdx.DistributeDOFs(mg.GetLastLevel(), mg, &levelSet, narrowBandWidth);
                     logger.buf << "numb of active tetras for pressure: " << numActiveTetras.pre << " (" << (100. * numActiveTetras.pre) / mg.GetNumTriangTetra() << "%)";
                     logger.log();
                     mapPressure = rcp(new Epetra_Map(static_cast<int>(preIdx.NumUnknowns()), 0, comm)); // for vorticity linear solve
@@ -608,22 +590,21 @@ int main(int argc, char* argv[]) {
             std::stringstream header; header << "t = t_" << i << " = " << t << " (" << (100. * i) / numSteps << "%)";
             logger.beg(header.str());
                 logger.beg("interpolate level-set");
-                    levelSet.Interpolate(mg, [&](Point3DCL const & x) { return phi(x, t); });
-                    distFunc.Interpolate(mg, [&](Point3DCL const & x) { return surface->dist(x, t); });
+                    levelSet.Interpolate(mg, [&](Point3DCL const & x) { return surface->dist(x, t); });
                 logger.end();
                 logger.beg("set up FE spaces");
                     logger.beg("set up velocity space");
                         logger.beg("initialize surface speed u_N");
-                            speedIdx.DistributeDOFs(mg.GetLastLevel(), mg, &distFunc);
+                            speedIdx.DistributeDOFs(mg.GetLastLevel(), mg, &levelSet);
                             u_N.Interpolate(mg, [&](Point3DCL const & x) { return surface->u_N(x, t); });
                             u_N_max = supnorm(u_N.Data);
                             logger.buf << "max |u_N| = " << u_N_max;
                             logger.log();
                         logger.end();
-                        computeNarrowBandWidth();
                         {
                             auto n = numActiveTetras.vel;
-                            numActiveTetras.vel = velIdx.DistributeDOFs(mg.GetLastLevel(), mg, &distFunc, narrowBandWidth);
+                            narrowBandWidth = NarrowBandWidthScaling * BDF * u_N_max * stepSize;
+                            numActiveTetras.vel = velIdx.DistributeDOFs(mg.GetLastLevel(), mg, &levelSet, narrowBandWidth);
                             logger.buf
                                 << "narrow band width = " << narrowBandWidth << '\n'
                                 << "numb of active tetras for velocity: " << n << " -> " << numActiveTetras.vel << " (" << (100. * numActiveTetras.vel) / mg.GetNumTriangTetra() << "%)";
@@ -635,7 +616,7 @@ int main(int argc, char* argv[]) {
                     logger.beg("set up pressure space");
                         {
                             auto n = numActiveTetras.pre;
-                            numActiveTetras.pre = preIdx.DistributeDOFs(mg.GetLastLevel(), mg, &distFunc, narrowBandWidth);
+                            numActiveTetras.pre = preIdx.DistributeDOFs(mg.GetLastLevel(), mg, &levelSet, narrowBandWidth);
                             logger.buf << "numb of active tetras for pressure: " << n << " -> " << numActiveTetras.pre << " (" << (100. * numActiveTetras.pre) / mg.GetNumTriangTetra() << "%)";
                             logger.log();
                         }

@@ -1,13 +1,13 @@
 {
     "Output": {
-      "Directory": "../../output/evolving_conv_lvl3",
-      "EveryStep": -1,
+      "Directory": "../../output/spherical_harmonics",
+      "EveryStep": 1,
       "Binary": true,
       "VTK": {
         "ExportFullGrid": false,
         "Velocity": true,
         "Vorticity": false,
-        "SurfSpeed": false,
+        "SurfSpeed": true,
         "Pressure": true
       },
       "Matrices": false,
@@ -17,7 +17,7 @@
     "Mesh": {
         "Type": "BrickBuilder",
         "Origin": [-1.66666,-1.66666,-1.66666],
-        "E1": [3.33333, 0,0], "E2": [0,3.33333,0], "E3": [0,0,3.33333],
+        "E1": [3.33333, 0, 0], "E2": [0, 3.33333, 0], "E3": [0, 0, 3.33333],
         "N1": 2, "N2": 2, "N3": 2,
         "RestartFile": "",
         "AdaptRef": {
@@ -25,7 +25,7 @@
             "Freq": 0,
             "Width": 10.0,
             "CoarsestLevel": 0,
-            "FinestLevel": 3,
+            "FinestLevel": 4,
             "SD": 0.1,
             "CurvDiff": -1,
             "Discontinuous": 0
@@ -33,9 +33,7 @@
     },
 
     "Surface": {
-      "Name": "Sphere",
-      "Comment": "UseExactDistanceFunc = true will use Surface.dist(x, t) everywhere, and false will use Surface.phi(x, t) everywhere except for building interface/narrow-band FE spaces; Surface.dist(x, t) will be used for the latter",
-      "UseExactDistanceFunc": false,
+      "Name": "OscillatingInextensibleSphere",
       "NarrowBandWidthScaling": 1.1,
       "Params": {
         "Sphere": {
@@ -46,18 +44,23 @@
           "R": 1.0,
           "r_min": 0.5,
           "r_max": 0.5
+        },
+        "OscillatingInextensibleSphere": {
+          "r_0": 1.0,
+          "eps": 0.2,
+          "omega": 1.0
         }
       }
     },
 
     "SurfNavierStokes": {
-      "nu": 1e-2,
+      "nu": 1e-3,
       "gamma": 0.0,
       "Comment": "Use ConvectionTermType = Stokes (zero convection term), Oseen (convection term is given and equal to velocity), or NavierStokes (convection term will be extrapolated from prev time steps)",
       "ConvectionTermType": "NavierStokes",
       "IC": {
         "Velocity": {
-          "Name": "DirectionChangeExact",
+          "Name": "0",
           "Params": {
             "0": {},
             "PolynomialExact": {},
@@ -72,7 +75,7 @@
           }
         },
         "Pressure": {
-          "Name": "PolynomialExact",
+          "Name": "0",
           "Params": {
             "0": {},
             "PolynomialExact": {}
@@ -100,8 +103,8 @@
 
     "Time": {
       "BDF": 2,
-      "NumbOfSteps": 40,
-      "FinalTime": 1.0
+      "NumbOfSteps": 300,
+      "FinalTime": 3.0
     },
 
     "Solver": {

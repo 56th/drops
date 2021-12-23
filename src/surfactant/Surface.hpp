@@ -16,12 +16,13 @@ namespace DROPS {
     protected:
         const bool isStationary_;
         std::string description_;
-        struct radius_ { double min, max; };
+        struct interval { double min, max; };
+        using box = std::array<interval, 3>;
     public:
         Surface(bool isStationary) : isStationary_(isStationary), description_(isStationary_ ? "stationary surface\n" : "evolving surface\n") {}
         bool isStationary() const { return isStationary_; }
         std::string description() const { return description_; }
-        virtual std::array<radius_, 3> radius(double t = 0.) const {
+        virtual box bounds(double t = 0.) const {
             std::string funcName = __func__;
             throw std::logic_error(funcName + ": not implemented");
         }
@@ -34,19 +35,21 @@ namespace DROPS {
             if (!isStationary_) throw std::logic_error(funcName + ": not implemented");
             return 0.;
         }
-        virtual double dist(Point3DCL const &, double t = 0.) const {
+        virtual double dist(Point3DCL const &, double t = 0.) const = 0;
+        virtual Point3DCL dist_grad(Point3DCL const &, double t = 0.) const {
             std::string funcName = __func__;
-            throw std::logic_error(funcName + ": distance function not available");
+            throw std::logic_error(funcName + ": normal vector function is not available");
         }
-        virtual double dist(double, double) const {
-            if (isStationary_) return 0.;
-            std::string funcName = __func__;
-            throw std::logic_error(funcName + ": dist(Gamma(t0), Gamma(t1)) is not available");
+        SMatrixCL<3, 3> P(Point3DCL const & x, double t = 0.) const {
+            return eye<3, 3>() - outer_product(dist_grad(x, t), dist_grad(x, t));
         }
-        virtual double phi(Point3DCL const & x, double t = 0.) const { return dist(x, t); }
-        virtual Point3DCL normal(Point3DCL const &, double t = 0.) const = 0;
-        SMatrixCL<3, 3> P(Point3DCL const & x, double t = 0.) const { return eye<3, 3>() - outer_product(normal(x, t), normal(x, t)); }
-        Point3DCL ext(Point3DCL const & x, double t = 0.) const { return x - dist(x, t) * normal(x, t); }
+        Point3DCL ext(Point3DCL const & x, double t = 0.) const {
+            try {
+                return x - dist(x, t) * dist_grad(x, t);
+            } catch(...) {
+                return x;
+            }
+        }
     };
 
     struct Sphere : Surface {
@@ -55,20 +58,38 @@ namespace DROPS {
         double r_prime(double t) const { return 2. * A * M_PI * r_0 * cos(2. * M_PI * t); }
         explicit Sphere(double r_0 = 1., double A = 0.) : Surface(!A), r_0(r_0), A(A) {
             std::string funcName = __func__;
-            if (r_0 <= 0.) throw std::invalid_argument(funcName + ": radius must be positive");
+            if (r_0 <= 0.) throw std::invalid_argument(funcName + ": bounds must be positive");
             if (A < 0. || A >= 1.) throw std::invalid_argument(funcName + ": A must be in [0, 1)");
             description_ += isStationary_ ? "phi = x^2 + y^2 + z^2 - R, R = " + std::to_string(r_0) :
                 "phi = x^2 + y^2 + z^2 - r^2(t), r(t) := r0 (1 + A sin(2 pi t))\n"
                 "A = " + std::to_string(A) + ", r_0 = " + std::to_string(r_0);
         }
         virtual ~Sphere() {}
-        std::array<radius_, 3> radius(double t) const final { return {0., r(t), 0., r(t), 0., r(t) }; }
+        box bounds(double t) const final { return {0., r(t), 0., r(t), 0., r(t) }; }
         std::array<bool, 3> rotationalInvariance(double) const final { return { true, true, true }; }
         double u_N(Point3DCL const &, double t) const final { return r_prime(t); }
         double dist(Point3DCL const & x, double t) const final { return norm(x) - r(t); }
-        double dist(double t0, double t1) const final { return std::fabs(r(t0) - r(t1)); }
-        double phi(Point3DCL const & x, double t) const final { return norm_sq(x) - r(t) * r(t); } // global P2 func
-        Point3DCL normal(Point3DCL const & x, double) const final { return x / norm(x); }
+        Point3DCL dist_grad(Point3DCL const & x, double) const final { return x / norm(x); }
+    };
+
+    struct OscillatingInextensibleSphere : Surface {
+        const double r_0, eps, omega;
+        double H_2(Point3DCL const & x) const { return .25 * std::sqrt(5. / M_PI) * (-pow(x[0],2) - pow(x[1],2) + 2.*pow(x[2],2))/norm_sq(x); };
+        double H_3(Point3DCL const & x) const { return .25 * std::sqrt(7. / M_PI) * (x[2]*(-3.*pow(x[0],2) - 3.*pow(x[1],2) + 2.*pow(x[2],2)))/pow(norm_sq(x),1.5); };
+        double A_2(double t) const { return .5 * cos(omega * 2. * M_PI * t); }
+        double A_2_prime(double t) const { return -omega * M_PI * sin(omega * 2. * M_PI * t); }
+        double A_3(double t) const { return pow(10., -.5) * sin(omega * 2. * M_PI * t); }
+        double A_3_prime(double t) const { return std::sqrt(.4) * omega * M_PI * cos(omega * 2. * M_PI * t); }
+        double r(Point3DCL const & x, double t) const { return r_0 + eps * (A_2(t) * H_2(x) + A_3(t) * H_3(x)); }
+        explicit OscillatingInextensibleSphere(double r_0 = 1., double eps = 0.1, double omega = 1.) : Surface(!eps), r_0(r_0), eps(eps), omega(omega) {
+            std::string funcName = __func__;
+            if (eps < 0.) throw std::invalid_argument(funcName + ": eps must be >= 0");
+            if (r_0 <= eps) throw std::invalid_argument(funcName + ": eps must be << r_0");
+            description_ += isStationary_ ? "phi = x^2 + y^2 + z^2 - R, R = " + std::to_string(r_0) : "inextensible sphere";
+        }
+        virtual ~OscillatingInextensibleSphere() {}
+        double u_N(Point3DCL const & x, double t) const final { return eps * (A_2_prime(t) * H_2(x) + A_3_prime(t) * H_3(x)); }
+        double dist(Point3DCL const & x, double t) const final { return norm(x) - r(x, t); }
     };
 
     struct Torus : Surface {
@@ -86,8 +107,8 @@ namespace DROPS {
                 "phi = (x^2 + y^2 + z^2 + R^2 - r(xi)^2)^2 - 4 R^2 (x^2 + y^2)";
         }
         virtual ~Torus() {}
-        std::array<radius_, 3> radius(double) const final {
-            std::array<radius_, 3> res;
+        box bounds(double) const final {
+            box res;
             res[x_0] = { R - r_max, R + r_max };
             res[x_1] = { R - .5 * (r_max + r_min), R + .5 * (r_max + r_min) };
             res[x_2] = { 0., r_max };
@@ -99,8 +120,7 @@ namespace DROPS {
             return res;
         }
         double dist(Point3DCL const & x, double) const final { return std::sqrt(pow(std::sqrt(x[x_0] * x[x_0] + x[x_1] * x[x_1]) - R, 2.) + x[x_2] * x[x_2]) - r(x[x_0], x[x_1]); }
-        double phi(Point3DCL const & x, double) const final { return pow(norm_sq(x) + R * R - r(x[x_0], x[x_1]) * r(x[x_0], x[x_1]), 2.) - 4. * R * R * (pow(x[x_0], 2.) + pow(x[x_1], 2.)); }
-        Point3DCL normal(Point3DCL const & x, double) const final {
+        Point3DCL dist_grad(Point3DCL const & x, double) const final {
             auto [r_x, r_y] = r_grad(x[x_0], x[x_1]);
             return Point3DCL(
                 -r_x + (x[x_0] * (-R + std::sqrt(pow(x[x_0], 2) + pow(x[x_1], 2)))) / (std::sqrt(pow(x[x_0], 2) + pow(x[x_1], 2)) * std::sqrt(pow(R - std::sqrt(pow(x[x_0], 2) + pow(x[x_1], 2)), 2) + pow(x[x_2], 2))),
@@ -115,6 +135,7 @@ namespace DROPS {
         auto name = params.get<std::string>("Surface.Name");
         if (name == "Sphere") return std::make_unique<Sphere>(params.get<double>("Surface.Params." + name + ".r_0"), params.get<double>("Surface.Params." + name + ".A"));
         if (name == "Torus") return std::make_unique<Torus>(params.get<double>("Surface.Params." + name + ".R"), params.get<double>("Surface.Params." + name + ".r_min"), params.get<double>("Surface.Params." + name + ".r_max"), params.get<size_t>("Surface.Params." + name + ".axis"));
+        if (name == "OscillatingInextensibleSphere") return std::make_unique<OscillatingInextensibleSphere>(params.get<double>("Surface.Params." + name + ".r_0"), params.get<double>("Surface.Params." + name + ".eps"), params.get<double>("Surface.Params." + name + ".omega"));
         throw std::invalid_argument(funcName + ": unknown surface '" + name + "'");
     }
 
