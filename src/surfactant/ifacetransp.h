@@ -1576,6 +1576,17 @@ public:
             }
         return A;
     }
+    mtx M_P2P2() {
+        if (qDomain.empty()) return createMtx(n.P2, 0.);
+        require(qHatP2[0], &LocalAssembler::buildHatP2);
+        auto A = createMtx(n.P2);
+        for (size_t i = 0; i < n.P2; ++i)
+            for (size_t j = i; j < n.P2; ++j) {
+                A[i][j] = quad_2D(qHatP2[j] * qHatP2[i], qDomain);
+                A[j][i] = A[i][j];
+            }
+        return A;
+    }
     mtx N_P1P1() {
         if (qDomain.empty()) return createMtx(n.P1, 0.);
         require(qHatP1[0], &LocalAssembler::buildHatP1);

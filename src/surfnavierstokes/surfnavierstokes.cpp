@@ -176,7 +176,8 @@ int main(int argc, char* argv[]) {
                 Q_pu(&preIdx, &velIdx, &LocalAssembler::Q_P1vecP2),
                 M_p(&preIdx, &preIdx, &LocalAssembler::M_P1P1),
                 C_p(&preIdx, &preIdx, stab == "Normal" ? &LocalAssembler::C_n_P1P1 : &LocalAssembler::C_full_P1P1),
-                A_p(&preIdx, &preIdx, &LocalAssembler::A_P1P1);
+                A_p(&preIdx, &preIdx, &LocalAssembler::A_P1P1),
+                M_u_N(&speedIdx, &speedIdx, &LocalAssembler::M_P2P2);
             FEVecDescCL
                 F_u(&velIdx, &LocalAssembler::F_momentum_vecP2),
                 G_p(&preIdx, &LocalAssembler::F_continuity_P1);
@@ -430,6 +431,7 @@ int main(int argc, char* argv[]) {
             auto feTime = logger.end();
             logger.beg("assemble");
                 surfNSystem.matrices = { &M_u, &A_u, &AL_u, &S_u, &C_u, &M_p, &C_p, &A_p, &B_pu, &Q_pu };
+                if (u_N_max) surfNSystem.matrices.push_back(&M_u_N);
                 setupFESystem(mg, surfNSystem);
                 MatrixCL A_sum;
                 VectorCL I_p(1., preIdx.NumUnknowns());
@@ -475,6 +477,7 @@ int main(int argc, char* argv[]) {
                     tJSON.put("NumTetras.Velocity", numActiveTetras.vel);
                     tJSON.put("NarrowBandWidth", narrowBandWidth);
                     tJSON.put("MaxSurfaceSpeed", u_N_max);
+                    tJSON.put("SurfaceSpeedKineticEnergy", u_N_max ? .5 * dot(u_N.Data, M_u_N.Data * u_N.Data) : 0.);
                     tJSON.put("MeshDepParams.rho_p", rho_p);
                     tJSON.put("MeshDepParams.rho_u", rho_u);
                     tJSON.put("MeshDepParams.tau_u", tau_u);
@@ -639,7 +642,7 @@ int main(int argc, char* argv[]) {
                     surfNSystem.params.surfNavierStokesParams.u_N = u_N_max ? &u_N : nullptr;
                     if (u_N_max) {
                         logger.log("assembling all matrices due to nnz surf speed");
-                        surfNSystem.matrices = { &N_u, &H_u, &M_u, &A_u, &AL_u, &S_u, &C_u, &M_p, &C_p, &A_p, &B_pu, &Q_pu };
+                        surfNSystem.matrices = { &N_u, &H_u, &M_u, &A_u, &AL_u, &S_u, &C_u, &M_p, &C_p, &A_p, &B_pu, &Q_pu, &M_u_N };
                     }
                     else if (Pe) {
                         logger.log("assembling convection mtx");
