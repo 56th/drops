@@ -4,10 +4,13 @@
 io = <|
 	"in" -> "/home/alexander/Documents/drops/output",
 	"out" -> "/home/alexander/Documents/Trace-FEM",
-	"runs" -> {"evolving_conv_lvl2", "evolving_conv_lvl3", "evolving_conv_lvl4", "evolving_conv_lvl5"}
+	"runs" -> {"spherical_harmonics_u_N"}
 |>;
 (* modules *)
 Get[NotebookDirectory[] <> "TeXTableForm.m"]
+ResourceFunction["MaTeXInstall"][]
+<<MaTeX`
+texStyle = {FontFamily -> "Latin Modern Roman", FontSize -> 12};
 (* functions *)
 str2exp[s_] := Quiet@ToExpression@StringReplace[ToString@s, {"e+" :> "*^", "e-" :> "*^-", "\\" :> ""}]
 exportTable[table_, name_] := Module[{tex, path = io["out"] <> "/tab/" <> name <> ".tex"},
@@ -25,6 +28,10 @@ applyCol[f_, table_, I_] := Module[{res = Transpose@table},
 	Do[res[[i]] = f /@ res[[i]], {i, I}];
 	Transpose@res
 ]
+(* plotting *)
+plotmarkers = "OpenMarkers";
+markers[data_, plot_:ListPlot, step_:1] := plot[#[[;;;;step]]& /@ data, PlotMarkers -> plotmarkers, Axes -> False]
+tickF = Charting`ScaledTicks["Linear"][##] /. {a_, _NumberForm, b___} :> {a, ToString @ PercentForm[a], b} &;
 
 
 (* ::Section:: *)
@@ -45,10 +52,41 @@ Do[
 {run, io["runs"]}]
 
 
-(* ::Section::Closed:: *)
+(* ::Section:: *)
 (*Stats*)
 
 
+kinT = Map[{#["t"], #["Integral", "FESolution", "KineticEnergy"]}&, files /@ io["runs"], {2}];
+kinN = Map[{#["t"], #["SurfaceSpeedKineticEnergy"]}&, files /@ io["runs"], {2}];
+Show[
+	ListPlot[Join[kinN, kinT], 
+		BaseStyle -> texStyle, Joined -> True, 
+		Frame -> True,
+			FrameLabel -> {MaTeX["t", Magnification -> 1.5], None},
+		PlotLegends -> PointLegend[
+			{
+				MaTeX["\\frac12 \|u_N(\cdot, t)\|^2_{L^2(\Gamma_h)}", Magnification -> 1.5], 
+				MaTeX["\\frac12 \|{\\bf u}_h(\cdot, t)\|^2_{L^2(\Gamma_h)}", Magnification -> 1.5]
+			}, LegendMarkers -> plotmarkers]
+	],
+	markers[Join[kinN, kinT], ListPlot, 10]
+]
+
+
+run = files@First@io["runs"];
+base = (First@run)["Integral", "SurfacaAreaP1"];
+err = {#["t"], (base - #["Integral", "SurfacaAreaP1"])/base}& /@ run;
+ListPlot[err, 
+	BaseStyle -> texStyle, Joined -> True, 
+	Frame -> True,
+		FrameLabel -> {MaTeX["t", Magnification -> 1.5], None},
+		FrameTicks-> {{tickF, None}, {Automatic, None}},
+	PlotLegends -> MaTeX["\\frac{|\Gamma_h(0)| - |\Gamma_h(t)|}{|\Gamma_h(0)|}", Magnification -> 1.5]
+]
+
+
+ListPlot[Map[{#["t"], #["Integral", "FESolution", "KineticEnergy"]}&, files /@ io["runs"], {2}], Joined -> True, PlotLabel->"kinetic energy", PlotLegends -> io["runs"]]
+ListPlot[Map[{#["t"], #["Integral","SurfacaAreaP1"]}&, files /@ io["runs"], {2}], Joined -> True, PlotLabel->"surface area", PlotLegends -> io["runs"], AspectRatio -> 1]
 ListLogPlot[Map[{#["t"], #["NumTetras", "Velocity"]}&, files /@ io["runs"], {2}], Joined -> True, PlotLabel->"# of active elements", PlotLegends -> io["runs"], PlotRange -> All]
 ListPlot[Map[{#["t"], #["Solver", "Outer", "ResidualNorm", "r_i"]}&, files /@ io["runs"], {2}], Filling -> Bottom, PlotLabel -> "residual norm", PlotLegends -> io["runs"], PlotRange -> All]
 ListPlot[Map[{#["t"], #["MaxSurfaceSpeed"]}&, files /@ io["runs"], {2}], Joined -> True, PlotLabel->"max |u_N|", PlotLegends -> io["runs"], PlotRange -> {-0.01, Automatic}]
@@ -56,7 +94,7 @@ ListPlot[Map[{#["t"], #["NarrowBandWidth"]}&, files /@ io["runs"], {2}], Joined 
 ListPlot[Map[{#["t"], #["Solver", "Outer", "TotalIters"]}&, files /@ io["runs"], {2}], Filling -> Bottom, PlotLabel->"# iters", PlotLegends -> io["runs"], PlotRange -> All]
 
 
-(* ::Section:: *)
+(* ::Section::Closed:: *)
 (*Error*)
 
 
