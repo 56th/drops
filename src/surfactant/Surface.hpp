@@ -73,22 +73,30 @@ namespace DROPS {
     };
 
     struct OscillatingInextensibleSphere : Surface {
-        const double r_0, eps, omega;
+        const double r_0, eps, eps_unsym, omega, omega_unsym;
         double H_2(Point3DCL const & x) const { return .25 * std::sqrt(5. / M_PI) * (-pow(x[0],2) - pow(x[1],2) + 2.*pow(x[2],2))/norm_sq(x); };
         double H_3(Point3DCL const & x) const { return .25 * std::sqrt(7. / M_PI) * (x[2]*(-3.*pow(x[0],2) - 3.*pow(x[1],2) + 2.*pow(x[2],2)))/pow(norm_sq(x),1.5); };
+        double H_31(Point3DCL const & x) const { return .25 * std::sqrt(10.5 / M_PI) * x[0] * (4. * pow(x[2], 2) - pow(x[0], 2) - pow(x[1], 2))/pow(norm_sq(x), 1.5); };
+        double H_42(Point3DCL const & x) const { return .375 * std::sqrt(5. / M_PI) * (pow(x[0], 2) - pow(x[1], 2)) * (7. * pow(x[2], 2) - norm_sq(x)) / pow(norm_sq(x), 2); };
         double A_2(double t) const { return .5 * cos(omega * 2. * M_PI * t); }
         double A_2_prime(double t) const { return -omega * M_PI * sin(omega * 2. * M_PI * t); }
         double A_3(double t) const { return pow(10., -.5) * sin(omega * 2. * M_PI * t); }
         double A_3_prime(double t) const { return std::sqrt(.4) * omega * M_PI * cos(omega * 2. * M_PI * t); }
-        double r(Point3DCL const & x, double t) const { return r_0 + eps * (A_2(t) * H_2(x) + A_3(t) * H_3(x)); }
-        explicit OscillatingInextensibleSphere(double r_0 = 1., double eps = 0.1, double omega = 1.) : Surface(!eps), r_0(r_0), eps(eps), omega(omega) {
+        double A_31(double t) const { return .5 * cos(omega_unsym * 2. * M_PI * t); }
+        double A_31_prime(double t) const { return -omega_unsym * M_PI * sin(omega_unsym * 2. * M_PI * t); }
+        double A_42(double t) const { return .5 * sin(omega_unsym * 2. * M_PI * t); }
+        double A_42_prime(double t) const { return omega_unsym * M_PI * cos(omega_unsym * 2. * M_PI * t); }
+        double r(Point3DCL const & x, double t) const { return r_0 + eps * (A_2(t) * H_2(x) + A_3(t) * H_3(x)) + eps_unsym * (A_42(t) * H_42(x) + A_31(t) * H_31(x)); }
+        explicit OscillatingInextensibleSphere(double r_0 = 1., double eps = 0.1, double omega = 1., double eps_unsym = 0.1, double omega_unsym = 0.1) : Surface(!eps && !eps_unsym), r_0(r_0), eps(eps), eps_unsym(eps_unsym), omega(omega), omega_unsym(omega_unsym) {
             std::string funcName = __func__;
             if (eps < 0.) throw std::invalid_argument(funcName + ": eps must be >= 0");
             if (r_0 <= eps) throw std::invalid_argument(funcName + ": eps must be << r_0");
+            if (eps_unsym < 0.) throw std::invalid_argument(funcName + ": eps_unsym must be >= 0");
+            if (r_0 <= eps_unsym) throw std::invalid_argument(funcName + ": eps_unsym must be << r_0");
             description_ += isStationary_ ? "phi = x^2 + y^2 + z^2 - R, R = " + std::to_string(r_0) : "inextensible sphere";
         }
         virtual ~OscillatingInextensibleSphere() {}
-        double u_N(Point3DCL const & x, double t) const final { return eps * (A_2_prime(t) * H_2(x) + A_3_prime(t) * H_3(x)); }
+        double u_N(Point3DCL const & x, double t) const final { return eps * (A_2_prime(t) * H_2(x) + A_3_prime(t) * H_3(x)) + eps_unsym * (A_42_prime(t) * H_42(x) + A_31_prime(t) * H_31(x)); }
         double dist(Point3DCL const & x, double t) const final { return norm(x) - r(x, t); }
     };
 
@@ -135,7 +143,7 @@ namespace DROPS {
         auto name = params.get<std::string>("Surface.Name");
         if (name == "Sphere") return std::make_unique<Sphere>(params.get<double>("Surface.Params." + name + ".r_0"), params.get<double>("Surface.Params." + name + ".A"));
         if (name == "Torus") return std::make_unique<Torus>(params.get<double>("Surface.Params." + name + ".R"), params.get<double>("Surface.Params." + name + ".r_min"), params.get<double>("Surface.Params." + name + ".r_max"), params.get<size_t>("Surface.Params." + name + ".axis"));
-        if (name == "OscillatingInextensibleSphere") return std::make_unique<OscillatingInextensibleSphere>(params.get<double>("Surface.Params." + name + ".r_0"), params.get<double>("Surface.Params." + name + ".eps"), params.get<double>("Surface.Params." + name + ".omega"));
+        if (name == "OscillatingInextensibleSphere") return std::make_unique<OscillatingInextensibleSphere>(params.get<double>("Surface.Params." + name + ".r_0"), params.get<double>("Surface.Params." + name + ".eps"), params.get<double>("Surface.Params." + name + ".omega"), params.get<double>("Surface.Params." + name + ".eps_unsym"), params.get<double>("Surface.Params." + name + ".omega_unsym"));
         throw std::invalid_argument(funcName + ": unknown surface '" + name + "'");
     }
 

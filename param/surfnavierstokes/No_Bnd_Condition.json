@@ -1,6 +1,6 @@
 {
     "Output": {
-      "Directory": "../../output/spherical_harmonics",
+      "Directory": "../../output/spherical_harmonics_unsym",
       "EveryStep": 1,
       "Binary": true,
       "VTK": {
@@ -48,7 +48,9 @@
         "OscillatingInextensibleSphere": {
           "r_0": 1.0,
           "eps": 0.2,
-          "omega": 1.0
+          "omega": 1.0,
+          "eps_unsym": 0.1,
+          "omega_unsym": 2.0
         }
       }
     },
