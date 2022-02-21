@@ -84,8 +84,8 @@ namespace DROPS {
         double A_3_prime(double t) const { return std::sqrt(.4) * omega * M_PI * cos(omega * 2. * M_PI * t); }
         double A_31(double t) const { return .5 * cos(omega_unsym * 2. * M_PI * t); }
         double A_31_prime(double t) const { return -omega_unsym * M_PI * sin(omega_unsym * 2. * M_PI * t); }
-        double A_42(double t) const { return .5 * sin(omega_unsym * 2. * M_PI * t); }
-        double A_42_prime(double t) const { return omega_unsym * M_PI * cos(omega_unsym * 2. * M_PI * t); }
+        double A_42(double t) const { return 5. * sin(omega_unsym * 2. * M_PI * t) / 18.; }
+        double A_42_prime(double t) const { return 5. * omega_unsym * M_PI * cos(omega_unsym * 2. * M_PI * t) / 9.; }
         double r(Point3DCL const & x, double t) const { return r_0 + eps * (A_2(t) * H_2(x) + A_3(t) * H_3(x)) + eps_unsym * (A_42(t) * H_42(x) + A_31(t) * H_31(x)); }
         explicit OscillatingInextensibleSphere(double r_0 = 1., double eps = 0.1, double omega = 1., double eps_unsym = 0.1, double omega_unsym = 0.1) : Surface(!eps && !eps_unsym), r_0(r_0), eps(eps), eps_unsym(eps_unsym), omega(omega), omega_unsym(omega_unsym) {
             std::string funcName = __func__;
