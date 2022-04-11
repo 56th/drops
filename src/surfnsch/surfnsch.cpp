@@ -207,7 +207,7 @@ int main(int argc, char* argv[]) {
             logger.end();
             logger.beg("refine towards the surface");
                 AdapTriangCL adap(mg);
-                DistMarkingStrategyCL markerLset([&](Point3DCL const & x, double) { return surface->phi(x); }, inpJSON.get<double>("Mesh.AdaptRef.Width"), meshCoarseLevel, meshFineLevel);
+                DistMarkingStrategyCL markerLset([&](Point3DCL const & x, double) { return surface->dist(x); }, inpJSON.get<double>("Mesh.AdaptRef.Width"), meshCoarseLevel, meshFineLevel);
                 adap.set_marking_strategy(&markerLset);
                 adap.MakeInitialTriang();
                 adap.set_marking_strategy(nullptr);
@@ -225,7 +225,7 @@ int main(int argc, char* argv[]) {
                 logger.log();
             }
             levelSet.SetIdx(&lstIdx);
-            levelSet.Interpolate(mg, [&](Point3DCL const & x) { return surface->phi(x); });
+            levelSet.Interpolate(mg, [&](Point3DCL const & x) { return surface->dist(x); });
         logger.end();
         logger.beg("set up FE spaces");
             IdxDescCL velIdx(vecP2IF_FE); {
