@@ -66,7 +66,7 @@
           "RandomBernoulli": { "RaftRatio" : 0.5 },
           "RandomUniform": { "RaftRatio" : 0.5, "RaftRatioNoiseFraction" : 0.1 },
           "SyntheticRafts": {"RaftCount":  6},
-          "MembraneFusion": {"CoulombConstant": 25.0}
+          "MembraneFusion": {"CoulombConstant1": 25.0, "CoulombConstant0": 1.0}
         }
       },
       "NS": {
