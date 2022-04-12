@@ -629,6 +629,11 @@ int main(int argc, char* argv[]) {
                     tJSON.put("Integral.FESolution.PressureL2", sqrt(dot(p.Data, M_p.Data * p.Data)));
                     auto velL2Sq = dot(u.Data, M_u.Data * u.Data);
                     tJSON.put("Integral.FESolution.KineticEnergy", .5 * velL2Sq);
+                    auto eforce = 0.0;
+                    for (int j = 0; j < n/3; ++j) {
+                        eforce += F_u.Data[j];
+                    }
+                    tJSON.put("Integral.FESolution.CoulombL2", eforce);
                     tJSON.put("Integral.FESolution.VelocityL2", sqrt(velL2Sq));
                     tJSON.put("Integral.FESolution.VelocityNormalL2", sqrt(dot(u.Data, S_u.Data * u.Data)));
                     tJSON.put("Integral.FESolution.VelocitySurfaceDivergenceL2", sqrt(dot(u.Data, AL_u.Data * u.Data)));
