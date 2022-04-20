@@ -122,9 +122,11 @@ int main(int argc, char* argv[]) {
             auto sigma_1 = inpJSON.get<double>("SurfNSCH.NS.LineTension.before");
             auto sigma_2 = inpJSON.get<double>("SurfNSCH.NS.LineTension.after");
             auto switch_step = inpJSON.get<double>("SurfNSCH.NS.LineTension.step");
+            auto coulomb1 = inpJSON.get<double>("SurfNSCH.IC.Params.MembraneFusion.CoulombConstant1");
+            auto coulomb0 = inpJSON.get<double>("SurfNSCH.IC.Params.MembraneFusion.CoulombConstant0");
             if(testName == "MembraneFusion"){
-                surfNSCHSystem.params.surfNavierStokesParams.coulomb1 = inpJSON.get<double>("SurfNSCH.IC.Params.MembraneFusion.CoulombConstant1");
-                surfNSCHSystem.params.surfNavierStokesParams.coulomb0 = inpJSON.get<double>("SurfNSCH.IC.Params.MembraneFusion.CoulombConstant0");
+                surfNSCHSystem.params.surfNavierStokesParams.coulomb1 = coulomb1;
+                surfNSCHSystem.params.surfNavierStokesParams.coulomb0 = coulomb0;
             }
             surfNSCHSystem.params.numbOfVirtualSubEdges = inpJSON.get<size_t>("SurfNSCH.NumbOfVirtualSubEdges");
             surfNSCHSystem.params.surfNavierStokesParams.m_g = surfNavierStokesData.m_g;
@@ -272,7 +274,7 @@ int main(int argc, char* argv[]) {
                 VecDescCL
                     u_star(&velIdx), u(&velIdx), surf_curl_u(&preIdx), w_T(&velIdx),
                     p_star(&preIdx), p(&preIdx),
-                    chi_star(&preIdx), chi(&preIdx), chi_extrap(&preIdx), omega(&preIdx), chi_BDF1(&preIdx), chi_BDF2(&preIdx),
+                    chi_star(&preIdx), chi(&preIdx), chi_extrap(&preIdx), omega(&preIdx), chi_BDF1(&preIdx), chi_BDF2(&preIdx), f_coulomb(&preIdx), f_coulomb_star(&preIdx),
                     F_chi(&preIdx), F_omega(&preIdx);
             logger.end();
         logger.end();
@@ -572,6 +574,8 @@ int main(int argc, char* argv[]) {
                         }
                     } while (surfCahnHilliardData.raftRatio > 0. && raftFractionError > .001);
                 }
+                f_coulomb.Interpolate(mg, [&](Point3DCL const & x) { return surfCahnHilliardData.sqInvDist(x, t); });
+                f_coulomb_star.Data = 0.;
                 u.Interpolate(mg, [&](Point3DCL const & x) { return surfNavierStokesData.u_T(x, t); });
                 p.Interpolate(mg, [&](Point3DCL const & x) { return surfNavierStokesData.p(x, t); });
                 p.Data -= dot(M_p.Data * p.Data, I_p) / dot(M_p.Data * I_p, I_p) * I_p;
@@ -629,11 +633,10 @@ int main(int argc, char* argv[]) {
                     tJSON.put("Integral.FESolution.PressureL2", sqrt(dot(p.Data, M_p.Data * p.Data)));
                     auto velL2Sq = dot(u.Data, M_u.Data * u.Data);
                     tJSON.put("Integral.FESolution.KineticEnergy", .5 * velL2Sq);
-                    auto eforce = 0.0;
-                    for (int j = 0; j < n/3; ++j) {
-                        eforce += F_u.Data[n-j];
+                    for (int j = 0; j < m; ++j) {
+                        f_coulomb_star.Data[j] = coulomb1 * chi.Data[j] * f_coulomb.Data[j] + (1-chi.Data[j]) *  coulomb0 * f_coulomb.Data[j];
                     }
-                    tJSON.put("Integral.FESolution.CoulombL2", eforce);
+                    tJSON.put("Integral.FESolution.CoulombL2", dot(M_p.Data * f_coulomb_star.Data, I_p));
                     tJSON.put("Integral.FESolution.VelocityL2", sqrt(velL2Sq));
                     tJSON.put("Integral.FESolution.VelocityNormalL2", sqrt(dot(u.Data, S_u.Data * u.Data)));
                     tJSON.put("Integral.FESolution.VelocitySurfaceDivergenceL2", sqrt(dot(u.Data, AL_u.Data * u.Data)));

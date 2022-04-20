@@ -14,14 +14,14 @@ namespace DROPS {
     struct SurfCahnHilliardData {
         bool exact;
         double raftRatio;
-        InstatScalarFunction chi, f;
+        InstatScalarFunction chi, f, sqInvDist;
         InstatVectorFunction wind;
         std::string description;
     };
 
     SurfCahnHilliardData surfCahnHilliardDataFactory(Surface const & surface, std::string const & name, ParamCL const & params) {
         std::string funcName = __func__;
-        InstatScalarFunction chi = zeroInstatScalarFunction, f = zeroInstatScalarFunction;
+        InstatScalarFunction chi = zeroInstatScalarFunction, f = zeroInstatScalarFunction, sqInvDist = zeroInstatScalarFunction;
         InstatVectorFunction wind = zeroInstatVectorFunction;
         SurfCahnHilliardData data;
         data.exact = false;
@@ -103,11 +103,15 @@ namespace DROPS {
                 std::bernoulli_distribution dis(data.raftRatio);
                 return dis(gen);
             };
+            sqInvDist = [=](Point3DCL const & x, double) mutable {
+                return -1 / pow(x[2]+2,2);
+            };
         }
         else throw std::invalid_argument(funcName + ": IC '" + name + "' is not defined");
         data.chi = [=, &surface](Point3DCL const & x, double t) { return chi(surface.ext(x, t), t); };
         data.wind = [=, &surface](Point3DCL const & x, double t) { return wind(surface.ext(x, t), t); };
         data.f = [=, &surface](Point3DCL const & x, double t) { return f(surface.ext(x, t), t); };
+        data.sqInvDist = [=, &surface](Point3DCL const & x, double t) { return sqInvDist(surface.ext(x, t), t); };
         return data;
     }
 
