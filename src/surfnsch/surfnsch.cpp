@@ -631,7 +631,7 @@ int main(int argc, char* argv[]) {
                     tJSON.put("Integral.FESolution.KineticEnergy", .5 * velL2Sq);
                     auto eforce = 0.0;
                     for (int j = 0; j < n/3; ++j) {
-                        eforce += F_u.Data[j];
+                        eforce += F_u.Data[n-j];
                     }
                     tJSON.put("Integral.FESolution.CoulombL2", eforce);
                     tJSON.put("Integral.FESolution.VelocityL2", sqrt(velL2Sq));

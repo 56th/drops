@@ -1150,16 +1150,16 @@ private:
             require(qSurfSpeedSurfGrad, &LocalAssembler::buildSurfSpeed);
             qMomentumF += qSurfSpeed * qSurfSpeedSurfGrad;
         }
+        require(qRho, &LocalAssembler::buildRho);
+        qMomentumF = qRho * qMomentumF;
         if (params.surfNavierStokesParams.coulomb1) {
             require(qChi, &LocalAssembler::buildConcentration);
             qMomentumF = params.surfNavierStokesParams.coulomb1 * (qChi * qMomentumF) - params.surfNavierStokesParams.coulomb0 * (qChi * qMomentumF) + params.surfNavierStokesParams.coulomb0 * qMomentumF;
         }
-        require(qRho, &LocalAssembler::buildRho);
-        qMomentumF = qRho * qMomentumF;
         if (params.surfNavierStokesParams.lineTension) {
             require(qChiSurfGrad, &LocalAssembler::buildConcentration);
             require(qOmega, &LocalAssembler::buildChemPotential);
-            qMomentumF += params.surfNavierStokesParams.lineTension * (qOmega * qChiSurfGrad);
+            qMomentumF += params.surfNavierStokesParams.lineTension * (qChi * qOmegaSurfGrad);
         }
     }
     void buildConcentrationF() {
