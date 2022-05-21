@@ -74,7 +74,7 @@ namespace DROPS {
             auto raftRatio = params.get<double>("SurfNSCH.IC.Params.RandomBernoulli.RaftRatio");
             params.put("SurfCahnHilliard.IC.Params.RandomBernoulli.RaftRatio", raftRatio);
             dataCH = surfCahnHilliardDataFactory(surface, "RandomBernoulli", params);
-            dataNS.f_T = [=, &surface](Point3DCL const & x, double t) { return surface.P(surface.ext(x, t), t) * Point3DCL(0., 0., -1 / pow(x[2]+2,2) ); };
+            dataNS.f_T = [=, &surface](Point3DCL const & x, double t) { return surface.P(surface.ext(x, t), t) * Point3DCL(0., 0., -1.0 ); };
             dataCH.exact = false;
             dataCH.f = zeroInstatScalarFunction;
         }
