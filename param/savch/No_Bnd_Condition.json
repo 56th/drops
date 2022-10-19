@@ -49,7 +49,9 @@
     "SurfCahnHilliard" : {
       "NumbOfVirtualSubEdges": 2,
       "IC": {
-        "Name": "WanDerVaals",
+        "Name": "RandomBernoulli",
+        "ImportChi": false,
+        "ChiPath": "/path",
         "Params": {
           "RandomBernoulli": { "RaftRatio" : 0.5 },
           "RandomUniform": { "RaftRatio" : 0.5, "RaftRatioNoiseFraction" : 0.1 },
@@ -63,6 +65,7 @@
         "Power"  : 1.0
       },
       "Beta_s" : 0.0,
+      "StabilizedMethod": true,
       "ChemicalPotentialScaling": 1.0,
       "MobilityScaling": 1.0,
       "UseDegenerateMobility": true,
@@ -70,8 +73,8 @@
     },
 
     "Time": {
-      "StepSize" : 0.0001,
-      "FinalTime": 1e10,
+      "StepSize" : 0.001,
+      "FinalTime": 0.1,
       "Adaptive" : {
         "Tol" : 0.005,
         "rho" : 0.9,

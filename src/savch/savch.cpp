@@ -107,6 +107,8 @@ int main(int argc, char* argv[]) {
             auto meshFineLevel = std::max(0, inpJSON.get<int>("Mesh.AdaptRef.FinestLevel"));
             if (meshFineLevel < meshCoarseLevel) meshFineLevel = meshCoarseLevel;
             auto prolongationLevel = inpJSON.get<int>("SurfCahnHilliard.ProlongateFromLevelNo");
+            bool import_chi_from_file = inpJSON.get<bool>("SurfCahnHilliard.IC.ImportChi");
+            bool switch_old = inpJSON.get<bool>("SurfCahnHilliard.StabilizedMethod");
             if (prolongationLevel < meshCoarseLevel) prolongationLevel = meshCoarseLevel;
             if (prolongationLevel > meshFineLevel) prolongationLevel = meshFineLevel;
             auto F_rho = inpJSON.get<double>("Time.Adaptive.rho");
@@ -284,7 +286,14 @@ int main(int argc, char* argv[]) {
                 VectorCL I_p(1., m);
             auto assembleTime = logger.end();
             logger.beg("interpolate initial data");
-                {
+                if(import_chi_from_file){
+                    logger.beg("Reading initial values of chi from file");
+                    auto path = inpJSON.get<std::string>("SurfCahnHilliard.IC.ChiPath");
+                    std::ifstream file(path);
+                    chi.Read(file, binary);
+                    logger.end();
+                }
+                else {
                     IdxDescCL chiIdxExtCoarse(P1_FE), chiIdxExt(P1_FE);
                     chiIdxExtCoarse.CreateNumbering(prolongationLevel, mg);
                     chiIdxExt.CreateNumbering(meshFineLevel, mg);
@@ -427,7 +436,7 @@ int main(int argc, char* argv[]) {
                                 if(i==1) r_sav = std::sqrt(E_1);
                                 omega_rhs_scaling = omega_rhs_scaling / (2.0 * E_1) - r_sav / std::sqrt(E_1);
                                 chePot.Data = M.Data * F_omega.Data;
-                                //omega_rhs_scaling = -1;
+                                if(switch_old) omega_rhs_scaling = -1;
                                 std::cout << r_sav / std::sqrt(E_1) << " VVV "<< omega_rhs_scaling + r_sav / std::sqrt(E_1) <<" VVV "<<endl;
                                 F_omega.Data =  beta_s * (M.Data * chi.Data) + omega_rhs_scaling * chePot.Data;
                                 MatrixCL M_sav;
@@ -439,7 +448,7 @@ int main(int argc, char* argv[]) {
                                 logger.log();
                                 linearSolver.system.mtx = static_cast<RCP<MT>>(MatrixCL(
                                     wind_max ? MatrixCL(alpha, M.Data, 1., N.Data) : MatrixCL(alpha, M.Data), MatrixCL(mobilityScaling, useDegenerateMobility ? A_deg.Data : A_one.Data, rho_vol, C.Data),
-                                    MatrixCL(eps * eps, A_one.Data, -1/(2*E_1), M_sav, beta_s, M.Data, eps * eps * rho_vol, C.Data), MatrixCL(-1., M.Data)
+                                    switch_old ? MatrixCL(eps * eps, A_one.Data, beta_s, M.Data, eps * eps * rho_vol, C.Data) : MatrixCL(eps * eps, A_one.Data, -1/(2*E_1), M_sav, beta_s, M.Data, eps * eps * rho_vol, C.Data), MatrixCL(-1., M.Data)
                                 ));
                                 logCRS(linearSolver.system.mtx, "{A, B; C, D} block mtx");
                                 linearSolver.system.rhs = static_cast<RCP<SV>>(F_chi.Data.append(F_omega.Data));
@@ -450,7 +459,7 @@ int main(int argc, char* argv[]) {
                             logger.end();
                         logger.end();
                         logger.beg("BDF2 step");
-                            if (i <1000) {
+                            {
                                 chi_BDF2 = chi_BDF1;
                                 logger.log("i = 1: BDF2 soln = BDF1 soln");
                                 logger.end();
