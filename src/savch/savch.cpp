@@ -137,7 +137,7 @@ int main(int argc, char* argv[]) {
             auto c0_l = std::min(c0, 1. - c0) / sqrt(3.);
             auto f_0 = [&](VectorCL const & c) {
                 auto res = c;
-                for (auto& el : res) el = xi * std::pow(el * (1. - el), 2.)+0.001;
+                for (auto& el : res) el = xi * std::pow(el * (1. - el), 2.)+1.001;
                 return res;
             };
             auto chemicalPotential = [&](double c) { // f'_0
