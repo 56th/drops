@@ -260,6 +260,7 @@ int main(int argc, char* argv[]) {
             }
             linearSolver.zeroIniGuess = !inpJSON.get<bool>("Solver.UsePreviousFrameAsInitialGuess");
             logger.beg("set up preconditioner");
+                Teuchos::RCP<OP> preMTX;
                 RCP<Amesos2::Solver<MT, MV>> amesosSolver;
                 linearSolver.system.pre = rcp(new Epetra_OperatorApply([&](MV const &X, MV &Y) {
                     amesosSolver->setB(rcpFromRef(X));
@@ -267,7 +268,7 @@ int main(int argc, char* argv[]) {
                     amesosSolver->solve();
                 }));
                 linearSolver.updatePreconditioner = [&]() {
-                    auto mtx = rcp_dynamic_cast<MT>(linearSolver.system.mtx);
+                    auto mtx = rcp_dynamic_cast<MT>(preMTX);
                     amesosSolver = Amesos2::create<MT, MV>(inpJSON.get<std::string>("Solver.Inner.Iteration"), mtx);
                     amesosSolver->symbolicFactorization();
                     amesosSolver->numericFactorization();
@@ -354,6 +355,8 @@ int main(int argc, char* argv[]) {
                         auto chi_diff = chi_star.Data - chi.Data;
                         tJSON.put("Integral.Error.ConcentrationL2", sqrt(dot(chi_diff, M.Data * chi_diff)));
                         tJSON.put("Integral.Error.ConcentrationH1", sqrt(dot(chi_diff, A_one.Data * chi_diff)));
+                        tJSON.put("Integral.Error.r_SAV", r_sav);
+                        tJSON.put("Integral.Error.r_SAV_E_1", E_1);
                     }
                     if (i > 0) {
                         tJSON.put("ElapsedTime.LinearSolve", linearSolver.stats.time.solve);
@@ -448,7 +451,11 @@ int main(int argc, char* argv[]) {
                                 logger.log();
                                 linearSolver.system.mtx = static_cast<RCP<MT>>(MatrixCL(
                                     wind_max ? MatrixCL(alpha, M.Data, 1., N.Data) : MatrixCL(alpha, M.Data), MatrixCL(mobilityScaling, useDegenerateMobility ? A_deg.Data : A_one.Data, rho_vol, C.Data),
-                                    switch_old ? MatrixCL(eps * eps, A_one.Data, beta_s, M.Data, eps * eps * rho_vol, C.Data) : MatrixCL(eps * eps, A_one.Data, -1/(2*E_1), M_sav, beta_s, M.Data, eps * eps * rho_vol, C.Data), MatrixCL(-1., M.Data)
+                                    switch_old ? MatrixCL(eps * eps, A_one.Data, beta_s, M.Data, eps * eps * rho_vol, C.Data) : MatrixCL(eps * eps, A_one.Data, 1/(2*E_1), M_sav, beta_s, M.Data, eps * eps * rho_vol, C.Data), MatrixCL(-1., M.Data)
+                                ));
+                                preMTX = static_cast<RCP<MT>>(MatrixCL(
+                                        wind_max ? MatrixCL(alpha, M.Data, 1., N.Data) : MatrixCL(alpha, M.Data), MatrixCL(mobilityScaling, useDegenerateMobility ? A_deg.Data : A_one.Data, rho_vol, C.Data),
+                                        MatrixCL(eps * eps, A_one.Data, 1, M.Data, eps * eps * rho_vol, C.Data) , MatrixCL(-1., M.Data)
                                 ));
                                 logCRS(linearSolver.system.mtx, "{A, B; C, D} block mtx");
                                 linearSolver.system.rhs = static_cast<RCP<SV>>(F_chi.Data.append(F_omega.Data));
@@ -493,6 +500,10 @@ int main(int argc, char* argv[]) {
                                 linearSolver.system.mtx = static_cast<RCP<MT>>(MatrixCL(
                                     wind_max ? MatrixCL(alpha, M.Data, 1., N.Data) : MatrixCL(alpha, M.Data), MatrixCL(mobilityScaling, useDegenerateMobility ? A_deg.Data : A_one.Data, rho_vol, C.Data),
                                     MatrixCL(eps * eps, A_one.Data, -1/(2*E_1), M_sav, beta_s, M.Data, eps * eps * rho_vol, C.Data), MatrixCL(-1., M.Data)
+                                ));
+                                preMTX = static_cast<RCP<MT>>(MatrixCL(
+                                        wind_max ? MatrixCL(alpha, M.Data, 1., N.Data) : MatrixCL(alpha, M.Data), MatrixCL(mobilityScaling, useDegenerateMobility ? A_deg.Data : A_one.Data, rho_vol, C.Data),
+                                        MatrixCL(eps * eps, A_one.Data, 1, M.Data, eps * eps * rho_vol, C.Data) , MatrixCL(-1., M.Data)
                                 ));
                                 logCRS(linearSolver.system.mtx, "{A, B; C, D} block mtx");
                                 linearSolver.system.rhs = static_cast<RCP<SV>>(F_chi.Data.append(F_omega.Data));
