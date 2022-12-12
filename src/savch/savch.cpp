@@ -347,6 +347,7 @@ int main(int argc, char* argv[]) {
                     tJSON.put("Integral.FESolution.RaftFraction", dot(M.Data * chi.Data, I_p) / surfArea);
                     tJSON.put("Integral.FESolution.PerimeterEstimate", eps * dot(A_one.Data * chi.Data, chi.Data));
                     tJSON.put("Integral.FESolution.LyapunovEnergy", dot(M.Data * I_p, f_0(chi.Data)) + .5 * eps * eps * dot(A_one.Data * chi.Data, chi.Data));
+                    tJSON.put("Integral.ExactSolution.ModifiedSavEnergy", r_sav*r_sav + .5 * eps * eps * dot(M.Data * chi.Data, chi.Data));
                     if (surfCahnHilliardData.exact) {
                         chi_star.Interpolate(mg, [&](Point3DCL const & x) { return surfCahnHilliardData.chi(x, t); });
                         tJSON.put("Integral.ExactSolution.RaftFraction", dot(M.Data * chi_star.Data, I_p) / surfArea);
