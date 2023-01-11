@@ -348,7 +348,9 @@ int main(int argc, char* argv[]) {
                     tJSON.put("Integral.FESolution.RaftFraction", dot(M.Data * chi.Data, I_p) / surfArea);
                     tJSON.put("Integral.FESolution.PerimeterEstimate", eps * dot(A_one.Data * chi.Data, chi.Data));
                     tJSON.put("Integral.FESolution.LyapunovEnergy", dot(M.Data * I_p, f_0(chi.Data)) + .5 * eps * eps * dot(A_one.Data * chi.Data, chi.Data));
-                    tJSON.put("Integral.FESolution.ModifiedSavEnergy", r_sav*r_sav + .5 * eps * eps * dot(M.Data * chi.Data, chi.Data));
+                    tJSON.put("Integral.FESolution.ModifiedSavEnergy", r_sav*r_sav + .5 * eps * eps * dot(A_one.Data * chi.Data, chi.Data) + 0.5* eps * eps *rho_vol * dot(C.Data * chi.Data, chi.Data));
+                    tJSON.put("Integral.FESolution.r_SAV", r_sav);
+                    tJSON.put("Integral.FESolution.r_SAV_E_1", E_1);
                     if (surfCahnHilliardData.exact) {
                         chi_star.Interpolate(mg, [&](Point3DCL const & x) { return surfCahnHilliardData.chi(x, t); });
                         tJSON.put("Integral.ExactSolution.RaftFraction", dot(M.Data * chi_star.Data, I_p) / surfArea);
@@ -357,8 +359,6 @@ int main(int argc, char* argv[]) {
                         auto chi_diff = chi_star.Data - chi.Data;
                         tJSON.put("Integral.Error.ConcentrationL2", sqrt(dot(chi_diff, M.Data * chi_diff)));
                         tJSON.put("Integral.Error.ConcentrationH1", sqrt(dot(chi_diff, A_one.Data * chi_diff)));
-                        tJSON.put("Integral.Error.r_SAV", r_sav);
-                        tJSON.put("Integral.Error.r_SAV_E_1", E_1);
                     }
                     if (i > 0) {
                         tJSON.put("ElapsedTime.LinearSolve", linearSolver.stats.time.solve);
@@ -433,9 +433,9 @@ int main(int argc, char* argv[]) {
                         if(i == 1){chi_extrap.Data = chi.Data;}
                         else {chi_extrap.Data = 2 * chi.Data -  chi_prev.Data;}
                         F_chi.Data = f.Data + (1. / dt) * (M.Data * chi.Data);
-                        for (size_t i = 0; i < m; ++i) F_omega.Data[i] = chemicalPotential(chi_extrap.Data[i]);
-                        auto omega_rhs_scaling = dot(F_omega.Data,chi.Data);
-                        E_1 = dot(M.Data * f_0(chi_extrap.Data),I_p);
+                        for (size_t i = 0; i < m; ++i) F_omega.Data[i] = chemicalPotential(chi.Data[i]);
+                        auto omega_rhs_scaling = dot(M.Data * F_omega.Data,chi.Data);
+                        E_1 = dot(M.Data * f_0(chi.Data),I_p);
                         if(i==1) r_sav = std::sqrt(E_1);
                         omega_rhs_scaling = omega_rhs_scaling / (2.0 * E_1) - r_sav / std::sqrt(E_1);
                         chePot.Data = M.Data * F_omega.Data;
@@ -450,7 +450,7 @@ int main(int argc, char* argv[]) {
                         logger.log();
                         linearSolver.system.mtx = static_cast<RCP<MT>>(MatrixCL(
                             MatrixCL(alpha, M.Data), MatrixCL(mobilityScaling, useDegenerateMobility ? A_deg.Data : A_one.Data, rho_vol, C.Data),
-                            MatrixCL(eps * eps, A_one.Data, 1/(2*E_1), M_sav, eps * eps * rho_vol, C.Data), MatrixCL(-1., M.Data)
+                            MatrixCL(eps * eps, A_one.Data, 0.0, M.Data, 1/(2*E_1), M_sav, eps * eps * rho_vol, C.Data), MatrixCL(-1., M.Data)
                         ));
                         preMTX = static_cast<RCP<MT>>(MatrixCL(
                                 MatrixCL(alpha, M.Data), MatrixCL(mobilityScaling, useDegenerateMobility ? A_deg.Data : A_one.Data, rho_vol, C.Data),
@@ -468,8 +468,8 @@ int main(int argc, char* argv[]) {
                     for (size_t i = 0; i < m; ++i) omega.Data[i] = (*linearSolver.system.lhs)[i + m];
                     chi_prev = chi;
                     chi = chi_BDF1;
-                    for (size_t i = 0; i < m; ++i) chePot.Data[i] = chemicalPotential(chi_prev.Data[i]);
-                    E_1 = dot(M.Data * f_0(chi_prev.Data),I_p);
+                    //for (size_t i = 0; i < m; ++i) chePot.Data[i] = chemicalPotential(chi_prev.Data[i]);
+                    //E_1 = dot(M.Data * f_0(chi_prev.Data),I_p);
                     r_sav =r_sav + dot(chePot.Data, chi.Data - chi_prev.Data) / (2.0 * std::sqrt(E_1));
                 logger.end();
                 logger.beg("output");

@@ -1569,11 +1569,9 @@ SparseMatBaseCL<T>& SparseMatBaseCL<T>::OuterProduct(const VectorBaseCL<T>& v, c
         for (size_t i = 0; i <v.size() ; ++i) {
             size_t cnt = 0;
             for (size_t j = 0; j < v.size(); ++j) {
-                if(std::abs(v[i]*w[j]) > 0.000000000000001 ){
                     temp_colind.push_back(j);
                     temp_val.push_back(v[i]*w[j]);
                     cnt++;
-                }
             }
             _rowbeg[i+1] = cnt + _rowbeg[i];
         }
