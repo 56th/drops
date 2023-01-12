@@ -454,7 +454,7 @@ int main(int argc, char* argv[]) {
                         ));
                         preMTX = static_cast<RCP<MT>>(MatrixCL(
                                 MatrixCL(alpha, M.Data), MatrixCL(mobilityScaling, useDegenerateMobility ? A_deg.Data : A_one.Data, rho_vol, C.Data),
-                                MatrixCL(eps * eps, A_one.Data, eps * eps, M.Data, 1, M.Data, eps * eps * rho_vol, C.Data) , MatrixCL(-1., M.Data)
+                                MatrixCL(eps * eps, A_one.Data,  1, M.Data, eps * eps * rho_vol, C.Data) , MatrixCL(-1., M.Data)
                         ));
                         logCRS(linearSolver.system.mtx, "{A, B; C, D} block mtx");
                         linearSolver.system.rhs = static_cast<RCP<SV>>(F_chi.Data.append(F_omega.Data));
