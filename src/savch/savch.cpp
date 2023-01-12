@@ -108,7 +108,6 @@ int main(int argc, char* argv[]) {
             if (meshFineLevel < meshCoarseLevel) meshFineLevel = meshCoarseLevel;
             auto prolongationLevel = inpJSON.get<int>("SurfCahnHilliard.ProlongateFromLevelNo");
             bool import_chi_from_file = inpJSON.get<bool>("SurfCahnHilliard.IC.ImportChi");
-            bool switch_old = inpJSON.get<bool>("SurfCahnHilliard.StabilizedMethod");
             if (prolongationLevel < meshCoarseLevel) prolongationLevel = meshCoarseLevel;
             if (prolongationLevel > meshFineLevel) prolongationLevel = meshFineLevel;
             auto F_rho = inpJSON.get<double>("Time.Adaptive.rho");
@@ -140,17 +139,17 @@ int main(int argc, char* argv[]) {
                 for (auto& el : res) el = xi * std::pow(el * (1. - el), 2.)+1.001;
                 return res;
             };
-            auto chemicalPotential = [&](double c) { // f'_0
-                /*if (c < 0.) return xi * (1. - c0) * c;
-                if (c > 1.) return xi * c0 * (c - 1.);
-                double x[1], f[1], d[1], s[1], t[1];
-                x[0] = c;
-                if      (c < c0 - c0_l) hermite_cubic_value(0., 0., 1. - c0, c0 - c0_l, 1. / (12. * sqrt(3.)), 0., 1, x, f, d, s, t);
-                else if (c < c0)        hermite_cubic_value(c0 - c0_l, 1. / (12. * sqrt(3.)), 0., c0, 0., -std::max(c0 * c0, (1. - c0) * (1. - c0)), 1, x, f, d, s, t);
-                else if (c < c0 + c0_l) hermite_cubic_value(c0, 0., -std::max(c0 * c0, (1. - c0) * (1. - c0)), c0 + c0_l, -1. / (12. * sqrt(3.)), 0., 1, x, f, d, s, t);
-                else                    hermite_cubic_value(c0 + c0_l, -1. / (12. * sqrt(3.)), 0., 1., 0., c0, 1, x, f, d, s, t);*/
-                return xi * 2 * c* (1-c) *(1 - 2*c);
-            };
+        auto chemicalPotential = [&](double c) { // f'_0
+            if (c < 0.) return xi * (1. - c0) * c;
+            if (c > 1.) return xi * c0 * (c - 1.);
+            double x[1], f[1], d[1], s[1], t[1];
+            x[0] = c;
+            if      (c < c0 - c0_l) hermite_cubic_value(0., 0., 1. - c0, c0 - c0_l, 1. / (12. * sqrt(3.)), 0., 1, x, f, d, s, t);
+            else if (c < c0)        hermite_cubic_value(c0 - c0_l, 1. / (12. * sqrt(3.)), 0., c0, 0., -std::max(c0 * c0, (1. - c0) * (1. - c0)), 1, x, f, d, s, t);
+            else if (c < c0 + c0_l) hermite_cubic_value(c0, 0., -std::max(c0 * c0, (1. - c0) * (1. - c0)), c0 + c0_l, -1. / (12. * sqrt(3.)), 0., 1, x, f, d, s, t);
+            else                    hermite_cubic_value(c0 + c0_l, -1. / (12. * sqrt(3.)), 0., 1., 0., c0, 1, x, f, d, s, t);
+            return xi * f[0];
+        };
         logger.end();
         logger.beg("build mesh");
             logger.beg("build initial bulk mesh");
@@ -439,8 +438,7 @@ int main(int argc, char* argv[]) {
                         if(i==1) r_sav = std::sqrt(E_1);
                         omega_rhs_scaling = omega_rhs_scaling / (2.0 * E_1) - r_sav / std::sqrt(E_1);
                         chePot.Data = M.Data * F_omega.Data;
-                        //if(switch_old) omega_rhs_scaling = -1;
-                        F_omega.Data =  beta_s * (M.Data * chi.Data) + omega_rhs_scaling * chePot.Data;
+                        F_omega.Data =  omega_rhs_scaling * chePot.Data;
                         MatrixCL M_sav;
                         M_sav.OuterProduct(chePot.Data,chePot.Data);
                     assembleTime = logger.end();
@@ -450,7 +448,7 @@ int main(int argc, char* argv[]) {
                         logger.log();
                         linearSolver.system.mtx = static_cast<RCP<MT>>(MatrixCL(
                             MatrixCL(alpha, M.Data), MatrixCL(mobilityScaling, useDegenerateMobility ? A_deg.Data : A_one.Data, rho_vol, C.Data),
-                            MatrixCL(eps * eps, A_one.Data, 0.0, M.Data, 1/(2*E_1), M_sav, eps * eps * rho_vol, C.Data), MatrixCL(-1., M.Data)
+                            MatrixCL(eps * eps, A_one.Data, beta_s, M.Data, 1/(2*E_1), M_sav, eps * eps * rho_vol, C.Data), MatrixCL(-1., M.Data)
                         ));
                         preMTX = static_cast<RCP<MT>>(MatrixCL(
                                 MatrixCL(alpha, M.Data), MatrixCL(mobilityScaling, useDegenerateMobility ? A_deg.Data : A_one.Data, rho_vol, C.Data),

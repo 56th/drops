@@ -65,7 +65,6 @@
         "Power"  : 1.0
       },
       "Beta_s" : 0.0,
-      "StabilizedMethod": true,
       "ChemicalPotentialScaling": 1.0,
       "MobilityScaling": 1.0,
       "UseDegenerateMobility": true,
