@@ -140,7 +140,7 @@ int main(int argc, char* argv[]) {
                 return res;
             };
         auto chemicalPotential = [&](double c) { // f'_0
-            if (c < 0.) return xi * (1. - c0) * c;
+            /*if (c < 0.) return xi * (1. - c0) * c;
             if (c > 1.) return xi * c0 * (c - 1.);
             double x[1], f[1], d[1], s[1], t[1];
             x[0] = c;
@@ -148,7 +148,8 @@ int main(int argc, char* argv[]) {
             else if (c < c0)        hermite_cubic_value(c0 - c0_l, 1. / (12. * sqrt(3.)), 0., c0, 0., -std::max(c0 * c0, (1. - c0) * (1. - c0)), 1, x, f, d, s, t);
             else if (c < c0 + c0_l) hermite_cubic_value(c0, 0., -std::max(c0 * c0, (1. - c0) * (1. - c0)), c0 + c0_l, -1. / (12. * sqrt(3.)), 0., 1, x, f, d, s, t);
             else                    hermite_cubic_value(c0 + c0_l, -1. / (12. * sqrt(3.)), 0., 1., 0., c0, 1, x, f, d, s, t);
-            return xi * f[0];
+            return xi * f[0];*/
+            return xi * 2 * c* (1-c) *(1 - 2*c);
         };
         logger.end();
         logger.beg("build mesh");
