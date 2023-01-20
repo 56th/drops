@@ -108,7 +108,7 @@ int main(int argc, char* argv[]) {
             if (meshFineLevel < meshCoarseLevel) meshFineLevel = meshCoarseLevel;
             auto prolongationLevel = inpJSON.get<int>("SurfCahnHilliard.ProlongateFromLevelNo");
             bool import_chi_from_file = inpJSON.get<bool>("SurfCahnHilliard.IC.ImportChi");
-            bool bdf1 = false;
+            bool bdf1 = inpJSON.get<bool>("Time.BDF1");
             if (prolongationLevel < meshCoarseLevel) prolongationLevel = meshCoarseLevel;
             if (prolongationLevel > meshFineLevel) prolongationLevel = meshFineLevel;
             auto F_rho = inpJSON.get<double>("Time.Adaptive.rho");
@@ -473,8 +473,6 @@ int main(int argc, char* argv[]) {
                     for (size_t i = 0; i < m; ++i) omega.Data[i] = (*linearSolver.system.lhs)[i + m];
                     chi_prev = chi;
                     chi = chi_BDF1;
-                    //for (size_t i = 0; i < m; ++i) chePot.Data[i] = chemicalPotential(chi_prev.Data[i]);
-                    //E_1 = dot(M.Data * f_0(chi_prev.Data),I_p);
                     r_sav =r_sav + dot(chePot.Data, chi.Data - chi_prev.Data) / (2.0 * std::sqrt(E_1));
                 logger.end();
                 }
@@ -526,9 +524,6 @@ int main(int argc, char* argv[]) {
                     r_sav_prev = tmp;
                     chi_prev = chi;
                     chi = chi_BDF2;
-                    //for (size_t i = 0; i < m; ++i) chePot.Data[i] = chemicalPotential(chi_prev.Data[i]);
-                    //E_1 = dot(M.Data * f_0(chi_prev.Data),I_p);
-
                 logger.end();
                 }
                 logger.beg("output");
