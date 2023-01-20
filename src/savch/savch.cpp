@@ -123,6 +123,7 @@ int main(int argc, char* argv[]) {
                 return f;
             };
             auto r_sav = 0.0;
+            auto r_sav_prev = 0.0;
             auto E_1 = 0.0;
             logger.buf
                 << surface->description() << '\n'
@@ -420,7 +421,7 @@ int main(int argc, char* argv[]) {
                         << "dt = " << dt;
                     logger.log();
                 logger.end();
-                if(bdf1){
+                if(bdf1 || i == 1){
                     logger.beg("BDF1 step");
                     logger.beg("assemble");
                         surfCHSystem.matrices = {};
@@ -438,7 +439,10 @@ int main(int argc, char* argv[]) {
                         for (size_t i = 0; i < m; ++i) F_omega.Data[i] = chemicalPotential(chi.Data[i]);
                         auto omega_rhs_scaling = dot(M.Data * F_omega.Data,chi.Data);
                         E_1 = dot(M.Data * f_0(chi.Data),I_p);
-                        if(i==1) r_sav = std::sqrt(E_1);
+                        if(i==1) {
+                            r_sav = std::sqrt(E_1);
+                            r_sav_prev = r_sav;
+                        }
                         omega_rhs_scaling = omega_rhs_scaling / (2.0 * E_1) - r_sav / std::sqrt(E_1);
                         chePot.Data = M.Data * F_omega.Data;
                         F_omega.Data =  omega_rhs_scaling * chePot.Data;
@@ -487,10 +491,9 @@ int main(int argc, char* argv[]) {
                         else {chi_extrap.Data = 2 * chi.Data -  chi_prev.Data;}
                         F_chi.Data = f.Data + (2. / dt) * (M.Data * chi.Data) - (1./ (2 * dt)) * (M.Data * chi_prev.Data);
                         for (size_t i = 0; i < m; ++i) F_omega.Data[i] = chemicalPotential(chi_extrap.Data[i]);
-                        auto omega_rhs_scaling = dot(M.Data * F_omega.Data,chi.Data);
                         E_1 = dot(M.Data * f_0(chi_extrap.Data),I_p);
                         if(i==1) r_sav = std::sqrt(E_1);
-                        omega_rhs_scaling =  - r_sav / std::sqrt(E_1) + (4.0 * omega_rhs_scaling) / (2.0 * E_1) + dot(M.Data * F_omega.Data,chi_prev.Data)/(2.0 * E_1) ;
+                        auto omega_rhs_scaling =   4.0 * r_sav / (3.0* std::sqrt(E_1)) - r_sav_prev / (3.0* std::sqrt(E_1)) + (2.0 * dot(M.Data * F_omega.Data,chi.Data)) / (3.0 * E_1) + dot(M.Data * F_omega.Data,chi_prev.Data)/(6.0 * E_1) ;
                         chePot.Data = M.Data * F_omega.Data;
                         F_omega.Data =  omega_rhs_scaling * chePot.Data;
                         MatrixCL M_sav;
@@ -518,7 +521,9 @@ int main(int argc, char* argv[]) {
                 logger.end();
                 logger.beg("save BDF1 soln");
                     for (size_t i = 0; i < m; ++i) omega.Data[i] = (*linearSolver.system.lhs)[i + m];
-                    r_sav =4 * r_sav - r_sav_prev + dot(chePot.Data, 4.0 * chi_BDF2.Data - 3.0 * chi.Data + chi_prev.Data) / (2.0 * std::sqrt(E_1));
+                    auto tmp = r_sav;
+                    r_sav =(4 * r_sav - r_sav_prev + 3.0 * dot(chePot.Data, chi_BDF2.Data) / (2.0 * std::sqrt(E_1)) - 4.0 * dot(chePot.Data,chi.Data) / (2.0 * std::sqrt(E_1)) + dot(chePot.Data,chi_prev.Data) / (2.0 * std::sqrt(E_1)))/3.0;
+                    r_sav_prev = tmp;
                     chi_prev = chi;
                     chi = chi_BDF2;
                     //for (size_t i = 0; i < m; ++i) chePot.Data[i] = chemicalPotential(chi_prev.Data[i]);
