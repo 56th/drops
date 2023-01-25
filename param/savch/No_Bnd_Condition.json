@@ -22,7 +22,7 @@
         "Freq": 0,
         "Width": 0,
         "CoarsestLevel": 0,
-        "FinestLevel": 4,
+        "FinestLevel": 3,
         "SD": 0.1,
         "CurvDiff": -1,
         "Discontinuous": 0
@@ -49,11 +49,11 @@
     "SurfCahnHilliard" : {
       "NumbOfVirtualSubEdges": 2,
       "IC": {
-        "Name": "WanDerVaals",
+        "Name": "RandomBernoulli",
         "ImportChi": false,
         "ChiPath": "/path",
         "Params": {
-          "RandomBernoulli": { "RaftRatio" : 0.5 },
+          "RandomBernoulli": { "RaftRatio" : 1.0 },
           "RandomUniform": { "RaftRatio" : 0.5, "RaftRatioNoiseFraction" : 0.1 },
           "WanDerVaals": { "AngularVelocity": 0.0, "Noise": 0.0 }
         }
@@ -67,14 +67,14 @@
       "Beta_s" : 0.0,
       "ChemicalPotentialScaling": 0.25,
       "MobilityScaling": 1.0,
-      "UseDegenerateMobility": true,
-      "Epsilon": 1.0
+      "UseDegenerateMobility": false,
+      "Epsilon": 0.05
     },
 
     "Time": {
-      "BDF1" : false,
-      "StepSize" : 0.0001,
-      "FinalTime": 0.1,
+      "BDF1" : true,
+      "StepSize" : 0.004,
+      "FinalTime": 1.0,
       "Adaptive" : {
         "Tol" : 0.005,
         "rho" : 0.9,

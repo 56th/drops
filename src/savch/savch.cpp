@@ -350,7 +350,15 @@ int main(int argc, char* argv[]) {
                     tJSON.put("Integral.FESolution.RaftFraction", dot(M.Data * chi.Data, I_p) / surfArea);
                     tJSON.put("Integral.FESolution.PerimeterEstimate", eps * dot(A_one.Data * chi.Data, chi.Data));
                     tJSON.put("Integral.FESolution.LyapunovEnergy", dot(M.Data * I_p, f_0(chi.Data)) + .5 * eps * eps * dot(A_one.Data * chi.Data, chi.Data));
-                    tJSON.put("Integral.FESolution.ModifiedSavEnergy", r_sav*r_sav + .5 * eps * eps * dot(A_one.Data * chi.Data, chi.Data) + 0.5* eps * eps *rho_vol * dot(C.Data * chi.Data, chi.Data));
+                    if(bdf1 || i ==1){ tJSON.put("Integral.FESolution.ModifiedSavEnergy",
+                                r_sav * r_sav + .5 * eps * eps * dot(A_one.Data * chi.Data, chi.Data) +
+                                0.5 * eps * eps * rho_vol * dot(C.Data * chi.Data, chi.Data));
+                    }else{
+                        tJSON.put("Integral.FESolution.ModifiedSavEnergy",
+                                  r_sav * r_sav + (2. * r_sav - r_sav_prev) * (2. * r_sav - r_sav_prev)
+                                  + .5 * eps * eps * dot(A_one.Data * chi.Data, chi.Data) + .5 * eps * eps * dot(A_one.Data * chi_extrap.Data, chi_extrap.Data) +
+                                  0.5 * eps * eps * rho_vol * dot(C.Data * chi.Data, chi.Data) + 0.5 * eps * eps * rho_vol * dot(C.Data * chi_extrap.Data, chi_extrap.Data));
+                    }
                     tJSON.put("Integral.FESolution.r_SAV", r_sav);
                     tJSON.put("Integral.FESolution.r_SAV_E_1", E_1);
                     if (surfCahnHilliardData.exact) {
@@ -486,12 +494,12 @@ int main(int argc, char* argv[]) {
                         surfCHSystem.vectors = { &f };
                         setupFESystem(mg, surfCHSystem);
                         if(i == 1){chi_extrap.Data = chi.Data;}
-                        else {chi_extrap.Data = 2 * chi.Data -  chi_prev.Data;}
-                        F_chi.Data = f.Data + (2. / dt) * (M.Data * chi.Data) - (1./ (2 * dt)) * (M.Data * chi_prev.Data);
-                        for (size_t i = 0; i < m; ++i) F_omega.Data[i] = chemicalPotential(chi_extrap.Data[i]);
+                        else {chi_extrap.Data = 2.0 * chi.Data -  chi_prev.Data;}
+                        F_chi.Data = f.Data + (2. / dt) * (M.Data * chi.Data) - (1./ (2.0 * dt)) * (M.Data * chi_prev.Data);
+                        for (size_t j = 0; j < m; ++j) F_omega.Data[j] = chemicalPotential(chi_extrap.Data[j]);
                         E_1 = dot(M.Data * f_0(chi_extrap.Data),I_p);
                         if(i==1) r_sav = std::sqrt(E_1);
-                        auto omega_rhs_scaling =   4.0 * r_sav / (3.0* std::sqrt(E_1)) - r_sav_prev / (3.0* std::sqrt(E_1)) + (2.0 * dot(M.Data * F_omega.Data,chi.Data)) / (3.0 * E_1) + dot(M.Data * F_omega.Data,chi_prev.Data)/(6.0 * E_1) ;
+                        auto omega_rhs_scaling =   4.0 * r_sav / (3.0* std::sqrt(E_1)) - r_sav_prev / (3.0* std::sqrt(E_1)) - (2.0 * dot(M.Data * F_omega.Data,chi.Data)) / (3.0 * E_1) + dot(M.Data * F_omega.Data,chi_prev.Data)/(6.0 * E_1) ;
                         chePot.Data = M.Data * F_omega.Data;
                         F_omega.Data =  omega_rhs_scaling * chePot.Data;
                         MatrixCL M_sav;
@@ -503,11 +511,11 @@ int main(int argc, char* argv[]) {
                         logger.log();
                         linearSolver.system.mtx = static_cast<RCP<MT>>(MatrixCL(
                             MatrixCL(alpha, M.Data), MatrixCL(mobilityScaling, useDegenerateMobility ? A_deg.Data : A_one.Data, rho_vol, C.Data),
-                            MatrixCL(eps * eps, A_one.Data, beta_s, M.Data, 3./(2.*E_1), M_sav, eps * eps * rho_vol, C.Data), MatrixCL(-1., M.Data)
+                            MatrixCL(eps * eps, A_one.Data, beta_s, M.Data, 1./(2.*E_1), M_sav, eps * eps * rho_vol, C.Data), MatrixCL(-1., M.Data)
                         ));
                         preMTX = static_cast<RCP<MT>>(MatrixCL(
                                 MatrixCL(alpha, M.Data), MatrixCL(mobilityScaling, useDegenerateMobility ? A_deg.Data : A_one.Data, rho_vol, C.Data),
-                                MatrixCL(eps * eps, A_one.Data,  1, M.Data, eps * eps * rho_vol, C.Data) , MatrixCL(-1., M.Data)
+                                MatrixCL(eps * eps, A_one.Data,  beta_s, M.Data, eps * eps * rho_vol, C.Data) , MatrixCL(-1., M.Data)
                         ));
                         logCRS(linearSolver.system.mtx, "{A, B; C, D} block mtx");
                         linearSolver.system.rhs = static_cast<RCP<SV>>(F_chi.Data.append(F_omega.Data));
@@ -520,10 +528,11 @@ int main(int argc, char* argv[]) {
                 logger.beg("save BDF1 soln");
                     for (size_t i = 0; i < m; ++i) omega.Data[i] = (*linearSolver.system.lhs)[i + m];
                     auto tmp = r_sav;
-                    r_sav =(4 * r_sav - r_sav_prev + 3.0 * dot(chePot.Data, chi_BDF2.Data) / (2.0 * std::sqrt(E_1)) - 4.0 * dot(chePot.Data,chi.Data) / (2.0 * std::sqrt(E_1)) + dot(chePot.Data,chi_prev.Data) / (2.0 * std::sqrt(E_1)))/3.0;
+                    r_sav =(4.0 * r_sav - r_sav_prev + 3.0 * dot(chePot.Data, chi_BDF2.Data) / (2.0 * std::sqrt(E_1)) - 4.0 * dot(chePot.Data,chi.Data) / (2.0 * std::sqrt(E_1)) + dot(chePot.Data,chi_prev.Data) / (2.0 * std::sqrt(E_1)))/3.0;
                     r_sav_prev = tmp;
                     chi_prev = chi;
                     chi = chi_BDF2;
+                    chi_extrap.Data = 2.0 * chi.Data -  chi_prev.Data;
                 logger.end();
                 }
                 logger.beg("output");
