@@ -350,7 +350,7 @@ int main(int argc, char* argv[]) {
                     tJSON.put("Integral.FESolution.RaftFraction", dot(M.Data * chi.Data, I_p) / surfArea);
                     tJSON.put("Integral.FESolution.PerimeterEstimate", eps * dot(A_one.Data * chi.Data, chi.Data));
                     tJSON.put("Integral.FESolution.LyapunovEnergy", dot(M.Data * I_p, f_0(chi.Data)) + .5 * eps * eps * dot(A_one.Data * chi.Data, chi.Data));
-                    if(bdf1 || i ==1){ tJSON.put("Integral.FESolution.ModifiedSavEnergy",
+                    if(bdf1){ tJSON.put("Integral.FESolution.ModifiedSavEnergy",
                                 r_sav * r_sav + .5 * eps * eps * dot(A_one.Data * chi.Data, chi.Data) +
                                 0.5 * eps * eps * rho_vol * dot(C.Data * chi.Data, chi.Data));
                     }else{
@@ -499,7 +499,7 @@ int main(int argc, char* argv[]) {
                         for (size_t j = 0; j < m; ++j) F_omega.Data[j] = chemicalPotential(chi_extrap.Data[j]);
                         E_1 = dot(M.Data * f_0(chi_extrap.Data),I_p);
                         if(i==1) r_sav = std::sqrt(E_1);
-                        auto omega_rhs_scaling =   4.0 * r_sav / (3.0* std::sqrt(E_1)) - r_sav_prev / (3.0* std::sqrt(E_1)) - (2.0 * dot(M.Data * F_omega.Data,chi.Data)) / (3.0 * E_1) + dot(M.Data * F_omega.Data,chi_prev.Data)/(6.0 * E_1) ;
+                        auto omega_rhs_scaling =   -4.0 * r_sav / (3.0* std::sqrt(E_1)) + r_sav_prev / (3.0* std::sqrt(E_1)) + (2.0 * dot(M.Data * F_omega.Data,chi.Data)) / (3.0 * E_1) - dot(M.Data * F_omega.Data,chi_prev.Data)/(6.0 * E_1) ;
                         chePot.Data = M.Data * F_omega.Data;
                         F_omega.Data =  omega_rhs_scaling * chePot.Data;
                         MatrixCL M_sav;
