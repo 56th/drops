@@ -141,18 +141,18 @@ int main(int argc, char* argv[]) {
                 for (auto& el : res) el = xi * std::pow(el * (1. - el), 2.)+1.001;
                 return res;
             };
-        auto chemicalPotential = [&](double c) { // f'_0
-            /*if (c < 0.) return xi * (1. - c0) * c;
-            if (c > 1.) return xi * c0 * (c - 1.);
-            double x[1], f[1], d[1], s[1], t[1];
-            x[0] = c;
-            if      (c < c0 - c0_l) hermite_cubic_value(0., 0., 1. - c0, c0 - c0_l, 1. / (12. * sqrt(3.)), 0., 1, x, f, d, s, t);
-            else if (c < c0)        hermite_cubic_value(c0 - c0_l, 1. / (12. * sqrt(3.)), 0., c0, 0., -std::max(c0 * c0, (1. - c0) * (1. - c0)), 1, x, f, d, s, t);
-            else if (c < c0 + c0_l) hermite_cubic_value(c0, 0., -std::max(c0 * c0, (1. - c0) * (1. - c0)), c0 + c0_l, -1. / (12. * sqrt(3.)), 0., 1, x, f, d, s, t);
-            else                    hermite_cubic_value(c0 + c0_l, -1. / (12. * sqrt(3.)), 0., 1., 0., c0, 1, x, f, d, s, t);
-            return xi * f[0];*/
-            return xi * 2 * c* (1-c) *(1 - 2*c);
-        };
+            auto chemicalPotential = [&](double c) { // f'_0
+                /*if (c < 0.) return xi * (1. - c0) * c;
+                if (c > 1.) return xi * c0 * (c - 1.);
+                double x[1], f[1], d[1], s[1], t[1];
+                x[0] = c;
+                if      (c < c0 - c0_l) hermite_cubic_value(0., 0., 1. - c0, c0 - c0_l, 1. / (12. * sqrt(3.)), 0., 1, x, f, d, s, t);
+                else if (c < c0)        hermite_cubic_value(c0 - c0_l, 1. / (12. * sqrt(3.)), 0., c0, 0., -std::max(c0 * c0, (1. - c0) * (1. - c0)), 1, x, f, d, s, t);
+                else if (c < c0 + c0_l) hermite_cubic_value(c0, 0., -std::max(c0 * c0, (1. - c0) * (1. - c0)), c0 + c0_l, -1. / (12. * sqrt(3.)), 0., 1, x, f, d, s, t);
+                else                    hermite_cubic_value(c0 + c0_l, -1. / (12. * sqrt(3.)), 0., 1., 0., c0, 1, x, f, d, s, t);
+                return xi * f[0];*/
+                return xi * 2 * c* (1-c) *(1 - 2*c);
+            };
         logger.end();
         logger.beg("build mesh");
             logger.beg("build initial bulk mesh");
@@ -281,7 +281,7 @@ int main(int argc, char* argv[]) {
             logger.end();
         logger.end();
         logger.beg("t = t_0 = 0");
-            size_t i = 0;
+            size_t i_time = 0;
             t = 0.;
             logger.beg("assemble");
                 surfCHSystem.matrices = { &M, &C, &A_one };
@@ -415,117 +415,131 @@ int main(int argc, char* argv[]) {
                     logger.buf << tJSON;
                     logger.log();;
                 };
-                exportStats(i);
+                exportStats(i_time);
             logger.end();
         logger.end();
         while (t < finalTime) {
-            logger.beg("t = t_" + std::to_string(++i));
+            logger.beg("t = t_" + std::to_string(++i_time));
                 auto t_prev = t;
                 auto dt_prev = dt;
-                logger.beg("update time");
-                    t = t_prev + dt;
-                    logger.buf
-                        << "t  = " << t << '\n'
-                        << "dt = " << dt;
-                    logger.log();
-                logger.end();
-                if(bdf1 || i == 1){
-                    logger.beg("BDF1 step");
-                    logger.beg("assemble");
-                        surfCHSystem.matrices = {};
-                        surfCHSystem.params.surfCahnHilliardParams.chi = &chi;
-                        if (useDegenerateMobility) surfCHSystem.matrices.push_back(&A_deg);
-                        surfCHSystem.params.surfCahnHilliardParams.u_T = &wind;
-                        //wind.Interpolate(mg, [&](Point3DCL const & x) { return surfCahnHilliardData.wind(x, t); });
-                        //auto wind_max = supnorm(wind.Data);
-                        //if (wind_max) surfCHSystem.matrices.push_back(&N);
-                        surfCHSystem.vectors = { &f };
-                        setupFESystem(mg, surfCHSystem);
-                        if(i == 1){chi_extrap.Data = chi.Data;}
-                        else {chi_extrap.Data = 2 * chi.Data -  chi_prev.Data;}
-                        F_chi.Data = f.Data + (1. / dt) * (M.Data * chi.Data);
-                        for (size_t i = 0; i < m; ++i) F_omega.Data[i] = chemicalPotential(chi.Data[i]);
-                        auto omega_rhs_scaling = dot(M.Data * F_omega.Data,chi.Data);
-                        E_1 = dot(M.Data * f_0(chi.Data),I_p);
-                        if(i==1) {
-                            r_sav = std::sqrt(E_1);
-                            r_sav_prev = r_sav;
-                        }
-                        omega_rhs_scaling = omega_rhs_scaling / (2.0 * E_1) - r_sav / std::sqrt(E_1);
-                        chePot.Data = M.Data * F_omega.Data;
-                        F_omega.Data =  omega_rhs_scaling * chePot.Data;
-                        MatrixCL M_sav;
-                        M_sav.OuterProduct(chePot.Data,chePot.Data);
-                    assembleTime = logger.end();
-                    logger.beg("convert to Epetra");
-                        alpha = 1. / dt;
-                        logger.buf << "alpha = " << alpha;
+                numTries = 0;
+                do {
+                    logger.beg("attempt #" + std::to_string(++numTries));
+                        logger.beg("update time");
+                            dt = F(e, dt);
+                            t = t_prev + dt;
+                            logger.buf
+                                    << "t  = " << t << '\n'
+                                    << "dt = " << dt;
+                            logger.log();
+                        logger.end();
+                        logger.beg("BDF1 step");
+                            logger.beg("assemble");
+                                surfCHSystem.matrices = {};
+                                surfCHSystem.params.surfCahnHilliardParams.chi = &chi;
+                                if (useDegenerateMobility) surfCHSystem.matrices.push_back(&A_deg);
+                                surfCHSystem.params.surfCahnHilliardParams.u_T = &wind;
+                                surfCHSystem.vectors = {&f};
+                                setupFESystem(mg, surfCHSystem);
+                                if (i_time == 1) { chi_extrap.Data = chi.Data; }
+                                else { chi_extrap.Data = 2 * chi.Data - chi_prev.Data; }
+                                F_chi.Data = f.Data + (1. / dt) * (M.Data * chi.Data);
+                                for (size_t i = 0; i < m; ++i) F_omega.Data[i] = chemicalPotential(chi.Data[i]);
+                                auto omega_rhs_scaling = dot(M.Data * F_omega.Data, chi.Data);
+                                E_1 = dot(M.Data * f_0(chi.Data), I_p);
+                                if (i_time == 1) {
+                                    r_sav = std::sqrt(E_1);
+                                    r_sav_prev = r_sav;
+                                }
+                                omega_rhs_scaling = omega_rhs_scaling / (2.0 * E_1) - r_sav / std::sqrt(E_1);
+                                chePot.Data = M.Data * F_omega.Data;
+                                F_omega.Data = omega_rhs_scaling * chePot.Data;
+                                MatrixCL M_sav;
+                                M_sav.OuterProduct(chePot.Data, chePot.Data);
+                            assembleTime = logger.end();
+                            logger.beg("convert to Epetra");
+                                alpha = 1. / dt;
+                                logger.buf << "alpha = " << alpha;
+                                logger.log();
+                                linearSolver.system.mtx = static_cast<RCP<MT>>(MatrixCL(
+                                        MatrixCL(alpha, M.Data),
+                                        MatrixCL(mobilityScaling, useDegenerateMobility ? A_deg.Data : A_one.Data, rho_vol, C.Data),
+                                        MatrixCL(eps * eps, A_one.Data, beta_s, M.Data, 1 / (2 * E_1), M_sav, eps * eps * rho_vol,
+                                                 C.Data), MatrixCL(-1., M.Data)
+                                ));
+                                preMTX = static_cast<RCP<MT>>(MatrixCL(
+                                        MatrixCL(alpha, M.Data),
+                                        MatrixCL(mobilityScaling, useDegenerateMobility ? A_deg.Data : A_one.Data, rho_vol, C.Data),
+                                        MatrixCL(eps * eps, A_one.Data, 1, M.Data, eps * eps * rho_vol, C.Data),
+                                        MatrixCL(-1., M.Data)
+                                ));
+                                logCRS(linearSolver.system.mtx, "{A, B; C, D} block mtx");
+                                linearSolver.system.rhs = static_cast<RCP<SV>>(F_chi.Data.append(F_omega.Data));
+                            logger.end();
+                            linearSolver.solve();
+                            logger.beg("convert from Epetra");
+                                for (size_t i = 0; i < m; ++i) chi_BDF1.Data[i] = (*linearSolver.system.lhs)[i];
+                            logger.end();
+                        logger.end();
+                        logger.beg("BDF2 step");
+                            if (i_time == 1) {
+                                chi_BDF2 = chi_BDF1;
+                                logger.log("i = 1: BDF2 soln = BDF1 soln");
+                                logger.end();
+                                break;
+                            }
+                            logger.beg("assemble");
+                                auto q = dt / dt_prev;
+                                chi_extrap.Data = (1. + q) * chi.Data - q * chi_prev.Data;
+                                surfCHSystem.matrices = {};
+                                surfCHSystem.params.surfCahnHilliardParams.chi = &chi;
+                                if (useDegenerateMobility) surfCHSystem.matrices.push_back(&A_deg);
+                                surfCHSystem.params.surfCahnHilliardParams.u_T = &wind;
+                                surfCHSystem.vectors = {&f};
+                                setupFESystem(mg, surfCHSystem);
+                                F_chi.Data = f.Data + ((1. + q) / dt) * (M.Data * chi.Data) - (q * q / (1. + q) / dt) * (M.Data * chi_prev.Data);
+                                for (size_t j = 0; j < m; ++j) F_omega.Data[j] = chemicalPotential(chi_extrap.Data[j]);
+                                E_1 = dot(M.Data * f_0(chi_extrap.Data), I_p);
+                                if (i_time == 1) r_sav = std::sqrt(E_1);
+                                omega_rhs_scaling =
+                                        -4.0 * r_sav / (3.0 * std::sqrt(E_1)) + r_sav_prev / (3.0 * std::sqrt(E_1)) +
+                                        (2.0 * dot(M.Data * F_omega.Data, chi.Data)) / (3.0 * E_1) -
+                                        dot(M.Data * F_omega.Data, chi_prev.Data) / (6.0 * E_1);
+                                chePot.Data = M.Data * F_omega.Data;
+                                F_omega.Data = omega_rhs_scaling * chePot.Data;
+                                M_sav.OuterProduct(chePot.Data, chePot.Data);
+                            assembleTime = logger.end();
+                            logger.beg("convert to Epetra");
+                                alpha = (1. + 2. * q) / (1. + q) / dt; // https://dc.uwm.edu/cgi/viewcontent.cgi?article=1405&context=etd, eqn. (2.12)
+                                logger.buf << "alpha = " << alpha;
+                                logger.log();
+                                linearSolver.system.mtx = static_cast<RCP<MT>>(MatrixCL(
+                                        MatrixCL(alpha, M.Data),
+                                        MatrixCL(mobilityScaling, useDegenerateMobility ? A_deg.Data : A_one.Data, rho_vol, C.Data),
+                                        MatrixCL(eps * eps, A_one.Data, beta_s, M.Data, 1. / (2. * E_1), M_sav, eps * eps * rho_vol,
+                                                 C.Data), MatrixCL(-1., M.Data)
+                                ));
+                                preMTX = static_cast<RCP<MT>>(MatrixCL(
+                                        MatrixCL(alpha, M.Data),
+                                        MatrixCL(mobilityScaling, useDegenerateMobility ? A_deg.Data : A_one.Data, rho_vol, C.Data),
+                                        MatrixCL(eps * eps, A_one.Data, beta_s, M.Data, eps * eps * rho_vol, C.Data),
+                                        MatrixCL(-1., M.Data)
+                                ));
+                                logCRS(linearSolver.system.mtx, "{A, B; C, D} block mtx");
+                                linearSolver.system.rhs = static_cast<RCP<SV>>(F_chi.Data.append(F_omega.Data));
+                            logger.end();
+                            linearSolver.solve();
+                            logger.beg("convert from Epetra");
+                                for (size_t i = 0; i < m; ++i) chi_BDF2.Data[i] = (*linearSolver.system.lhs)[i];
+                            logger.end();
+                        logger.end();
+                        auto chi_diff = chi_BDF2.Data - chi_BDF1.Data;
+                        e = sqrt(dot(chi_diff, M.Data * chi_diff) / dot(chi_BDF2.Data, M.Data * chi_BDF2.Data));
+                        logger.buf << "e = " << e;
                         logger.log();
-                        linearSolver.system.mtx = static_cast<RCP<MT>>(MatrixCL(
-                            MatrixCL(alpha, M.Data), MatrixCL(mobilityScaling, useDegenerateMobility ? A_deg.Data : A_one.Data, rho_vol, C.Data),
-                            MatrixCL(eps * eps, A_one.Data, beta_s, M.Data, 1/(2*E_1), M_sav, eps * eps * rho_vol, C.Data), MatrixCL(-1., M.Data)
-                        ));
-                        preMTX = static_cast<RCP<MT>>(MatrixCL(
-                                MatrixCL(alpha, M.Data), MatrixCL(mobilityScaling, useDegenerateMobility ? A_deg.Data : A_one.Data, rho_vol, C.Data),
-                                MatrixCL(eps * eps, A_one.Data,  1, M.Data, eps * eps * rho_vol, C.Data) , MatrixCL(-1., M.Data)
-                        ));
-                        logCRS(linearSolver.system.mtx, "{A, B; C, D} block mtx");
-                        linearSolver.system.rhs = static_cast<RCP<SV>>(F_chi.Data.append(F_omega.Data));
                     logger.end();
-                    linearSolver.solve();
-                    logger.beg("convert from Epetra");
-                        for (size_t i = 0; i < m; ++i) chi_BDF1.Data[i] = (*linearSolver.system.lhs)[i];
-                    logger.end();
-                logger.end();
-                logger.beg("save BDF1 soln");
-                    for (size_t i = 0; i < m; ++i) omega.Data[i] = (*linearSolver.system.lhs)[i + m];
-                    chi_prev = chi;
-                    chi = chi_BDF1;
-                    r_sav =r_sav + dot(chePot.Data, chi.Data - chi_prev.Data) / (2.0 * std::sqrt(E_1));
-                logger.end();
-                }
-                else{
-                    logger.beg("BDF2 step");
-                    logger.beg("assemble");
-                        surfCHSystem.matrices = {};
-                        surfCHSystem.params.surfCahnHilliardParams.chi = &chi;
-                        if (useDegenerateMobility) surfCHSystem.matrices.push_back(&A_deg);
-                        surfCHSystem.params.surfCahnHilliardParams.u_T = &wind;
-                        surfCHSystem.vectors = { &f };
-                        setupFESystem(mg, surfCHSystem);
-                        if(i == 1){chi_extrap.Data = chi.Data;}
-                        else {chi_extrap.Data = 2.0 * chi.Data -  chi_prev.Data;}
-                        F_chi.Data = f.Data + (2. / dt) * (M.Data * chi.Data) - (1./ (2.0 * dt)) * (M.Data * chi_prev.Data);
-                        for (size_t j = 0; j < m; ++j) F_omega.Data[j] = chemicalPotential(chi_extrap.Data[j]);
-                        E_1 = dot(M.Data * f_0(chi_extrap.Data),I_p);
-                        if(i==1) r_sav = std::sqrt(E_1);
-                        auto omega_rhs_scaling =   -4.0 * r_sav / (3.0* std::sqrt(E_1)) + r_sav_prev / (3.0* std::sqrt(E_1)) + (2.0 * dot(M.Data * F_omega.Data,chi.Data)) / (3.0 * E_1) - dot(M.Data * F_omega.Data,chi_prev.Data)/(6.0 * E_1) ;
-                        chePot.Data = M.Data * F_omega.Data;
-                        F_omega.Data =  omega_rhs_scaling * chePot.Data;
-                        MatrixCL M_sav;
-                        M_sav.OuterProduct(chePot.Data,chePot.Data);
-                    assembleTime = logger.end();
-                    logger.beg("convert to Epetra");
-                        alpha = 3. / (2. * dt);
-                        logger.buf << "alpha = " << alpha;
-                        logger.log();
-                        linearSolver.system.mtx = static_cast<RCP<MT>>(MatrixCL(
-                            MatrixCL(alpha, M.Data), MatrixCL(mobilityScaling, useDegenerateMobility ? A_deg.Data : A_one.Data, rho_vol, C.Data),
-                            MatrixCL(eps * eps, A_one.Data, beta_s, M.Data, 1./(2.*E_1), M_sav, eps * eps * rho_vol, C.Data), MatrixCL(-1., M.Data)
-                        ));
-                        preMTX = static_cast<RCP<MT>>(MatrixCL(
-                                MatrixCL(alpha, M.Data), MatrixCL(mobilityScaling, useDegenerateMobility ? A_deg.Data : A_one.Data, rho_vol, C.Data),
-                                MatrixCL(eps * eps, A_one.Data,  beta_s, M.Data, eps * eps * rho_vol, C.Data) , MatrixCL(-1., M.Data)
-                        ));
-                        logCRS(linearSolver.system.mtx, "{A, B; C, D} block mtx");
-                        linearSolver.system.rhs = static_cast<RCP<SV>>(F_chi.Data.append(F_omega.Data));
-                    logger.end();
-                    linearSolver.solve();
-                    logger.beg("convert from Epetra");
-                        for (size_t i = 0; i < m; ++i) chi_BDF2.Data[i] = (*linearSolver.system.lhs)[i];
-                    logger.end();
-                logger.end();
-                logger.beg("save BDF1 soln");
+                    } while (e > F_tol && F_min < dt && dt < F_max);
+                logger.beg("save BDF2 soln");
                     for (size_t i = 0; i < m; ++i) omega.Data[i] = (*linearSolver.system.lhs)[i + m];
                     auto tmp = r_sav;
                     r_sav =(4.0 * r_sav - r_sav_prev + 3.0 * dot(chePot.Data, chi_BDF2.Data) / (2.0 * std::sqrt(E_1)) - 4.0 * dot(chePot.Data,chi.Data) / (2.0 * std::sqrt(E_1)) + dot(chePot.Data,chi_prev.Data) / (2.0 * std::sqrt(E_1)))/3.0;
@@ -534,9 +548,8 @@ int main(int argc, char* argv[]) {
                     chi = chi_BDF2;
                     chi_extrap.Data = 2.0 * chi.Data -  chi_prev.Data;
                 logger.end();
-                }
                 logger.beg("output");
-                    exportStats(i);
+                        exportStats(i_time);
                 logger.end();
             logger.end();
         }
