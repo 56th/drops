@@ -546,7 +546,14 @@ int main(int argc, char* argv[]) {
                 logger.beg("save BDF2 soln");
                     for (size_t i = 0; i < m; ++i) omega.Data[i] = (*linearSolver.system.lhs)[i + m];
                     auto tmp = r_sav;
-                    r_sav =(beta * r_sav - gamma * r_sav_prev + alpha * dot(chePot.Data, chi_BDF2.Data) / (2.0 * std::sqrt(E_1)) - beta * dot(chePot.Data,chi.Data) / (2.0 * std::sqrt(E_1)) + gamma * dot(chePot.Data,chi_prev.Data) / (2.0 * std::sqrt(E_1)))/alpha;
+                    if (i_time == 1) {
+                        r_sav =r_sav + dot(chePot.Data, chi.Data - chi_prev.Data) / (2.0 * std::sqrt(E_1));
+                    }else {
+                        r_sav = (beta * r_sav - gamma * r_sav_prev +
+                                 alpha * dot(chePot.Data, chi_BDF2.Data) / (2.0 * std::sqrt(E_1)) -
+                                 beta * dot(chePot.Data, chi.Data) / (2.0 * std::sqrt(E_1)) +
+                                 gamma * dot(chePot.Data, chi_prev.Data) / (2.0 * std::sqrt(E_1))) / alpha;
+                    }
                     r_sav_prev = tmp;
                     chi_prev = chi;
                     chi = chi_BDF2;
