@@ -402,7 +402,7 @@ int main(int argc, char* argv[]) {
                 do {
                     logger.beg("attempt #" + std::to_string(++numTries));
                         logger.beg("update time");
-                            if(i == 1 or !isTimeAdaptive) { dt = F(e, dt); }
+                            if(i == 1 or isTimeAdaptive) { dt = F(e, dt); }
                             t = t_prev + dt;
                             logger.buf
                                 << "t  = " << t << '\n'
@@ -480,7 +480,7 @@ int main(int argc, char* argv[]) {
                         logger.buf << "e = " << e;
                         logger.log();
                     logger.end();
-                } while (!isTimeAdaptive or (e > F_tol && F_min < dt && dt < F_max));
+                } while (isTimeAdaptive and (e > F_tol && F_min < dt && dt < F_max));
                 logger.beg("save BDF2 soln");
                     for (size_t i = 0; i < m; ++i) omega.Data[i] = (*linearSolver.system.lhs)[i + m];
                     chi_prev = chi;
