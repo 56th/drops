@@ -111,6 +111,7 @@ int main(int argc, char* argv[]) {
             if (prolongationLevel > meshFineLevel) prolongationLevel = meshFineLevel;
             auto F_rho = inpJSON.get<double>("Time.Adaptive.rho");
             auto F_tol = inpJSON.get<double>("Time.Adaptive.Tol");
+            auto isTimeAdaptive = inpJSON.get<bool>("Time.Adaptive.isTimeAdaptive");
             auto F_min = inpJSON.get<double>("Time.Adaptive.MinStepSize", 0.);
             auto F_max = inpJSON.get<double>("Time.Adaptive.MaxStepSize", std::numeric_limits<double>::max());
             auto F = [=](double e, double dt) {
@@ -137,7 +138,7 @@ int main(int argc, char* argv[]) {
                 return res;
             };
             auto chemicalPotential = [&](double c) { // f'_0
-                if (c < 0.) return xi * (1. - c0) * c;
+                /*if (c < 0.) return xi * (1. - c0) * c;
                 if (c > 1.) return xi * c0 * (c - 1.);
                 double x[1], f[1], d[1], s[1], t[1];
                 x[0] = c;
@@ -145,7 +146,8 @@ int main(int argc, char* argv[]) {
                 else if (c < c0)        hermite_cubic_value(c0 - c0_l, 1. / (12. * sqrt(3.)), 0., c0, 0., -std::max(c0 * c0, (1. - c0) * (1. - c0)), 1, x, f, d, s, t);
                 else if (c < c0 + c0_l) hermite_cubic_value(c0, 0., -std::max(c0 * c0, (1. - c0) * (1. - c0)), c0 + c0_l, -1. / (12. * sqrt(3.)), 0., 1, x, f, d, s, t);
                 else                    hermite_cubic_value(c0 + c0_l, -1. / (12. * sqrt(3.)), 0., 1., 0., c0, 1, x, f, d, s, t);
-                return xi * f[0];
+                return xi * f[0];*/
+                return xi * 2 * c* (1-c) *(1 - 2*c);
             };
         logger.end();
         logger.beg("build mesh");
@@ -400,7 +402,7 @@ int main(int argc, char* argv[]) {
                 do {
                     logger.beg("attempt #" + std::to_string(++numTries));
                         logger.beg("update time");
-                            dt = F(e, dt);
+                            if(i == 1 or !isTimeAdaptive) { dt = F(e, dt); }
                             t = t_prev + dt;
                             logger.buf
                                 << "t  = " << t << '\n'
@@ -478,7 +480,7 @@ int main(int argc, char* argv[]) {
                         logger.buf << "e = " << e;
                         logger.log();
                     logger.end();
-                } while (e > F_tol && F_min < dt && dt < F_max);
+                } while (!isTimeAdaptive or (e > F_tol && F_min < dt && dt < F_max));
                 logger.beg("save BDF2 soln");
                     for (size_t i = 0; i < m; ++i) omega.Data[i] = (*linearSolver.system.lhs)[i + m];
                     chi_prev = chi;
