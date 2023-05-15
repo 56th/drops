@@ -138,12 +138,31 @@ namespace DROPS {
         }
     };
 
+    struct IdealizedCell : Surface {
+        explicit IdealizedCell() : Surface(true) {
+            std::string funcName = __func__;
+            description_ += "phi = 1/4 * x^2 + y^2 + 4 * z^2/ (1 + 0.5 * sin(pi * x))^2 - 1";
+        }
+        virtual ~IdealizedCell() {}
+        box bounds(double t) const final { return {0., 4.0, 0., 4.0, 0., 4.0 }; }
+        std::array<bool, 3> rotationalInvariance(double) const final { return { false, false, false }; }
+        double dist(Point3DCL const & x, double t) const final { return x[0] * x[0] / 4 + x[1] * x[1] + 4 * x[2] * x[2] / pow(1 + 0.5 * sin(M_PI * x[0]) , 2) - 1; }
+        Point3DCL dist_grad(Point3DCL const & x, double) const final {
+            return Point3DCL (
+                0.5 * x[0] - 8 * x[2] * x[2] * 0.5 * M_PI * cos(M_PI * x[0])/ pow(1 + 0.5 * sin(M_PI * x[0]) , 3),
+                2 * x[1],
+                8 * x[2] / pow(1 + 0.5 * sin(M_PI * x[0]) , 2)
+            );
+        }
+    };
+
     std::unique_ptr<Surface> surfaceFactory(ParamCL const & params) {
         std::string funcName = __func__;
         auto name = params.get<std::string>("Surface.Name");
         if (name == "Sphere") return std::make_unique<Sphere>(params.get<double>("Surface.Params." + name + ".r_0"), params.get<double>("Surface.Params." + name + ".A"));
         if (name == "Torus") return std::make_unique<Torus>(params.get<double>("Surface.Params." + name + ".R"), params.get<double>("Surface.Params." + name + ".r_min"), params.get<double>("Surface.Params." + name + ".r_max"), params.get<size_t>("Surface.Params." + name + ".axis"));
         if (name == "OscillatingInextensibleSphere") return std::make_unique<OscillatingInextensibleSphere>(params.get<double>("Surface.Params." + name + ".r_0"), params.get<double>("Surface.Params." + name + ".eps"), params.get<double>("Surface.Params." + name + ".omega"), params.get<double>("Surface.Params." + name + ".eps_unsym"), params.get<double>("Surface.Params." + name + ".omega_unsym"));
+        if (name == "IdealizedCell") return std::make_unique<IdealizedCell>();
         throw std::invalid_argument(funcName + ": unknown surface '" + name + "'");
     }
 
