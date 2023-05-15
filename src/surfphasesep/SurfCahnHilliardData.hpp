@@ -103,9 +103,6 @@ namespace DROPS {
                 std::bernoulli_distribution dis(data.raftRatio);
                 return dis(gen);
             };
-            sqInvDist = [=](Point3DCL const & x, double) mutable {
-                return -1 / pow(x[2]+2,2);
-            };
         }
         else throw std::invalid_argument(funcName + ": IC '" + name + "' is not defined");
         data.chi = [=, &surface](Point3DCL const & x, double t) { return chi(surface.ext(x, t), t); };
