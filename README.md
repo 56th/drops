@@ -86,9 +86,12 @@ mkdir vtk  # for VTK output
 
 ## UH branch instructions
 
-This is a set of instructions for reproducing the results from papers listed below.
+This is a set of instructions for reproducing the results from papers listed below. 
+Note: These instructions are for Linux machines, however if you want to run it on Windows or MacOS, you can do so by installing proper dependencies.
 
-You will need the following third party libraries (TPLs): Trilinos, VTK, and Matlab. To build Trilinos, you may use the following script (modify paths for your local machine):
+1. You will need the following third party libraries (TPLs): Trilinos, VTK, and Matlab.
+
+1.1. Download or clone [Trilinos](https://github.com/trilinos/Trilinos) from it is github repo, then you may use the following script (modify paths for your local machine):
 
 ```
 cmake \
@@ -107,12 +110,25 @@ cmake \
 
 make -j2 install
 ```
-Use Paraview version 5.7.0-RC1 or newer.
 
+1.2. Install MATLAB
+
+1.3. Install VTK: (a) you can build your own copy of [VTK](https://vtk.org/download/) by downloading from website (b) you can use the version that is included in your linux distribution
+
+Note: These TPLs may have their own dependencies, please refer to the corresponding library webpage.
+
+### Notes on UH compute nodes
 For UH compute nodes guide, check [wiki](https://sites.google.com/view/josiclabwiki/home).
 
+### Cahn-Hilliard model
 
-### Publications
+### Scalar auxiliary variable method for CH equations
+
+### Navier-Stokes-Cahn-Hilliard model
+
+
+
+## Publications
 1. V.  Yushutin, A. Quaini, S. Majd, M. Olshanskii, A computational study of lateral phase separation in biological membranes, International Journal for Numerical Methods in Biomedical Engineering, V. 35 (2019), e3182;  doi: 10.1002/cnm.3181;
 2. M. Olshanskii, A.  Reusken, A.  Zhiliakov, Inf-sup stability of the trace P2-P1 Taylor-Hood elements for surface PDEs, Mathematics of Computation V.  90 (2021), p. 1527-1555; doi: 10.1090/mcom/3551;
 3. A.  Zhiliakov, Y.  Wang, A. Quaini, M. Olshanskii, S. Majd, Experimental validation of a phase-field model to predict coarsening dynamics of lipid domains in multicomponent membranes, BBA - Biomembranes, V.  1863 (2021), Article 183446;   doi: 10.1016/j.bbamem.2020.183446;
