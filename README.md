@@ -5,7 +5,7 @@ two-phase flows, mass and surfactant transport in two-phase systems developed
 at the Chair of Numerical Mathematics at RWTH Aachen University. 
 The discretization is based on special finite element methods (XFEM/CutFEM, traceFEM).
 
-Here you can find the models which are added by a research group at the University of Houston. You can find the list of related published papers in the of this page. 
+Here you can find the models which were added by a research group at the University of Houston. Also there is a list of related published papers in the end of this page. 
 
 ## How to build DROPS
 
@@ -20,31 +20,6 @@ You will need
   files by using `g++ -E -x c++ myparam.json > myparam-stripped.json` and removing
   the first lines starting with `#`.
   
-### UH branch
-
-You will need the following third party libraries (TPLs): Trilinos, VTK, and Matlab. To build Trilinos, you may use the following script (modify paths for your local machine):
-
-```
-cmake \
--DTPL_ENABLE_MPI=ON \
--DMPI_BASE_DIR=/usr/lib/x86_64-linux-gnu/openmpi \
--DCMAKE_INSTALL_PREFIX=~/trilinos/build \
--DBUILD_SHARED_LIBS=ON \
--DTrilinos_ENABLE_EXPLICIT_INSTANTIATION=ON \
--DTrilinos_ENABLE_Epetra=ON \
--DTrilinos_ENABLE_AztecOO=ON \
--DTrilinos_ENABLE_Ifpack=ON \
--DTrilinos_ENABLE_Ifpack2=ON \
--DTrilinos_ENABLE_Belos=ON \
--DTrilinos_ENABLE_Kokkos=ON \
-~/trilinos/source
-
-make -j2 install
-```
-Use Paraview version 5.7.0-RC1 or newer.
-
-For UH compute nodes guide, check [wiki](https://sites.google.com/view/josiclabwiki/home).
-
 ### Generating Makefiles
 
 CMake is used to generate the build system based on Makefiles.
@@ -108,6 +83,34 @@ resides in the directory `drops/bin/levelset`, from within that directory call
 mkdir vtk  # for VTK output
 ./twophasedrops ../../param/levelset/twophasedrops/risingbutanoldroplet.json
 ```
+
+## UH branch instructions
+
+This is a set of instructions for reproducing the results from papers listed below.
+
+You will need the following third party libraries (TPLs): Trilinos, VTK, and Matlab. To build Trilinos, you may use the following script (modify paths for your local machine):
+
+```
+cmake \
+-DTPL_ENABLE_MPI=ON \
+-DMPI_BASE_DIR=/usr/lib/x86_64-linux-gnu/openmpi \
+-DCMAKE_INSTALL_PREFIX=~/trilinos/build \
+-DBUILD_SHARED_LIBS=ON \
+-DTrilinos_ENABLE_EXPLICIT_INSTANTIATION=ON \
+-DTrilinos_ENABLE_Epetra=ON \
+-DTrilinos_ENABLE_AztecOO=ON \
+-DTrilinos_ENABLE_Ifpack=ON \
+-DTrilinos_ENABLE_Ifpack2=ON \
+-DTrilinos_ENABLE_Belos=ON \
+-DTrilinos_ENABLE_Kokkos=ON \
+~/trilinos/source
+
+make -j2 install
+```
+Use Paraview version 5.7.0-RC1 or newer.
+
+For UH compute nodes guide, check [wiki](https://sites.google.com/view/josiclabwiki/home).
+
 
 ### Publications
 1. V.  Yushutin, A. Quaini, S. Majd, M. Olshanskii, A computational study of lateral phase separation in biological membranes, International Journal for Numerical Methods in Biomedical Engineering, V. 35 (2019), e3182;  doi: 10.1002/cnm.3181;
