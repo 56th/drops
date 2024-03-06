@@ -1,0 +1,6 @@
+{
+    "General": {
+        "DynamicLibsPrefix": "../",
+        "DynamicLibs": []
+    }
+}

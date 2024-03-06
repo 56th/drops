@@ -63,20 +63,19 @@
         "Power"  : 1.0
       },
       "Beta_s" : 1.0,
-      "ChemicalPotentialScaling": 0.25,
+      "ChemicalPotentialScaling": 1.0,
       "MobilityScaling": 1.0,
       "UseDegenerateMobility": true,
       "Epsilon": 0.05
     },
 
     "Time": {
-      "StepSize" : 0.01,
-      "FinalTime": 4,
+      "StepSize" : 0.001,
+      "FinalTime": 1e10,
       "Adaptive" : {
         "Tol" : 0.005,
         "rho" : 0.9,
-        "isTimeAdaptive": true,
-        "MinStepSize" : 0.01
+        "MinStepSize" : 0.001
       }
     },
 

@@ -823,6 +823,7 @@ public:
         tmp.LinComb(a, A, b, B);
         return LinComb(1., tmp, args...);
     }
+    SparseMatBaseCL& OuterProduct(const VectorBaseCL<T>& v, const VectorBaseCL<T>& w);
     SparseMatBaseCL& concat_under (const SparseMatBaseCL<T>&, const SparseMatBaseCL<T>&);
 
     void insert_col (size_t c, const VectorBaseCL<T>& v);
@@ -1548,6 +1549,51 @@ SparseMatBaseCL<T>& SparseMatBaseCL<T>::LinComb(
     delete [] t_sum;
     return *this;
 }
+
+
+
+
+
+
+/// \brief Outer product of v and w, returns matrix.
+template <typename T>
+SparseMatBaseCL<T>& SparseMatBaseCL<T>::OuterProduct(const VectorBaseCL<T>& v, const VectorBaseCL<T>& w){
+    Assert( v.size()==w.size(), "OuterProduct: incompatible dimensions", DebugNumericC);
+    IncrementVersion();
+    num_rows( v.size());
+    num_cols( v.size());
+    _rowbeg[0]= 0;
+
+    std::vector<size_t> temp_colind; ///< (nnz_ entries) column-number of corresponding entry in _val
+    std::vector<T>      temp_val;
+        for (size_t i = 0; i <v.size() ; ++i) {
+            size_t cnt = 0;
+            for (size_t j = 0; j < v.size(); ++j) {
+                    temp_colind.push_back(j);
+                    temp_val.push_back(v[i]*w[j]);
+                    cnt++;
+            }
+            _rowbeg[i+1] = cnt + _rowbeg[i];
+        }
+    num_nonzeros(temp_colind.size());
+        for (size_t i = 0; i < nnz_; ++i) {
+            _val[i] = temp_val[i];
+            _colind[i] = temp_colind[i];
+        }
+
+    return *this;
+}
+
+
+
+
+
+
+
+
+
+
+
 
 /// \brief Inserts v as column c. The old columns [c, num_cols()) are shifted to the right.
 ///
