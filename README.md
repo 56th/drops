@@ -5,7 +5,15 @@ two-phase flows, mass and surfactant transport in two-phase systems developed
 at the Chair of Numerical Mathematics at RWTH Aachen University. 
 The discretization is based on special finite element methods (XFEM/CutFEM, traceFEM).
 
-Here you can find the models which were added by a research group at the University of Houston. Also there is a list of related published papers in the end of this page. 
+Here you can find the models which were added by a research group at the University of Houston. Also there is a list of _some_ related published papers in the end of this page. 
+
+**CONTENTS**
+
+[How to build DROPS](https://github.com/56th/drops?tab=readme-ov-file#how-to-build-drops)
+
+[UH branch instructions](https://github.com/56th/drops?tab=readme-ov-file#uh-branch-instructions)
+
+[Publications](https://github.com/56th/drops?tab=readme-ov-file#publications)
 
 ## How to build DROPS
 
