@@ -122,6 +122,8 @@ For UH compute nodes guide, check [wiki](https://sites.google.com/view/josiclabw
 
 ### Cahn-Hilliard model
 
+Cahn - Hilliard model problems is located in the directory `\scr\surfphasesep`
+
 ### Scalar auxiliary variable method for CH equations
 
 ### Navier-Stokes-Cahn-Hilliard model
