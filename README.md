@@ -125,6 +125,9 @@ make -j2 install
 
 Note: These TPLs may have their own dependencies, please refer to the corresponding library webpage.
 
+2. After installing all the requirements, run `do-configure-XXX.sh` file to build the DROPS package. This file will create another script `runml` inside the desired model problem directory. Using this script simulation can be started.
+3. Use JSON files located in the directory `/param` to set parameters for the corresponding simulation.
+
 ### Notes on UH compute nodes
 For UH compute nodes guide, check [wiki](https://sites.google.com/view/josiclabwiki/home).
 
