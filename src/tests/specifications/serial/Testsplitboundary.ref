@@ -8,10 +8,21 @@ Folder of executable: tests
 #the folder where the executable is situated
 Path of parameter-file:
 Name of test: testsplitboundary
-Name of author: Grande
+Name of author: loch
+#-------------------------------------------------------------------------------
+#------------------------------NUMBERS------------------------------------------
+Name of variable: "bnd_faces"
+Prefix of variable: "number of boundary faces: "
+Value of variable: 0
+Relative error:
+Absolute error: 1
+Minimal value:
+Maximal value:
 #-------------------------------------------------------------------------------
 #------------------------------STRINGS-------------------------------------------
 # String find = 1: you want to find this string, = 0: you don't want to find this string
+String value: "As far as I can tell the MultigridCL is sane."
+String find: 1
 String value: "...ok"
 String find: 1
 #-------------------------------------------------------------------------------
