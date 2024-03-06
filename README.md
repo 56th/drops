@@ -122,11 +122,15 @@ For UH compute nodes guide, check [wiki](https://sites.google.com/view/josiclabw
 
 ### Cahn-Hilliard model
 
-Cahn - Hilliard model problems is located in the directory `\scr\surfphasesep`
+Cahn - Hilliard model code is located in the file `/src/surfphasesep/surfphasesep.cpp`
 
 ### Scalar auxiliary variable method for CH equations
 
+Scalar auxiliary variable method for Cahn - Hilliard model code is located in the file `/src/savch/savch.cpp`
+
 ### Navier-Stokes-Cahn-Hilliard model
+
+Navier-Stokes-Cahn-Hilliard model code is located in the file `/src/surfnsch/surfnsch.cpp`
 
 
 
